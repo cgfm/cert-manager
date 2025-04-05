@@ -1,0 +1,16 @@
+# Typical files to ignore
+*.log
+*.tmp
+*.swp
+*.bak
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
+.env
+
+# Ignore everything in certs/
+certs/
