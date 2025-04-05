@@ -38,23 +38,31 @@ function getStyles() {
         margin: 0 auto;
     }
     
+    /* Header Layout */
     header {
-        margin-bottom: 2rem;
         display: flex;
-        flex-direction: column;
-        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    header h1 {
+        margin-right: auto;
+        margin-bottom: 0;
+    }
+    
+    .header-buttons {
+        display: flex;
+        gap: 10px;
     }
     
     h1 {
         font-weight: 600;
         color: var(--text-color);
         font-size: 1.8rem;
-    }
-    
-    .search-container {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1rem;
     }
     
     input[type="text"] {
@@ -70,11 +78,6 @@ function getStyles() {
     input[type="text"]:focus {
         border-color: var(--primary-color);
         box-shadow: 0 0 0 3px rgba(58, 134, 255, 0.1);
-    }
-    
-    .view-toggle {
-        display: flex;
-        margin-bottom: 1rem;
     }
     
     .view-toggle button {
@@ -325,6 +328,267 @@ function getStyles() {
         .hierarchy-indent {
             padding-left: 1rem;
         }
+    }
+    
+    /* Certificate Action Buttons */
+    .cert-actions {
+        padding: 5px;
+        text-align: center;
+        white-space: nowrap;
+    }
+    
+    .cert-actions button {
+        margin: 2px;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .config-btn {
+        background-color: #4a6da7;
+        color: white;
+    }
+    
+    .renew-btn {
+        background-color: #2ecc71;
+        color: white;
+    }
+    
+    /* Modal Styles */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    
+    .modal-content {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        width: 500px;
+        max-width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close:hover {
+        color: #333;
+    }
+    
+    /* Form Styles */
+    .config-form {
+        margin-top: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .form-group input[type="number"] {
+        width: 60px;
+        padding: 5px;
+    }
+    
+    .button-group {
+        margin-top: 20px;
+        text-align: right;
+    }
+    
+    .button-group button {
+        margin-left: 10px;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    #saveConfig {
+        background-color: #2ecc71;
+        color: white;
+    }
+    
+    #cancelConfig {
+        background-color: #e74c3c;
+        color: white;
+    }
+    
+    /* Deployment Actions Styles */
+    .action-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+    }
+    
+    .action-params {
+        flex-grow: 1;
+        margin: 0 10px;
+    }
+    
+    .action-params input {
+        width: 100%;
+        padding: 5px;
+    }
+    
+    .remove-action {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+    
+    #addAction {
+        margin-top: 10px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+    
+    /* Create Certificate Button */
+    #createCertBtn {
+        background-color: #27ae60;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 15px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    #createCertBtn:hover {
+        background-color: #2ecc71;
+    }
+    
+    /* Global Settings Button */
+    #globalSettingsBtn {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 15px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    #globalSettingsBtn:hover {
+        background-color: #2980b9;
+    }
+    
+    /* Form Help Text */
+    .help-text {
+        font-size: 12px;
+        color: #777;
+        margin-top: 4px;
+    }
+    
+    /* Form Controls */
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    
+    /* Loading state for buttons */
+    button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    /* Domain Management Styles */
+    .domain-management {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .domains-list {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-bottom: 15px;
+    }
+    
+    .domain-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .domain-item:last-child {
+        border-bottom: none;
+    }
+    
+    .domain-name {
+        font-family: monospace;
+        background-color: #f1f1f1;
+        padding: 3px 8px;
+        border-radius: 3px;
+    }
+    
+    .remove-domain-btn {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 12px;
+        cursor: pointer;
+    }
+    
+    .add-domain-form {
+        display: flex;
+        margin-top: 10px;
+    }
+    
+    .add-domain-form input {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px 0 0 4px;
+    }
+    
+    #addDomainBtn {
+        background-color: #2ecc71;
+        color: white;
+        border: none;
+        border-radius: 0 4px 4px 0;
+        padding: 8px 15px;
+        cursor: pointer;
     }
   `;
 }

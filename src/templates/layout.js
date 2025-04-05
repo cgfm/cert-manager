@@ -16,6 +16,7 @@ function layout(title, styles, content) {
 </head>
 <body>
     ${content}
+    <script src="/js/cert-config.js"></script>
 </body>
 </html>
   `;

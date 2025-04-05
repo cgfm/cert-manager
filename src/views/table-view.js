@@ -1,7 +1,11 @@
+/**
+ * Renders the main certificate viewer page with both flat and hierarchical views
+ */
 const getStyles = require('../templates/styles');
 const layout = require('../templates/layout');
-const renderCertRow = require('../templates/cert-row');
-const renderHierarchyRow = require('../templates/hierarchy-row');
+// Fix the import statement below - we need to import the actual function
+const { renderCertRow } = require('../templates/cert-row');
+const { renderHierarchyRow } = require('../templates/hierarchy-row');
 const getClientScript = require('../templates/client-script');
 
 function renderTable({ certificates, hierarchy }) {
@@ -30,6 +34,7 @@ function renderTable({ certificates, hierarchy }) {
             <div class="cert-count">
                 Showing <span id="certCount">${certificates.length}</span> certificates
             </div>
+            <div class="header-buttons"></div>
         </header>
 
         <!-- Flat View -->
@@ -40,6 +45,7 @@ function renderTable({ certificates, hierarchy }) {
                         <th onclick="sortTable('flat', 0)">Certificate</th>
                         <th onclick="sortTable('flat', 1)">Domains</th>
                         <th onclick="sortTable('flat', 2)" data-sort="1">Expiry Date</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,6 +62,7 @@ function renderTable({ certificates, hierarchy }) {
                         <th>Certificate</th>
                         <th>Domains</th>
                         <th>Expiry Date</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>

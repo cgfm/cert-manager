@@ -38,7 +38,7 @@ function renderCertRow(cert, now, thirtyDaysFromNow) {
     : 'N/A';
   
   return `
-    <tr data-cert-id="${cert.subjectKeyId || ''}" class="cert-row">
+    <tr data-cert-id="${cert.subjectKeyId || ''}" data-fingerprint="${cert.fingerprint || ''}" class="cert-row">
         <td class="cert-name">
             <span class="status-indicator ${statusClass}"></span>
             ${cert.name}${certTypeLabel}
@@ -49,4 +49,7 @@ function renderCertRow(cert, now, thirtyDaysFromNow) {
   `;
 }
 
-module.exports = renderCertRow;
+// Export the function correctly
+module.exports = {
+  renderCertRow
+};
