@@ -11,7 +11,33 @@ const { isValidDomainOrIP } = require('./utils/domain-validator');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CERTS_DIR = process.env.CERTS_DIR || '/certs';
-const CONFIG_FILE = process.env.CONFIG_FILE || path.join(process.env.HOME || '/app', '.cert-viewer', 'config.json');
+const CONFIG_FILE = process.env.CONFIG_FILE || '/config/cert-config.json';
+
+
+// Create an initial config file
+const defaultConfig = {
+    globalDefaults: {
+        autoRenewByDefault: false,
+        renewDaysBeforeExpiry: 30,
+        caValidityPeriod: {
+            rootCA: 3650,
+            intermediateCA: 1825,
+            standard: 90
+        },
+        enableCertificateBackups: true
+    },
+    certificates: {}
+};
+
+const configDir = path.dirname(CONFIG_FILE);
+if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+}
+
+if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+    console.log('Created initial config file at ' + CONFIG_FILE);
+}
 
 // Initialize managers
 const configManager = new ConfigManager(CONFIG_FILE);
@@ -182,6 +208,81 @@ app.post('/api/settings', (req, res) => {
     const settings = req.body;
     configManager.setGlobalDefaults(settings);
     res.json({ success: true });
+});
+
+// Add the file system browsing API endpoint
+app.get('/api/filesystem', (req, res) => {
+    const requestedPath = req.query.path || '/';
+    
+    try {
+        // Security check - restrict to known directories
+        const allowedPaths = ['/certs', '/config', '/tmp'];
+        const isRootOrAllowed = requestedPath === '/' || 
+            allowedPaths.some(path => requestedPath === path || requestedPath.startsWith(`${path}/`));
+        
+        if (!isRootOrAllowed) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access restricted to /certs, /config, and /tmp directories'
+            });
+        }
+        
+        // Check if path exists
+        if (!fs.existsSync(requestedPath)) {
+            return res.json({
+                success: false,
+                message: 'Path does not exist'
+            });
+        }
+        
+        // Check if it's a directory
+        if (!fs.statSync(requestedPath).isDirectory()) {
+            return res.json({
+                success: false,
+                message: 'Path is not a directory'
+            });
+        }
+        
+        // Read directory contents
+        const items = fs.readdirSync(requestedPath);
+        
+        // Sort into directories and files
+        const directories = [];
+        const files = [];
+        
+        for (const item of items) {
+            const fullPath = path.join(requestedPath, item);
+            
+            try {
+                const stats = fs.statSync(fullPath);
+                if (stats.isDirectory()) {
+                    directories.push(item);
+                } else {
+                    files.push(item);
+                }
+            } catch (error) {
+                console.error(`Error accessing ${fullPath}:`, error);
+                // Skip files/directories that can't be accessed
+            }
+        }
+        
+        // Sort alphabetically
+        directories.sort();
+        files.sort();
+        
+        return res.json({
+            success: true,
+            path: requestedPath,
+            directories,
+            files
+        });
+    } catch (error) {
+        console.error('Error browsing filesystem:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error while browsing filesystem'
+        });
+    }
 });
 
 // Start the server

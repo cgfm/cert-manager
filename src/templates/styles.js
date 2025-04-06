@@ -146,11 +146,17 @@ function getStyles() {
     }
     
     th[data-sort="1"]::after {
-        content: '↓';
+        content: '\\f063';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 0.8rem;
     }
     
     th[data-sort="-1"]::after {
-        content: '↑';
+        content: '\\f062';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 0.8rem;
     }
     
     tbody tr {
@@ -273,29 +279,84 @@ function getStyles() {
         color: #6023b6;
     }
     
-    .hierarchy-indent {
+    /* Hierarchical view indentation - improved version */
+    .hierarchy-level-1 {
         padding-left: 2rem;
         position: relative;
     }
-    
-    .hierarchy-indent::before {
-        content: '';
-        position: absolute;
-        left: 0.75rem;
-        top: 0;
-        height: 100%;
-        width: 1px;
-        background-color: var(--border-color);
-    }
-    
-    .hierarchy-indent::after {
+
+    .hierarchy-level-1::before {
         content: '';
         position: absolute;
         left: 0.75rem;
         top: 50%;
         height: 1px;
-        width: 0.75rem;
+        width: 1rem;
         background-color: var(--border-color);
+    }
+
+    .hierarchy-level-1::after {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 0;
+        height: 50%;
+        width: 1px;
+        background-color: var(--border-color);
+    }
+
+    .hierarchy-level-2 {
+        padding-left: 4rem;
+        position: relative;
+    }
+
+    .hierarchy-level-2::before {
+        content: '';
+        position: absolute;
+        left: 2.75rem;
+        top: 50%;
+        height: 1px;
+        width: 1rem;
+        background-color: var(--border-color);
+    }
+
+    .hierarchy-level-2::after {
+        content: '';
+        position: absolute;
+        left: 2.75rem;
+        top: 0;
+        height: 50%;
+        width: 1px;
+        background-color: var(--border-color);
+    }
+
+    .hierarchy-level-3 {
+        padding-left: 6rem;
+        position: relative;
+    }
+
+    .hierarchy-level-3::before {
+        content: '';
+        position: absolute;
+        left: 4.75rem;
+        top: 50%;
+        height: 1px;
+        width: 1rem;
+        background-color: var(--border-color);
+    }
+
+    .hierarchy-level-3::after {
+        content: '';
+        position: absolute;
+        left: 4.75rem;
+        top: 0;
+        height: 50%;
+        width: 1px;
+        background-color: var(--border-color);
+    }
+
+    .hierarchy-indent {
+        /* This class is no longer used */
     }
     
     .hierarchy-container {
@@ -351,6 +412,10 @@ function getStyles() {
         color: white;
     }
     
+    .config-btn i, .renew-btn i {
+        margin-right: 5px;
+    }
+    
     .renew-btn {
         background-color: #2ecc71;
         color: white;
@@ -373,11 +438,12 @@ function getStyles() {
     .modal-content {
         background-color: #fff;
         padding: 20px;
-        border-radius: 5px;
-        width: 500px;
+        border-radius: 8px;
+        width: 550px;
         max-width: 90%;
         max-height: 90vh;
         overflow-y: auto;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     }
     
     .close {
@@ -386,6 +452,7 @@ function getStyles() {
         font-size: 28px;
         font-weight: bold;
         cursor: pointer;
+        transition: color 0.2s;
     }
     
     .close:hover {
@@ -404,44 +471,55 @@ function getStyles() {
     .form-group label {
         display: block;
         margin-bottom: 5px;
+        font-weight: 500;
     }
     
     .form-group input[type="number"] {
-        width: 60px;
-        padding: 5px;
+        width: 70px;
+        padding: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
     }
     
     .button-group {
         margin-top: 20px;
         text-align: right;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
     }
     
     .button-group button {
-        margin-left: 10px;
         padding: 8px 15px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
     }
     
     #saveConfig {
-        background-color: #2ecc71;
+        background-color: var(--success-color);
         color: white;
     }
     
     #cancelConfig {
-        background-color: #e74c3c;
+        background-color: var(--danger-color);
         color: white;
     }
     
     /* Deployment Actions Styles */
     .action-item {
         display: flex;
+        justify-content: space-between;
         align-items: center;
         margin-bottom: 10px;
-        padding: 10px;
+        padding: 10px 15px;
         background-color: #f9f9f9;
-        border-radius: 4px;
+        border-radius: 6px;
+        border-left: 3px solid var(--primary-color);
     }
     
     .action-params {
@@ -451,26 +529,32 @@ function getStyles() {
     
     .action-params input {
         width: 100%;
-        padding: 5px;
+        padding: 8px;
     }
     
-    .remove-action {
-        background-color: #e74c3c;
+    .remove-action-btn {
+        background-color: var(--danger-color);
         color: white;
         border: none;
         border-radius: 4px;
         padding: 5px 10px;
         cursor: pointer;
+        font-size: 12px;
     }
     
-    #addAction {
+    #addActionBtn {
         margin-top: 10px;
-        background-color: #3498db;
+        background-color: var(--primary-color);
         color: white;
         border: none;
         border-radius: 4px;
-        padding: 5px 10px;
+        padding: 8px 12px;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        margin-bottom: 15px;
     }
     
     /* Create Certificate Button */
@@ -482,6 +566,9 @@ function getStyles() {
         padding: 8px 15px;
         cursor: pointer;
         font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
     
     #createCertBtn:hover {
@@ -490,13 +577,16 @@ function getStyles() {
     
     /* Global Settings Button */
     #globalSettingsBtn {
-        background-color: #3498db;
+        background-color: var(--primary-color);
         color: white;
         border: none;
         border-radius: 4px;
         padding: 8px 15px;
         cursor: pointer;
         font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
     
     #globalSettingsBtn:hover {
@@ -506,7 +596,7 @@ function getStyles() {
     /* Form Help Text */
     .help-text {
         font-size: 12px;
-        color: #777;
+        color: var(--text-muted);
         margin-top: 4px;
     }
     
@@ -515,10 +605,20 @@ function getStyles() {
     .form-group input[type="email"],
     .form-group select {
         width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
         border-radius: 4px;
         box-sizing: border-box;
+        font-family: inherit;
+        font-size: 14px;
+    }
+    
+    .form-group select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 30px;
     }
     
     /* Loading state for buttons */
@@ -532,21 +632,33 @@ function getStyles() {
         margin: 20px 0;
         padding: 15px;
         background-color: #f8f9fa;
-        border-radius: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .domain-management h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 7px;
     }
     
     .domains-list {
         max-height: 200px;
         overflow-y: auto;
         margin-bottom: 15px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
     }
     
     .domain-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 10px;
-        border-bottom: 1px solid #eee;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-color);
     }
     
     .domain-item:last-child {
@@ -556,39 +668,258 @@ function getStyles() {
     .domain-name {
         font-family: monospace;
         background-color: #f1f1f1;
-        padding: 3px 8px;
-        border-radius: 3px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
     
-    .remove-domain-btn {
-        background-color: #e74c3c;
+    .domain-name i {
+        color: var(--text-muted);
+    }
+    
+    .stage-remove-domain-btn {
+        background-color: var(--danger-color);
         color: white;
         border: none;
         border-radius: 4px;
-        padding: 3px 8px;
+        padding: 5px 10px;
         font-size: 12px;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
     
     .add-domain-form {
         display: flex;
-        margin-top: 10px;
+        margin-top: 15px;
     }
     
     .add-domain-form input {
         flex-grow: 1;
-        padding: 8px;
-        border: 1px solid #ddd;
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
         border-radius: 4px 0 0 4px;
+        font-family: inherit;
     }
     
-    #addDomainBtn {
-        background-color: #2ecc71;
+    #stageDomainBtn {
+        background-color: var(--primary-color);
         color: white;
         border: none;
         border-radius: 0 4px 4px 0;
         padding: 8px 15px;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    
+    /* File browser styles */
+    .file-browser-modal .modal-content {
+        max-width: 600px;
+    }
+    
+    .file-browser {
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        margin: 15px 0;
+    }
+    
+    .current-path {
+        background-color: var(--hover-color);
+        padding: 10px 15px;
+        border-bottom: 1px solid var(--border-color);
+        font-family: monospace;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .file-list {
+        padding: 10px;
+        max-height: 350px;
+        overflow-y: auto;
+    }
+    
+    .file-item {
+        padding: 8px 10px;
+        margin-bottom: 5px;
+        cursor: pointer;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background-color 0.2s;
+    }
+    
+    .file-item:hover {
+        background-color: var(--hover-color);
+    }
+    
+    .file-icon {
+        color: var(--text-muted);
+        width: 20px;
+        text-align: center;
+    }
+    
+    .directory .file-icon {
+        color: var(--primary-color);
+    }
+    
+    .error-message {
+        color: var(--danger-color);
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Browse button */
+    .browse-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        margin-left: 8px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    /* Pending changes styling */
+    .stage-remove-domain-btn.pending-removal {
+        background-color: var(--text-muted);
+    }
+    
+    .pending-removal-item {
+        background-color: #ffecec;
+    }
+    
+    #pendingChanges {
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 6px;
+    }
+    
+    #pendingChanges h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #856404;
+    }
+    
+    .pending-additions, .pending-removals {
+        margin-bottom: 15px;
+    }
+    
+    .pending-additions strong, .pending-removals strong {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 5px;
+    }
+    
+    #pendingList ul {
+        list-style-type: none;
+        padding-left: 10px;
+        margin: 8px 0;
+    }
+    
+    #pendingList li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 8px;
+        background-color: rgba(255, 255, 255, 0.7);
+        border-radius: 4px;
+        margin-bottom: 5px;
+    }
+    
+    .undo-btn {
+        background-color: var(--text-muted);
+        color: white;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+    }
+    
+    .pending-actions {
+        margin-top: 15px;
+        text-align: right;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    
+    .apply-changes-btn {
+        background-color: var(--success-color);
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .discard-changes-btn {
+        background-color: var(--danger-color);
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    /* Icons for table actions */
+    .fa-icon-margin {
+        margin-right: 5px;
+    }
+    
+    /* Custom icon colors */
+    .text-danger {
+        color: var(--danger-color);
+    }
+    
+    .text-warning {
+        color: var(--warning-color);
+    }
+    
+    .text-success {
+        color: var(--success-color);
+    }
+    
+    .text-primary {
+        color: var(--primary-color);
+    }
+    
+    /* Better modal headers */
+    .modal-content h2, .modal-content h3 {
+        margin-bottom: 15px;
+    }
+    
+    /* Action buttons common styles */
+    button i {
+        font-size: 0.9em;
     }
   `;
 }

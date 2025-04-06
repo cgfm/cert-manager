@@ -1,0 +1,13 @@
+{
+  "globalDefaults": {
+    "autoRenewByDefault": false,
+    "renewDaysBeforeExpiry": 30,
+    "caValidityPeriod": {
+      "rootCA": 3650,
+      "intermediateCA": 1825,
+      "standard": 90
+    },
+    "enableCertificateBackups": true
+  },
+  "certificates": {}
+}

@@ -1,13 +1,21 @@
 version: '3.8'
 services:
-  cert-viewer:
+  cert-manager:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       - ./certs:/certs
+      - ./config:/config
+    environment:
+      - AUTO_RENEW_DEFAULT=false
+      - RENEW_DAYS_BEFORE_EXPIRY=30
+      - ROOT_CA_VALIDITY_DAYS=3650
+      - INTERMEDIATE_CA_VALIDITY_DAYS=1825
+      - STANDARD_CERT_VALIDITY_DAYS=90
+      - ENABLE_CERTIFICATE_BACKUPS=true
+      - NODE_ENV=production
+      - CONFIG_PATH=/config/cert-config.json
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
     restart: unless-stopped

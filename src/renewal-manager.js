@@ -97,43 +97,172 @@ class RenewalManager {
         const validityDays = config.validityDays || defaults.caValidityPeriod.standard;
         
         try {
-            // Determine certificate type and execute the appropriate renewal command
-            let command, args;
-            
-            if (cert.path && cert.path.includes('certbot')) {
-                // For Let's Encrypt certificates
-                command = 'certbot';
-                args = ['renew', '--cert-name', cert.domains[0], '--force-renewal'];
-            } else {
-                // For self-signed certificates or other types
-                // We effectively recreate the certificate with the same parameters
-                if (cert.isSelfSigned) {
-                    // For self-signed or CA certificates
-                    const sslCommand = this.buildOpenSSLCACommand({
-                        domains: cert.domains,
-                        certType: cert.certType || 'standard'
-                    }, validityDays);
-                    
-                    const parts = sslCommand.split(' ');
-                    command = parts[0];
-                    args = parts.slice(1);
+            // Extract the actual directory and filenames from cert.path
+            let outputDir, keyFilename, certFilename;
+            if (cert.path) {
+                // If cert.path is available, use its directory and extract the filename
+                outputDir = path.dirname(cert.path);
+                certFilename = path.basename(cert.path);
+                
+                // Try to guess the key filename based on common patterns
+                if (cert.keyPath) {
+                    keyFilename = path.basename(cert.keyPath);
+                } else if (fs.existsSync(path.join(outputDir, 'private.key'))) {
+                    keyFilename = 'private.key';
+                } else if (fs.existsSync(path.join(outputDir, certFilename.replace('.crt', '.key')))) {
+                    keyFilename = certFilename.replace('.crt', '.key');
                 } else {
-                    // For regular certificates
-                    const certbotCommand = this.buildCertbotCommand({
-                        domains: cert.domains,
-                        challengeType: 'http' // Default to HTTP challenge
-                    }, validityDays);
+                    // Default fallback
+                    keyFilename = 'private.key';
+                }
+            } else {
+                // Otherwise create a sanitized name
+                const sanitizedName = cert.domains[0].replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+                outputDir = path.join(this.certsDir, sanitizedName);
+                certFilename = 'certificate.crt';
+                keyFilename = 'private.key';
+            }
+            
+            // Make sure the directory exists
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            // Set up paths for key and certificate
+            const keyPath = path.join(outputDir, keyFilename);
+            const certPath = path.join(outputDir, certFilename);
+            
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
+            
+            // Check if the certificate is signed by a CA
+            let isSignedByCA = false;
+            let signingCAPath = null;
+            let signingCAKeyPath = null;
+            
+            if (cert.path && fs.existsSync(cert.path)) {
+                try {
+                    // Get certificate issuer information
+                    const certData = execSync(`openssl x509 -in "${cert.path}" -issuer -noout`).toString();
+                    const issuerMatch = certData.match(/issuer=.*?CN\s*=\s*([^,\n]+)/);
                     
-                    const parts = certbotCommand.split(' ');
-                    command = parts[0];
-                    args = parts.slice(1);
+                    if (issuerMatch && issuerMatch[1] !== cert.domains[0]) {
+                        // Certificate is signed by a different entity (likely a CA)
+                        isSignedByCA = true;
+                        
+                        // Try to find the CA certificate in our certs directory
+                        const caName = issuerMatch[1].trim();
+                        const caDir = path.join(this.certsDir, caName.replace(/[^a-zA-Z0-9-_.]/g, '_'));
+                        
+                        if (fs.existsSync(path.join(caDir, 'certificate.crt'))) {
+                            signingCAPath = path.join(caDir, 'certificate.crt');
+                            signingCAKeyPath = path.join(caDir, 'private.key');
+                            console.log(`Found signing CA certificate at ${signingCAPath}`);
+                        } else {
+                            // Look for any CA that matches the issuer name
+                            const caDirs = fs.readdirSync(this.certsDir);
+                            for (const dir of caDirs) {
+                                const certPath = path.join(this.certsDir, dir, 'certificate.crt');
+                                if (fs.existsSync(certPath)) {
+                                    try {
+                                        const caData = execSync(`openssl x509 -in "${certPath}" -subject -noout`).toString();
+                                        const caSubject = caData.match(/subject=.*?CN\s*=\s*([^,\n]+)/);
+                                        
+                                        if (caSubject && caSubject[1].trim() === caName) {
+                                            signingCAPath = certPath;
+                                            signingCAKeyPath = path.join(this.certsDir, dir, 'private.key');
+                                            console.log(`Found signing CA certificate at ${signingCAPath}`);
+                                            break;
+                                        }
+                                    } catch (e) {
+                                        // Skip this certificate if we can't read it
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (!signingCAPath) {
+                            console.warn(`Warning: Certificate is signed by CA "${caName}" but couldn't find the CA certificate. Will create self-signed certificate instead.`);
+                            isSignedByCA = false;
+                        } else if (!fs.existsSync(signingCAKeyPath)) {
+                            console.warn(`Warning: Found CA certificate at ${signingCAPath} but couldn't find the CA private key. Will create self-signed certificate instead.`);
+                            isSignedByCA = false;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Warning: Failed to check certificate issuer: ${e.message}`);
+                    // Assume not signed by a CA if we can't determine
+                    isSignedByCA = false;
                 }
             }
             
-            console.log(`Executing renewal command: ${command} ${args.join(' ')}`);
+            // Build the SAN extension for domains and IPs
+            let sanExtension = '';
             
-            // Execute the renewal command
-            const result = await this.executeCommandWithOutput(command, args);
+            // Add domains to SAN
+            if (cert.domains && cert.domains.length > 0) {
+                sanExtension += cert.domains.map(domain => `DNS:${domain}`).join(',');
+            }
+            
+            // Add IPs to SAN if available
+            if (cert.ips && cert.ips.length > 0) {
+                if (sanExtension) sanExtension += ',';
+                sanExtension += cert.ips.map(ip => `IP:${ip}`).join(',');
+            }
+            
+            let result;
+            if (isSignedByCA && signingCAPath && signingCAKeyPath) {
+                // For certificates signed by a CA, we need to:
+                // 1. Create a CSR
+                // 2. Sign the CSR with the CA certificate
+                console.log(`Certificate is signed by a CA. Will renew using the same CA.`);
+                
+                // Create a CSR path
+                const csrPath = path.join(outputDir, 'renewal.csr');
+                
+                // Create a CSR first (with a new private key)
+                const csrCommand = `OPENSSL_CONF=/dev/null openssl req -new -sha256 -nodes -newkey rsa:2048` +
+                    ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${cert.domains[0]}"`;
+                    
+                // Execute the CSR command
+                console.log(`Creating CSR: ${csrCommand}`);
+                await this.executeCommandWithOutput(...csrCommand.split(' '));
+                
+                // Now sign the CSR with the CA
+                const sanFile = path.join(outputDir, 'san.ext');
+                fs.writeFileSync(sanFile, `subjectAltName = ${sanExtension}`);
+                
+                const signCommand = `OPENSSL_CONF=/dev/null openssl x509 -req -in "${csrPath}" -CA "${signingCAPath}"` +
+                    ` -CAkey "${signingCAKeyPath}" -CAcreateserial -days ${validityDays} -sha256` +
+                    ` -out "${certPath}" -extfile "${sanFile}"`;
+                
+                console.log(`Signing certificate with CA: ${signCommand}`);
+                result = await this.executeCommandWithOutput(...signCommand.split(' '));
+                
+                // Clean up temporary files
+                if (fs.existsSync(csrPath)) fs.unlinkSync(csrPath);
+                if (fs.existsSync(sanFile)) fs.unlinkSync(sanFile);
+            } else {
+                // For self-signed certificates
+                console.log(`Creating self-signed certificate`);
+                
+                // For all certificates (removing isSelfSigned check)
+                // Add OPENSSL_CONF=/dev/null to suppress progress indicators
+                const sslCommand = `OPENSSL_CONF=/dev/null openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
+                    ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
+                    ` -subj "/CN=${cert.domains[0]}"` + 
+                    (sanExtension ? ` -addext "subjectAltName=${sanExtension}"` : '');
+                
+                const parts = sslCommand.split(' ');
+                const command = parts[0];
+                const args = parts.slice(1);
+                
+                console.log(`Executing renewal command: ${command} ${args.join(' ')}`);
+                
+                // Execute the renewal command
+                result = await this.executeCommandWithOutput(command, args);
+            }
             
             return {
                 success: true,
@@ -156,26 +285,77 @@ class RenewalManager {
         const caType = cert.certType === 'rootCA' ? 'rootCA' : 'intermediateCA';
         const validityDays = config.validityDays || defaults.caValidityPeriod[caType];
         
-        // In a real implementation, this would involve:
-        // 1. Creating a new key (or reusing the existing one)
-        // 2. Creating a new CSR
-        // 3. Signing the CSR (for root CA, self-sign; for intermediate, sign with root)
-        // 4. Saving the new certificate
-        
-        // For this example, we'll just simulate a successful renewal
-        console.log(`CA Certificate ${cert.name} would be renewed with ${validityDays} days validity`);
-        
-        return Promise.resolve({
-            success: true,
-            message: `CA Certificate ${cert.name} renewed successfully`
-        });
+        try {
+            // Extract the actual directory from cert.path
+            let outputDir;
+            if (cert.path) {
+                // If cert.path is available, use its directory
+                outputDir = path.dirname(cert.path);
+            } else {
+                // Otherwise create a sanitized name
+                const sanitizedName = cert.name.replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+                outputDir = path.join(this.certsDir, sanitizedName);
+            }
+            
+            // Make sure the directory exists
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            // Set up paths for key and certificate
+            const keyPath = path.join(outputDir, 'private.key');
+            const certPath = path.join(outputDir, 'certificate.crt');
+            
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
+            
+            // Create the OpenSSL command based on CA type
+            let sslCommand;
+            if (caType === 'rootCA') {
+                // Generate a self-signed root CA certificate
+                sslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096` +
+                    ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${cert.name}"` +
+                    ` -addext "subjectAltName=DNS:${cert.name}"`;
+                    
+                // Add CA extensions
+                sslCommand += ` -addext "basicConstraints=critical,CA:true"` +
+                    ` -addext "keyUsage=critical,keyCertSign,cRLSign"`;
+            } else {
+                // For an intermediate CA
+                const csrPath = path.join(outputDir, 'intermediate.csr');
+                
+                // Create a CSR first
+                sslCommand = `openssl req -new -sha256 -nodes -newkey rsa:4096` +
+                    ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${cert.name}" &&` +
+                    ` openssl x509 -req -in "${csrPath}" -CA "${this.certsDir}/rootCA/certificate.crt"` +
+                    ` -CAkey "${this.certsDir}/rootCA/private.key" -CAcreateserial` +
+                    ` -out "${certPath}" -days ${validityDays} -sha256` +
+                    ` -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\\nkeyUsage=critical,keyCertSign,cRLSign\\nsubjectAltName=DNS:${cert.name}")`;
+            }
+            
+            const parts = sslCommand.split(' ');
+            const command = parts[0];
+            const args = parts.slice(1);
+            
+            console.log(`Executing CA renewal command: ${command} ${args.join(' ')}`);
+            
+            const result = await this.executeCommandWithOutput(command, args);
+            
+            return {
+                success: true,
+                message: `CA Certificate ${cert.name} renewed successfully`,
+                output: result
+            };
+        } catch (error) {
+            console.error(`CA renewal failed:`, error);
+            throw new Error(`Failed to renew CA certificate: ${error.message}`);
+        }
     }
 
     async createCertificate(options) {
-        const { domains, email, challengeType, certType } = options;
+        const { domains, certType } = options;
         
         console.log(`Creating certificate for domains: ${domains.join(', ')}`);
-        console.log(`Using challenge type: ${challengeType}`);
         
         // Get global defaults for certificate validity
         const defaults = this.configManager.getGlobalDefaults();
@@ -194,21 +374,36 @@ class RenewalManager {
         }
         
         try {
-            // Build certificate creation command based on type and challenge
+            // Determine output directory and file paths based on certificate type
+            const commonName = domains[0];
+            const sanitizedName = commonName.replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+            const outputDir = path.join(this.certsDir, sanitizedName);
+            
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            const keyPath = path.join(outputDir, 'private.key');
+            const certPath = path.join(outputDir, 'certificate.crt');
+            
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
+            
+            // Build certificate creation command based on type
             let command, args;
             
             if (certType === 'rootCA' || certType === 'intermediateCA') {
-                // For CA certificates, we'd use OpenSSL directly
+                // For CA certificates, we use OpenSSL directly
                 const sslCommand = this.buildOpenSSLCACommand(options, validityDays);
                 // Split the command into executable and arguments
                 const parts = sslCommand.split(' ');
                 command = parts[0];
                 args = parts.slice(1);
             } else {
-                // For regular certs, we might use Let's Encrypt via certbot
-                const certbotCommand = this.buildCertbotCommand(options, validityDays);
+                // For regular certs, we use OpenSSL directly
+                const sslCommand = this.buildOpenSSLCommand(options, validityDays);
                 // Split the command into executable and arguments
-                const parts = certbotCommand.split(' ');
+                const parts = sslCommand.split(' ');
                 command = parts[0];
                 args = parts.slice(1);
             }
@@ -234,18 +429,22 @@ class RenewalManager {
         const { domains, certType } = options;
         const commonName = domains[0];
         
+        // Create a sanitized directory name from the common name
+        const sanitizedName = commonName.replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+        
         // Create output directory for the certificate if it doesn't exist
-        const outputDir = path.join(this.certsDir, commonName.replace(/\*/g, 'wildcard'));
+        const outputDir = path.join(this.certsDir, sanitizedName);
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
         
+        // Ensure these are files, not directories
         const keyPath = path.join(outputDir, 'private.key');
         const certPath = path.join(outputDir, 'certificate.crt');
         
         if (certType === 'rootCA') {
             // Generate a self-signed root CA certificate
-            return `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096 -keyout ${keyPath} -out ${certPath} -subj "/CN=${commonName}" -addext "subjectAltName=DNS:${commonName}"`;
+            return `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096 -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${commonName}" -addext "subjectAltName=DNS:${commonName}"`;
         } else if (certType === 'intermediateCA') {
             // For an intermediate CA, we need a bit more setup
             // This is a simplified version; in reality, you'd need to:
@@ -254,7 +453,7 @@ class RenewalManager {
             
             // Create a CSR first
             const csrPath = path.join(outputDir, 'intermediate.csr');
-            const command = `openssl req -new -sha256 -nodes -newkey rsa:4096 -keyout ${keyPath} -out ${csrPath} -subj "/CN=${commonName}" && `;
+            const command = `openssl req -new -sha256 -nodes -newkey rsa:4096 -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${commonName}" && `;
             
             // Then sign it with a root CA (this is where you'd need to specify the root CA details)
             // Assuming the first root CA found in the certs directory
@@ -278,56 +477,31 @@ class RenewalManager {
             const rootCAPath = path.join(this.certsDir, rootCerts[0], 'certificate.crt');
             const rootKeyPath = path.join(this.certsDir, rootCerts[0], 'private.key');
             
-            return `${command} openssl x509 -req -in ${csrPath} -CA ${rootCAPath} -CAkey ${rootKeyPath} -CAcreateserial -out ${certPath} -days ${validityDays} -sha256 -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign")`;
+            return `${command} openssl x509 -req -in "${csrPath}" -CA "${rootCAPath}" -CAkey "${rootKeyPath}" -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256 -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign")`;
         }
         
         throw new Error(`Unsupported certificate type: ${certType}`);
     }
 
-    buildCertbotCommand(options, validityDays) {
-        const { domains, email, challengeType } = options;
+    buildOpenSSLCommand(options, validityDays) {
+        const { domains } = options;
+        const commonName = domains[0];
         
-        // Create a base directory for certbot
-        const certbotDir = path.join(this.certsDir, 'certbot');
-        if (!fs.existsSync(certbotDir)) {
-            fs.mkdirSync(certbotDir, { recursive: true });
+        // Create a sanitized directory name from the common name
+        const sanitizedName = commonName.replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+        
+        // Create output directory for the certificate if it doesn't exist
+        const outputDir = path.join(this.certsDir, sanitizedName);
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
         }
         
-        let command = 'certbot certonly --non-interactive';
+        // Ensure these are files, not directories
+        const keyPath = path.join(outputDir, 'private.key');
+        const certPath = path.join(outputDir, 'certificate.crt');
         
-        // Add email if provided
-        if (email) {
-            command += ` --email ${email}`;
-        } else {
-            command += ' --register-unsafely-without-email';
-        }
-        
-        // Add domain list
-        command += ` -d ${domains.join(' -d ')}`;
-        
-        // Add challenge type
-        switch (challengeType) {
-            case 'http':
-                command += ' --webroot --webroot-path /var/www/html';
-                break;
-            case 'dns':
-                // For DNS challenges, you might need to specify a DNS plugin
-                command += ' --manual --preferred-challenges dns';
-                break;
-            case 'standalone':
-                command += ' --standalone';
-                break;
-            default:
-                command += ' --webroot --webroot-path /var/www/html';
-        }
-        
-        // Add config directory and work directory
-        command += ` --config-dir ${certbotDir}/config --work-dir ${certbotDir}/work --logs-dir ${certbotDir}/logs`;
-        
-        // Add non-interactive mode and agree to terms
-        command += ' --agree-tos';
-        
-        return command;
+        // Generate standard self-signed certificate with SAN
+        return `openssl req -new -x509 -nodes -sha256 -days ${validityDays} -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${commonName}" -addext "subjectAltName=DNS:${domains.join(',DNS:')}"`;
     }
 
     executeCommandWithOutput(command, args = []) {
@@ -451,53 +625,46 @@ class RenewalManager {
         const domains = [...(cert.domains || []), newDomain];
         
         try {
-            // Determine the certificate type and challenge method
-            let challengeType = 'http';
-            let certType = 'standard';
-            
-            // Check if it's a wildcard domain
-            if (newDomain.includes('*')) {
-                challengeType = 'dns';
-                certType = 'wildcard';
-            }
-            
             // Get cert config
             const config = this.configManager.getCertConfig(cert.fingerprint);
             
             // Create a new certificate with all domains
             console.log(`Recreating certificate with domains: ${domains.join(', ')}`);
             
-            // Build the appropriate command
-            let command, args;
-            
-            if (cert.issuer && cert.issuer.includes('Let\'s Encrypt')) {
-                const certbotCommand = this.buildCertbotCommand({
-                    domains,
-                    challengeType,
-                    certType
-                });
-                
-                const parts = certbotCommand.split(' ');
-                command = parts[0];
-                args = parts.slice(1);
+            // Extract the actual directory from cert.path
+            let outputDir;
+            if (cert.path) {
+                // If cert.path is available, use its directory
+                outputDir = path.dirname(cert.path);
             } else {
-                // For other types like self-signed, we use OpenSSL directly
-                const outputDir = path.dirname(cert.path || path.join(this.certsDir, domains[0].replace(/\*/g, 'wildcard')));
-                const keyPath = path.join(outputDir, 'private.key');
-                const certPath = path.join(outputDir, 'certificate.crt');
-                
-                // Create directory if it doesn't exist
-                if (!fs.existsSync(outputDir)) {
-                    fs.mkdirSync(outputDir, { recursive: true });
-                }
-                
-                // For self-signed certificates
-                const sslCommand = `openssl req -new -x509 -nodes -sha256 -days 90 -newkey rsa:2048 -keyout ${keyPath} -out ${certPath} -subj "/CN=${domains[0]}" -addext "subjectAltName=DNS:${domains.join(',DNS:')}"`;
-                
-                const parts = sslCommand.split(' ');
-                command = parts[0];
-                args = parts.slice(1);
+                // Otherwise create a sanitized name
+                const sanitizedName = domains[0].replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+                outputDir = path.join(this.certsDir, sanitizedName);
             }
+            
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            const keyPath = path.join(outputDir, 'private.key');
+            const certPath = path.join(outputDir, 'certificate.crt');
+            
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
+            
+            // Determine validity period
+            const defaults = this.configManager.getGlobalDefaults();
+            const validityDays = config.validityDays || defaults.caValidityPeriod.standard;
+            
+            // Generate the self-signed certificate with all domains
+            const sslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` + 
+                ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
+                ` -subj "/CN=${domains[0]}" -addext "subjectAltName=DNS:${domains.join(',DNS:')}"`;
+            
+            const parts = sslCommand.split(' ');
+            const command = parts[0];
+            const args = parts.slice(1);
             
             console.log(`Executing command: ${command} ${args.join(' ')}`);
             
@@ -509,7 +676,7 @@ class RenewalManager {
                 await this.runDeployActions({
                     ...cert,
                     domains,
-                    path: cert.path, // Use the same path as the original certificate
+                    path: certPath, // Update the path to the new certificate
                 }, config.deployActions);
             }
             
@@ -544,53 +711,46 @@ class RenewalManager {
         const domains = cert.domains.filter(domain => domain !== domainToRemove);
         
         try {
-            // Determine the certificate type and challenge method
-            let challengeType = 'http';
-            let certType = 'standard';
-            
-            // Check if there's any wildcard domain
-            if (domains.some(d => d.includes('*'))) {
-                challengeType = 'dns';
-                certType = 'wildcard';
-            }
-            
             // Get cert config
             const config = this.configManager.getCertConfig(cert.fingerprint);
             
             // Create a new certificate with remaining domains
             console.log(`Recreating certificate with domains: ${domains.join(', ')}`);
             
-            // Build the appropriate command
-            let command, args;
-            
-            if (cert.issuer && cert.issuer.includes('Let\'s Encrypt')) {
-                const certbotCommand = this.buildCertbotCommand({
-                    domains,
-                    challengeType,
-                    certType
-                });
-                
-                const parts = certbotCommand.split(' ');
-                command = parts[0];
-                args = parts.slice(1);
+            // Extract the actual directory from cert.path
+            let outputDir;
+            if (cert.path) {
+                // If cert.path is available, use its directory
+                outputDir = path.dirname(cert.path);
             } else {
-                // For other types like self-signed, we use OpenSSL directly
-                const outputDir = path.dirname(cert.path || path.join(this.certsDir, domains[0].replace(/\*/g, 'wildcard')));
-                const keyPath = path.join(outputDir, 'private.key');
-                const certPath = path.join(outputDir, 'certificate.crt');
-                
-                // Create directory if it doesn't exist
-                if (!fs.existsSync(outputDir)) {
-                    fs.mkdirSync(outputDir, { recursive: true });
-                }
-                
-                // For self-signed certificates
-                const sslCommand = `openssl req -new -x509 -nodes -sha256 -days 90 -newkey rsa:2048 -keyout ${keyPath} -out ${certPath} -subj "/CN=${domains[0]}" -addext "subjectAltName=DNS:${domains.join(',DNS:')}"`;
-                
-                const parts = sslCommand.split(' ');
-                command = parts[0];
-                args = parts.slice(1);
+                // Otherwise create a sanitized name
+                const sanitizedName = domains[0].replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_');
+                outputDir = path.join(this.certsDir, sanitizedName);
             }
+            
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            const keyPath = path.join(outputDir, 'private.key');
+            const certPath = path.join(outputDir, 'certificate.crt');
+            
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
+            
+            // Determine validity period
+            const defaults = this.configManager.getGlobalDefaults();
+            const validityDays = config.validityDays || defaults.caValidityPeriod.standard;
+            
+            // Generate the self-signed certificate with remaining domains
+            const sslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
+                ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
+                ` -subj "/CN=${domains[0]}" -addext "subjectAltName=DNS:${domains.join(',DNS:')}"`;
+            
+            const parts = sslCommand.split(' ');
+            const command = parts[0];
+            const args = parts.slice(1);
             
             console.log(`Executing command: ${command} ${args.join(' ')}`);
             
@@ -602,7 +762,7 @@ class RenewalManager {
                 await this.runDeployActions({
                     ...cert,
                     domains,
-                    path: cert.path, // Use the same path as the original certificate
+                    path: certPath, // Update the path to the new certificate
                 }, config.deployActions);
             }
             
@@ -615,6 +775,37 @@ class RenewalManager {
             console.error(`Failed to remove domain from certificate:`, error);
             throw new Error(`Failed to remove domain from certificate: ${error.message}`);
         }
+    }
+
+    // Add this helper method to handle backups
+    async backupCertificateIfNeeded(keyPath, certPath) {
+        // Check global backup settings
+        const defaults = this.configManager.getGlobalDefaults();
+        
+        // Check if backups are enabled
+        if (!defaults.enableCertificateBackups) {
+            console.log('Certificate backups are disabled in global settings. Skipping backup.');
+            return;
+        }
+        
+        // Create backup filenames with date stamp
+        const timestamp = new Date().toISOString().replace(/[:\.]/g, '-').replace('T', '_').slice(0, 19);
+        
+        // Check if files exist before attempting to back them up
+        if (fs.existsSync(certPath)) {
+            const backupCertPath = `${certPath}.${timestamp}.bak`;
+            fs.copyFileSync(certPath, backupCertPath);
+            console.log(`Backed up certificate to ${backupCertPath}`);
+        }
+        
+        if (fs.existsSync(keyPath)) {
+            const backupKeyPath = `${keyPath}.${timestamp}.bak`;
+            fs.copyFileSync(keyPath, backupKeyPath);
+            console.log(`Backed up private key to ${backupKeyPath}`);
+        }
+        
+        // We don't rename the original files - they will be overwritten by the renewal process
+        // This ensures the certificate keeps the same filename after renewal
     }
 }
 

@@ -9,6 +9,7 @@ function layout(title, styles, content) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap">
     <style>
         ${styles}
@@ -17,6 +18,7 @@ function layout(title, styles, content) {
 <body>
     ${content}
     <script src="/js/cert-config.js"></script>
+    <script src="/js/utils.js"></script>
 </body>
 </html>
   `;

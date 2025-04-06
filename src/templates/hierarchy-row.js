@@ -9,7 +9,6 @@ function renderHierarchyRow(cert, level = 0) {
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   
   let rows = '';
-  const indent = level > 0 ? 'hierarchy-indent' : '';
   
   if (cert.isGroup) {
     // Group header
@@ -41,10 +40,12 @@ function renderHierarchyRow(cert, level = 0) {
     statusClass = 'status-ca';
     certTypeClass = 'cert-type-root';
     certTypeLabel = '<span class="cert-type cert-type-root">Root CA</span>';
+    rowClass = 'ca-row';
   } else if (cert.certType === 'intermediateCA') {
     statusClass = 'status-intermediate-ca';
     certTypeClass = 'cert-type-intermediate';
     certTypeLabel = '<span class="cert-type cert-type-intermediate">Intermediate CA</span>';
+    rowClass = 'intermediate-row';
   } else {
     // Check expiry for non-CA certificates
     if (cert.expiryDate) {
@@ -63,18 +64,25 @@ function renderHierarchyRow(cert, level = 0) {
     ? cert.domains.map(domain => `<span class="domain-tag">${domain}</span>`).join('')
     : 'N/A';
   
+  // Use indentation only within the first cell, not the whole row
+  const indentClass = level > 0 ? 'hierarchy-level-' + level : '';
+  
   // Add fingerprint as data attribute for action buttons
   rows += `
-    <tr class="cert-row ${rowClass} ${indent}" data-cert-id="${cert.subjectKeyId || ''}" data-fingerprint="${cert.fingerprint || ''}">
-      <td class="cert-name">
+    <tr class="cert-row ${rowClass}" data-cert-id="${cert.subjectKeyId || ''}" data-fingerprint="${cert.fingerprint || ''}">
+      <td class="cert-name ${indentClass}">
         <span class="status-indicator ${statusClass}"></span>
         ${cert.name}${certTypeLabel}
       </td>
       <td class="cert-domains">${domainTags}</td>
       <td class="cert-expiry ${expiryClass}" data-date="${cert.expiryDate || ''}">${formatDate(cert.expiryDate)}</td>
       <td class="cert-actions">
-        <button class="config-btn" data-fingerprint="${cert.fingerprint || ''}">Configure</button>
-        <button class="renew-btn" data-fingerprint="${cert.fingerprint || ''}">Renew</button>
+        <button class="config-btn" data-fingerprint="${cert.fingerprint || ''}">
+          <i class="fas fa-cog"></i> Configure
+        </button>
+        <button class="renew-btn" data-fingerprint="${cert.fingerprint || ''}">
+          <i class="fas fa-sync-alt"></i> Renew
+        </button>
       </td>
     </tr>
   `;

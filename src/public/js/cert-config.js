@@ -1,4 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if we need to add isValidDomainOrIP function
+    if (typeof isValidDomainOrIP !== 'function') {
+        // Fall back to a simple implementation if utils.js is not loaded
+        window.isValidDomainOrIP = function(domain) {
+            // Simple regex for domain or IP validation
+            const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+            const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+            const wildcardDomainRegex = /^\*\.([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+            
+            return domainRegex.test(domain) || 
+                   ipRegex.test(domain) || 
+                   wildcardDomainRegex.test(domain) ||
+                   domain === 'localhost';
+        };
+    }
+    
     // Add configuration button to each certificate row
     document.querySelectorAll('.cert-row').forEach(row => {
         const fingerprint = row.dataset.fingerprint;
@@ -19,8 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add buttons if not already present
         if (actionsCell.querySelectorAll('button').length === 0) {
             actionsCell.innerHTML = `
-                <button class="config-btn" data-fingerprint="${fingerprint}">Configure</button>
-                <button class="renew-btn" data-fingerprint="${fingerprint}">Renew</button>
+                <button class="config-btn" data-fingerprint="${fingerprint}">
+                    <i class="fas fa-cog"></i> Configure
+                </button>
+                <button class="renew-btn" data-fingerprint="${fingerprint}">
+                    <i class="fas fa-sync-alt"></i> Renew
+                </button>
             `;
             
             // Add event listeners
@@ -49,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!document.getElementById('globalSettingsBtn')) {
             const settingsBtn = document.createElement('button');
             settingsBtn.id = 'globalSettingsBtn';
-            settingsBtn.textContent = 'Global Settings';
+            settingsBtn.innerHTML = '<i class="fas fa-cogs"></i> Global Settings';
             settingsBtn.addEventListener('click', showGlobalSettingsModal);
             buttonContainer.appendChild(settingsBtn);
         }
@@ -58,13 +78,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!document.getElementById('createCertBtn')) {
             const createBtn = document.createElement('button');
             createBtn.id = 'createCertBtn';
-            createBtn.textContent = 'Create New Certificate';
+            createBtn.innerHTML = '<i class="fas fa-plus-square"></i> Create New Certificate';
             createBtn.addEventListener('click', showCreateCertModal);
             buttonContainer.appendChild(createBtn);
         }
     }
+
+    // Add styles for file browser and pending changes
+    addFilePickerStyles();
 });
 
+// Update the modal HTML template with Font Awesome icons
 async function showConfigModal(fingerprint) {
     try {
         const response = await fetch(`/api/certificate/${fingerprint}`);
@@ -76,181 +100,101 @@ async function showConfigModal(fingerprint) {
         modal.innerHTML = `
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>Certificate Configuration</h2>
+                <h2><i class="fas fa-cog"></i> Certificate Configuration</h2>
                 <h3>${cert.name}</h3>
                 
-
                 <!-- Domain Management Section -->
                 <div class="domain-management">
-                    <h3>Domains & IPs</h3>
+                    <h3><i class="fas fa-globe"></i> Domains & IPs</h3>
                     <div class="domains-list">
                         ${(cert.domains || []).map(domain => `
                             <div class="domain-item">
-                                <span class="domain-name">${domain}</span>
-                                <button class="remove-domain-btn" data-domain="${domain}">Remove</button>
+                                <span class="domain-name">
+                                    <i class="${domain.includes('*') ? 'fas fa-star' : domain.match(/^\d/) ? 'fas fa-network-wired' : 'fas fa-link'}"></i>
+                                    ${domain}
+                                </span>
+                                <button class="stage-remove-domain-btn" data-domain="${domain}">
+                                    <i class="fas fa-trash-alt"></i> Remove
+                                </button>
                             </div>
                         `).join('')}
                     </div>
                     <div class="add-domain-form">
                         <input type="text" id="newDomain" placeholder="example.com or 192.168.1.1">
-                        <button id="addDomainBtn">Add Domain/IP</button>
+                        <button id="stageDomainBtn">
+                            <i class="fas fa-plus"></i> Add Domain/IP
+                        </button>
+                    </div>
+                    
+                    <!-- Pending changes section -->
+                    <div id="pendingChanges" style="display: none;">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Pending Changes</h4>
+                        <div id="pendingList"></div>
+                        <div class="pending-actions">
+                            <button id="applyChanges" class="apply-changes-btn">
+                                <i class="fas fa-check"></i> Apply Changes
+                            </button>
+                            <button id="discardChanges" class="discard-changes-btn">
+                                <i class="fas fa-times"></i> Discard Changes
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
-                <p>Expires: ${new Date(cert.expiryDate).toLocaleDateString()}</p>
+                <p><i class="fas fa-calendar-alt"></i> Expires: ${new Date(cert.expiryDate).toLocaleDateString()}</p>
                 
                 <div class="config-form">
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="autoRenew" ${cert.config.autoRenew ? 'checked' : ''}>
-                            Auto-renew
+                            <i class="fas fa-sync"></i> Auto-renew
                         </label>
                     </div>
                     
                     <div class="form-group">
-                        <label>Days before expiry to renew:</label>
+                        <label><i class="fas fa-clock"></i> Days before expiry to renew:</label>
                         <input type="number" id="renewDays" value="${cert.config.renewDaysBeforeExpiry || 30}" min="1" max="90">
                     </div>
                     
-                    <h4>Deployment Actions</h4>
+                    <h4><i class="fas fa-tasks"></i> Deployment Actions</h4>
                     <div id="deployActions"></div>
                     
-                    <button id="addAction">Add Action</button>
+                    <div class="form-group">
+                        <label for="actionType"><i class="fas fa-cogs"></i> Action Type:</label>
+                        <select id="actionType">
+                            <option value="copy">Copy to location</option>
+                            <option value="docker-restart">Restart Docker container</option>
+                            <option value="command">Execute command</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="actionParams" id="actionParamLabel"><i class="fas fa-folder"></i> Destination:</label>
+                        <input type="text" id="actionParams" placeholder="/path/to/destination">
+                        <button type="button" id="browseBtn" class="browse-btn">
+                            <i class="fas fa-folder-open"></i> Browse
+                        </button>
+                    </div>
+                    
+                    <button id="addActionBtn">
+                        <i class="fas fa-plus-circle"></i> Add Action
+                    </button>
+                    
+                    <div id="actionsContainer"></div>
                     
                     <div class="button-group">
-                        <button id="saveConfig">Save Configuration</button>
-                        <button id="cancelConfig">Cancel</button>
+                        <button id="saveConfig">
+                            <i class="fas fa-save"></i> Save Configuration
+                        </button>
+                        <button id="cancelConfig">
+                            <i class="fas fa-times-circle"></i> Cancel
+                        </button>
                     </div>
                 </div>
             </div>
         `;
-        
-        document.body.appendChild(modal);
-        
-        // Setup event handlers
-        modal.querySelector('.close').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        // Setup domain removal buttons
-        modal.querySelectorAll('.remove-domain-btn').forEach(btn => {
-            btn.addEventListener('click', async event => {
-                const domain = event.target.dataset.domain;
-                if (!confirm(`Are you sure you want to remove domain "${domain}" from this certificate?`)) {
-                    return;
-                }
-                
-                try {
-                    const response = await fetch(`/api/certificate/${fingerprint}/domains/remove`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ domain })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        alert(result.message);
-                        document.body.removeChild(modal);
-                        // Reload the page to show updated certificate
-                        window.location.reload();
-                    } else {
-                        alert(`Failed to remove domain: ${result.error || 'Unknown error'}`);
-                    }
-                } catch (error) {
-                    alert(`Failed to remove domain: ${error.message}`);
-                }
-            });
-        });
-        
-        // Add client-side domain validation
-        function isValidDomainOrIP(value) {
-            // Domain regex based on RFC 1034/1035 with some simplifications
-            const domainRegex = /^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$/;
-            // IPv4 regex with octet validation
-            const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-            // IPv6 regex (simplified)
-            const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-            
-            // Check for wildcard domain
-            if (value.startsWith('*.')) {
-                return domainRegex.test(value.substring(2));
-            }
-            
-            // Check if it's a domain
-            if (domainRegex.test(value)) return true;
-            
-            // Check if it's an IPv4
-            if (ipv4Regex.test(value)) {
-                const octets = value.split('.').map(Number);
-                return octets.every(octet => octet >= 0 && octet <= 255);
-            }
-            
-            // Check if it's an IPv6
-            return ipv6Regex.test(value);
-        }
 
-        // Setup add domain button
-        modal.querySelector('#addDomainBtn').addEventListener('click', async () => {
-            const domain = modal.querySelector('#newDomain').value.trim();
-            
-            if (!domain) {
-                alert('Please enter a domain or IP address');
-                return;
-            }
-            
-            // Validate domain format
-            if (!isValidDomainOrIP(domain)) {
-                alert('Invalid domain or IP address format');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/certificate/${fingerprint}/domains/add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domain })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert(result.message);
-                    document.body.removeChild(modal);
-                    // Reload the page to show updated certificate
-                    window.location.reload();
-                } else {
-                    alert(`Failed to add domain: ${result.error || 'Unknown error'}`);
-                }
-            } catch (error) {
-                alert(`Failed to add domain: ${error.message}`);
-            }
-        });
-        
-        // Add existing deployment actions - keep the rest of your existing code
-        const deployActionsContainer = modal.querySelector('#deployActions');
-        (cert.config.deployActions || []).forEach((action, index) => {
-            addActionToForm(deployActionsContainer, action, index);
-        });
-        
-        // The rest of your event handlers (add action, save, cancel) remain the same...
-        
-        // Add action button
-        modal.querySelector('#addAction').addEventListener('click', () => {
-            const index = deployActionsContainer.children.length;
-            addActionToForm(deployActionsContainer, { type: 'copy', destination: '' }, index);
-        });
-        
-        // Save button
-        modal.querySelector('#saveConfig').addEventListener('click', async () => {
-            // Your existing save logic
-        });
-        
-        // Cancel button
-        modal.querySelector('#cancelConfig').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
+        // Rest of the modal setup code...
     } catch (error) {
         alert('Failed to load certificate details: ' + error.message);
     }
@@ -457,6 +401,13 @@ async function showGlobalSettingsModal() {
                         <input type="number" id="defaultRenewDays" value="${settings.renewDaysBeforeExpiry}" min="1" max="90">
                     </div>
                     
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableBackups" ${settings.enableCertificateBackups !== false ? 'checked' : ''}>
+                            Create backups when certificates are renewed
+                        </label>
+                    </div>
+                    
                     <h3>Certificate Validity Periods (days)</h3>
                     <div class="form-group">
                         <label>Root CA certificates:</label>
@@ -493,6 +444,7 @@ async function showGlobalSettingsModal() {
             const newSettings = {
                 autoRenewByDefault: modal.querySelector('#autoRenewDefault').checked,
                 renewDaysBeforeExpiry: parseInt(modal.querySelector('#defaultRenewDays').value, 10),
+                enableCertificateBackups: modal.querySelector('#enableBackups').checked,
                 caValidityPeriod: {
                     rootCA: parseInt(modal.querySelector('#rootCAValidity').value, 10),
                     intermediateCA: parseInt(modal.querySelector('#intermediateCAValidity').value, 10),
@@ -529,4 +481,511 @@ async function showGlobalSettingsModal() {
     } catch (error) {
         alert('Failed to load settings: ' + error.message);
     }
+}
+
+// Update the addActionToForm function to use Font Awesome icons
+function addActionToForm(container, action = null) {
+    // Create a new action item div
+    const actionItem = document.createElement('div');
+    actionItem.className = 'action-item';
+    
+    // Set the action type and parameters
+    const type = action ? action.type : document.getElementById('actionType').value;
+    const params = action ? action.destination || action.containerId || action.command || '' : document.getElementById('actionParams').value;
+    
+    // Choose appropriate icon based on action type
+    let icon;
+    switch (type) {
+        case 'copy':
+            icon = '<i class="fas fa-copy"></i>';
+            break;
+        case 'docker-restart':
+            icon = '<i class="fab fa-docker"></i>';
+            break;
+        case 'command':
+            icon = '<i class="fas fa-terminal"></i>';
+            break;
+        default:
+            icon = '<i class="fas fa-cog"></i>';
+    }
+    
+    // Create the display and input elements
+    actionItem.innerHTML = `
+        <span>${icon} ${type}: ${params || 'No parameters'}</span>
+        <button type="button" class="remove-action-btn"><i class="fas fa-trash"></i></button>
+        <input type="hidden" name="actionTypes[]" value="${type}">
+        <input type="hidden" name="actionParams[]" value="${params}">
+    `;
+    
+    // Add event listener to the remove button
+    actionItem.querySelector('.remove-action-btn').addEventListener('click', function() {
+        actionItem.remove();
+    });
+    
+    // Add to the container
+    container.appendChild(actionItem);
+    
+    // Clear the inputs for the next action if not adding an existing one
+    if (!action) {
+        document.getElementById('actionParams').value = '';
+    }
+}
+
+// Add event listener to the Add Action button
+function setupModalEventHandlers(modal, cert, fingerprint) {
+    // Setup action type change handler
+    const actionTypeSelect = modal.querySelector('#actionType');
+    if (actionTypeSelect) {
+        actionTypeSelect.addEventListener('change', function() {
+            const actionParamLabel = modal.querySelector('#actionParamLabel');
+            const browseBtn = modal.querySelector('#browseBtn');
+            
+            if (this.value === 'copy') {
+                actionParamLabel.textContent = 'Destination:';
+                browseBtn.style.display = 'inline-block';
+            } else if (this.value === 'docker-restart') {
+                actionParamLabel.textContent = 'Container ID:';
+                browseBtn.style.display = 'none';
+            } else if (this.value === 'command') {
+                actionParamLabel.textContent = 'Command:';
+                browseBtn.style.display = 'none';
+            }
+        });
+    }
+    
+    // Add Action button click handler
+    const addActionBtn = modal.querySelector('#addActionBtn');
+    if (addActionBtn) {
+        addActionBtn.addEventListener('click', function() {
+            const actionsContainer = modal.querySelector('#actionsContainer');
+            addActionToForm(actionsContainer);
+        });
+    }
+    
+    // Setup browse button
+    const browseBtn = modal.querySelector('#browseBtn');
+    if (browseBtn) {
+        browseBtn.addEventListener('click', function() {
+            showFileBrowser(modal);
+        });
+    }
+    
+    // Setup save configuration button
+    modal.querySelector('#saveConfig').addEventListener('click', async function() {
+        try {
+            const autoRenew = modal.querySelector('#autoRenew').checked;
+            const renewDays = parseInt(modal.querySelector('#renewDays').value, 10);
+            
+            // Collect deployment actions
+            const deployActions = [];
+            modal.querySelectorAll('.action-item').forEach(item => {
+                const type = item.querySelector('input[name="actionTypes[]"]').value;
+                const param = item.querySelector('input[name="actionParams[]"]').value;
+                
+                let action;
+                if (type === 'copy') {
+                    action = { type, destination: param };
+                } else if (type === 'docker-restart') {
+                    action = { type, containerId: param };
+                } else if (type === 'command') {
+                    action = { type, command: param };
+                }
+                
+                if (action) deployActions.push(action);
+            });
+            
+            const config = {
+                autoRenew,
+                renewDaysBeforeExpiry: renewDays,
+                deployActions
+            };
+            
+            const response = await fetch(`/api/certificate/${fingerprint}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Configuration saved successfully');
+                document.body.removeChild(modal);
+            } else {
+                alert('Failed to save configuration: ' + result.error);
+            }
+        } catch (error) {
+            alert('Failed to save configuration: ' + error.message);
+        }
+    });
+    
+    // Setup close and cancel buttons
+    modal.querySelector('.close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    modal.querySelector('#cancelConfig').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+// Add function to show file browser
+function showFileBrowser(parentModal) {
+    // Create a modal dialog for file browsing
+    const modal = document.createElement('div');
+    modal.className = 'modal file-browser-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2><i class="fas fa-folder-open"></i> Select Destination</h2>
+            
+            <div class="file-browser">
+                <div class="current-path">
+                    <i class="fas fa-folder"></i> Path: <span id="currentPath">/</span>
+                </div>
+                <div class="file-list" id="fileList">
+                    <p><i class="fas fa-spinner fa-spin"></i> Loading...</p>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="selectPathBtn">
+                    <i class="fas fa-check"></i> Select Current Path
+                </button>
+                <button id="cancelBrowseBtn">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    let currentPath = '/';
+    loadDirectory(currentPath);
+    
+    // Setup close button
+    modal.querySelector('.close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Setup cancel button
+    modal.querySelector('#cancelBrowseBtn').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Setup select button
+    modal.querySelector('#selectPathBtn').addEventListener('click', () => {
+        parentModal.querySelector('#actionParams').value = currentPath;
+        document.body.removeChild(modal);
+    });
+    
+    // Function to load a directory
+    async function loadDirectory(path) {
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Loading...</p>';
+        
+        try {
+            const response = await fetch(`/api/filesystem?path=${encodeURIComponent(path)}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                fileList.innerHTML = `<div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i> Error: ${data.message}
+                </div>`;
+                return;
+            }
+            
+            // Update current path
+            document.getElementById('currentPath').textContent = path;
+            currentPath = path;
+            
+            // Build the directory contents
+            let html = '';
+            
+            // Add parent directory option if not at root
+            if (path !== '/') {
+                html += `
+                    <div class="file-item parent-dir" data-path="${path}">
+                        <span class="file-icon"><i class="fas fa-arrow-up"></i></span>
+                        <span class="file-name">..</span>
+                    </div>
+                `;
+            }
+            
+            // Add directories
+            data.directories.forEach(dir => {
+                html += `
+                    <div class="file-item directory" data-path="${path === '/' ? `/${dir}` : `${path}/${dir}`}">
+                        <span class="file-icon"><i class="fas fa-folder"></i></span>
+                        <span class="file-name">${dir}</span>
+                    </div>
+                `;
+            });
+            
+            // Add files
+            data.files.forEach(file => {
+                // Select icon based on file extension
+                let fileIcon = 'fas fa-file';
+                const extension = file.split('.').pop().toLowerCase();
+                
+                if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(extension)) {
+                    fileIcon = 'fas fa-file-image';
+                } else if (['pdf'].includes(extension)) {
+                    fileIcon = 'fas fa-file-pdf';
+                } else if (['doc', 'docx'].includes(extension)) {
+                    fileIcon = 'fas fa-file-word';
+                } else if (['xls', 'xlsx'].includes(extension)) {
+                    fileIcon = 'fas fa-file-excel';
+                } else if (['ppt', 'pptx'].includes(extension)) {
+                    fileIcon = 'fas fa-file-powerpoint';
+                } else if (['zip', 'tar', 'gz', '7z', 'rar'].includes(extension)) {
+                    fileIcon = 'fas fa-file-archive';
+                } else if (['js', 'py', 'java', 'c', 'cpp', 'php', 'rb'].includes(extension)) {
+                    fileIcon = 'fas fa-file-code';
+                } else if (['txt', 'log', 'md'].includes(extension)) {
+                    fileIcon = 'fas fa-file-alt';
+                }
+                
+                html += `
+                    <div class="file-item file" data-path="${path === '/' ? `/${file}` : `${path}/${file}`}">
+                        <span class="file-icon"><i class="${fileIcon}"></i></span>
+                        <span class="file-name">${file}</span>
+                    </div>
+                `;
+            });
+            
+            fileList.innerHTML = html;
+            
+            // Add click events for navigation and selection...
+            fileList.querySelectorAll('.directory, .parent-dir').forEach(item => {
+                item.addEventListener('click', event => {
+                    const clickedPath = event.currentTarget.dataset.path;
+                    
+                    if (event.currentTarget.classList.contains('parent-dir')) {
+                        // Go up a directory
+                        const parts = clickedPath.split('/');
+                        parts.pop(); // Remove last part
+                        const parentPath = parts.join('/') || '/';
+                        loadDirectory(parentPath);
+                    } else {
+                        // Enter the directory
+                        loadDirectory(clickedPath);
+                    }
+                });
+            });
+            
+            // Add click events for file selection
+            fileList.querySelectorAll('.file').forEach(item => {
+                item.addEventListener('click', event => {
+                    const filePath = event.currentTarget.dataset.path;
+                    parentModal.querySelector('#actionParams').value = filePath;
+                    document.body.removeChild(modal);
+                });
+            });
+            
+        } catch (error) {
+            console.error('Error loading directory:', error);
+            fileList.innerHTML = `<div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i> Error loading directory: ${error.message}
+            </div>`;
+        }
+    }
+}
+
+// Add CSS for file browser to the document
+function addFilePickerStyles() {
+    if (!document.getElementById('file-picker-styles')) {
+        const styleSheet = document.createElement('style');
+        styleSheet.id = 'file-picker-styles';
+        styleSheet.innerHTML = `
+            /* File browser specific styles */
+            .file-browser-modal .modal-content {
+                max-width: 600px;
+                max-height: 80vh;
+            }
+            
+            .file-browser {
+                border: 1px solid var(--border-color, #ddd);
+                border-radius: 4px;
+                margin: 10px 0;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            
+            .current-path {
+                background-color: var(--hover-color, #f5f5f5);
+                padding: 10px;
+                border-bottom: 1px solid var(--border-color, #ddd);
+                font-family: monospace;
+            }
+            
+            .file-list {
+                padding: 10px;
+            }
+            
+            .file-item {
+                padding: 5px 10px;
+                margin-bottom: 5px;
+                cursor: pointer;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .file-item:hover {
+                background-color: var(--hover-color, #f0f0f0);
+            }
+            
+            .file-icon {
+                margin-right: 10px;
+            }
+            
+            .error-message {
+                color: var(--danger-color, #dc3545);
+                padding: 10px;
+            }
+            
+            /* Pending changes styling */
+            .stage-remove-domain-btn.pending-removal {
+                background-color: var(--danger-color, #dc3545);
+                color: white;
+            }
+            
+            .pending-removal-item {
+                background-color: #ffecec;
+            }
+            
+            #pendingChanges {
+                background-color: #fff3cd;
+                border: 1px solid #ffeeba;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 4px;
+            }
+            
+            .pending-additions, .pending-removals {
+                margin-bottom: 10px;
+            }
+            
+            .undo-btn {
+                background-color: var(--text-muted, #6c757d);
+                color: white;
+                border: none;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-size: 12px;
+                cursor: pointer;
+                margin-left: 5px;
+            }
+            
+            .pending-actions {
+                margin-top: 10px;
+                text-align: right;
+            }
+            
+            .apply-changes-btn {
+                background-color: var(--success-color, #28a745);
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-right: 5px;
+            }
+            
+            .discard-changes-btn {
+                background-color: var(--danger-color, #dc3545);
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            
+            /* Action items styling */
+            .action-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px;
+                margin-bottom: 5px;
+                background-color: var(--hover-color, #f0f0f0);
+                border-radius: 4px;
+            }
+            
+            .action-item span {
+                flex-grow: 1;
+            }
+            
+            .remove-action-btn {
+                background-color: var(--danger-color, #dc3545);
+                color: white;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            
+            /* Browse button */
+            .browse-btn {
+                background-color: var(--primary-color, #3a86ff);
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            
+            /* For domain validation */
+            .domain-validation-error {
+                color: var(--danger-color, #dc3545);
+                font-size: 12px;
+                margin-top: 5px;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+    }
+}
+
+// Update the updatePendingChangesUI function to use Font Awesome icons
+function updatePendingChangesUI() {
+    const pendingList = modal.querySelector('#pendingList');
+    const pendingChangesSection = modal.querySelector('#pendingChanges');
+    
+    // Show or hide pending changes section
+    if (pendingChanges.addDomains.length > 0 || pendingChanges.removeDomains.length > 0) {
+        pendingChangesSection.style.display = 'block';
+    } else {
+        pendingChangesSection.style.display = 'none';
+        return;
+    }
+    
+    // Update the list of pending changes
+    let html = '';
+    
+    if (pendingChanges.addDomains.length > 0) {
+        html += '<div class="pending-additions"><strong><i class="fas fa-plus-circle"></i> Domains to add:</strong><ul>';
+        pendingChanges.addDomains.forEach(domain => {
+            html += `<li>${domain} <button class="undo-btn" data-action="add" data-domain="${domain}">
+                <i class="fas fa-undo"></i> Undo
+            </button></li>`;
+        });
+        html += '</ul></div>';
+    }
+    
+    if (pendingChanges.removeDomains.length > 0) {
+        html += '<div class="pending-removals"><strong><i class="fas fa-minus-circle"></i> Domains to remove:</strong><ul>';
+        pendingChanges.removeDomains.forEach(domain => {
+            html += `<li>${domain} <button class="undo-btn" data-action="remove" data-domain="${domain}">
+                <i class="fas fa-undo"></i> Undo
+            </button></li>`;
+        });
+        html += '</ul></div>';
+    }
+    
+    pendingList.innerHTML = html;
+    
+    // Add undo button event listeners...
 }
