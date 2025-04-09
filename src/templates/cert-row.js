@@ -37,14 +37,30 @@ function renderCertRow(cert, now, thirtyDaysFromNow) {
     ? cert.domains.map(domain => `<span class="domain-tag">${domain}</span>`).join('')
     : 'N/A';
   
+  // Make sure we have a fingerprint before adding buttons
+  const fingerprint = cert.fingerprint || '';
+  
+  // Only add buttons if we have a valid fingerprint
+  const actionButtons = fingerprint ? `
+    <button class="config-btn" data-fingerprint="${fingerprint}">
+      <i class="fas fa-cog"></i> Configure
+    </button>
+    <button class="renew-btn" data-fingerprint="${fingerprint}">
+      <i class="fas fa-sync-alt"></i> Renew
+    </button>
+  ` : 'No actions available';
+  
   return `
-    <tr data-cert-id="${cert.subjectKeyId || ''}" data-fingerprint="${cert.fingerprint || ''}" class="cert-row">
+    <tr data-cert-id="${cert.subjectKeyId || ''}" data-fingerprint="${fingerprint}" class="cert-row">
         <td class="cert-name">
             <span class="status-indicator ${statusClass}"></span>
             ${cert.name}${certTypeLabel}
         </td>
         <td class="cert-domains">${domainTags}</td>
         <td class="cert-expiry ${expiryClass}" data-date="${cert.expiryDate || ''}">${formatDate(cert.expiryDate)}</td>
+        <td class="cert-actions">
+          ${actionButtons}
+        </td>
     </tr>
   `;
 }

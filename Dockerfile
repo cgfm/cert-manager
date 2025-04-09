@@ -12,9 +12,13 @@ COPY src ./src
 
 ENV NODE_ENV=production
 
-EXPOSE 3000
+# Create logs directory
+RUN mkdir -p /logs && chmod 777 /logs
 
-VOLUME ["/certs", "/config"]
+# Expose both HTTP and HTTPS ports
+EXPOSE 3000 4443
+
+VOLUME ["/certs", "/config", "/logs"]
 
 CMD ["node", "src/index.js"]
 

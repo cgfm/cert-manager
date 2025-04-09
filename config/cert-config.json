@@ -9,5 +9,167 @@
     },
     "enableCertificateBackups": true
   },
-  "certificates": {}
+  "certificates": {
+    "sha256 Fingerprint=3DC78EA5AE11831E7491A7D7E5EB8EEC539378AC24C3A60D4B0F35E82321A724": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "1.2.3.4",
+        "1.2.3.4",
+        "192.168.178.240",
+        "seneca.local"
+      ]
+    },
+    "sha256 Fingerprint=1167FE9EF1E6183AAC34E7C35F5DB9EA218806197C94497273AA6CB622EE38A4": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "openhab.seneca.local",
+        "192.168.168.240",
+        "1.2.3.4"
+      ]
+    },
+    "sha256 Fingerprint=A6E714F143B2CBE4FFBF4567E1E231B2D373EB93E529EEA374B92C9CDEBFDDC0": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4"
+      ]
+    },
+    "sha256 Fingerprint=D40B30702DA18994BA37A1D81E85937A1F2B9391782811795D3D5B8A7F0DDCE7": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "2.2.2.2"
+      ]
+    },
+    "sha256 Fingerprint=1398B7A17C5614273B68779EF001E103FDE03213272FF161815BF73E0F28E605": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "2.2.2.2",
+        "seneca.local"
+      ]
+    },
+    "sha256 Fingerprint=C4D4B93D26E6F460AB51BE45E900D7AFAB4165D766A95E4904CC2230CCFF989A": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local"
+      ]
+    },
+    "sha256 Fingerprint=2C3809CB5236D9ED55A9FD71850D59506C49AF06CF2F9D5CA33E4F452D22E728": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local",
+        "2.2.2.2."
+      ]
+    },
+    "sha256 Fingerprint=079CF34B26F0A36F73F020A5BDE04B819F0203BAED6E72DC5302908C3796E621": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local",
+        "2.2.2.2.",
+        "3.3.3.3"
+      ]
+    },
+    "sha256 Fingerprint=718BD0F14D2E1A0186F9EB4F40BE019F585A4EA75D9791BABD959554102E3752": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local",
+        "2.2.2.2."
+      ]
+    },
+    "sha256 Fingerprint=7B9BE32D3C589773EE6878CFC97689EB55CEF97CD8A83A8F8F118FF1687870DD": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local"
+      ]
+    },
+    "sha256 Fingerprint=0CEB1D112C50CF308C937B80C0F2D641FA76D8CC45EB3017F4424FE165D6F4A4": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local",
+        "2.2.2.2"
+      ]
+    },
+    "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [
+        {
+          "type": "copy",
+          "destination": "/tmp"
+        }
+      ]
+    }
+  }
 }

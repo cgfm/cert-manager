@@ -7,6 +7,8 @@ services:
     volumes:
       - ./certs:/certs
       - ./config:/config
+      - ./src:/app/src
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - AUTO_RENEW_DEFAULT=false
       - RENEW_DAYS_BEFORE_EXPIRY=30

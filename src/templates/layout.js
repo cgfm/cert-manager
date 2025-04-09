@@ -1,5 +1,5 @@
 /**
- * Base layout template for the certificate viewer
+ * Base layout template for the certificate manager
  */
 function layout(title, styles, content) {
   return `
@@ -19,6 +19,7 @@ function layout(title, styles, content) {
     ${content}
     <script src="/js/cert-config.js"></script>
     <script src="/js/utils.js"></script>
+    <script src="/js/logs-viewer.js"></script>
 </body>
 </html>
   `;

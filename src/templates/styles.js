@@ -1,5 +1,5 @@
 /**
- * CSS styles for the certificate viewer
+ * CSS styles for the certificate manager
  */
 function getStyles() {
   return `
@@ -920,6 +920,207 @@ function getStyles() {
     /* Action buttons common styles */
     button i {
         font-size: 0.9em;
+    }
+
+    /* HTTPS Configuration Styles */
+    .admin-menu {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+    }
+
+    .admin-button {
+        padding: 8px 12px;
+        border: none;
+        background-color: var(--primary-color, #3a86ff);
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 10px;
+    }
+
+    .admin-button:hover {
+        background-color: var(--primary-hover-color, #2667da);
+    }
+
+    .form-section {
+        border: 1px solid #eee;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .form-section h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 18px;
+        color: var(--text-color, #444);
+    }
+
+    .form-subsection {
+        margin-top: 15px;
+        padding-left: 15px;
+        border-left: 3px solid #eee;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .form-help {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+    }
+
+    .browse-btn {
+        padding: 5px 10px;
+        margin-left: 5px;
+        border: 1px solid #ccc;
+        background-color: #f8f8f8;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .browse-btn:hover {
+        background-color: #eee;
+    }
+
+    .warning-box {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 12px;
+        margin-top: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .warning-box i {
+        color: #ffc107;
+        margin-top: 3px;
+    }
+
+    /* File browser */
+    .path-navigation {
+        display: flex;
+        margin-bottom: 15px;
+        gap: 10px;
+    }
+
+    .path-navigation input {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .file-browser {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        height: 300px;
+        overflow-y: auto;
+        margin-bottom: 15px;
+    }
+
+    .file-list {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .file-list li {
+        padding: 8px 12px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+    }
+
+    .file-list li:hover {
+        background-color: #f5f5f5;
+    }
+
+    .file-list li.selected {
+        background-color: #e3f2fd;
+    }
+
+    .file-list li i {
+        margin-right: 8px;
+    }
+
+    .file-list li.directory i {
+        color: #ffc107;
+    }
+
+    .file-list li.file i {
+        color: #546e7a;
+    }
+
+    /* Tab navigation for settings modal */
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 20px;
+        overflow-x: auto;
+    }
+
+    .tab-btn {
+        padding: 10px 16px;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: var(--text-muted);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+        background-color: var(--hover-color);
+        color: var(--text-color);
+    }
+
+    .tab-btn.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+        background-color: transparent;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+        animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .info-box {
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin: 15px 0;
+    }
+    
+    .info-box p {
+        margin: 0;
     }
   `;
 }

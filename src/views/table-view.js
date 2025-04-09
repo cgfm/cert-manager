@@ -1,5 +1,5 @@
 /**
- * Renders the main certificate viewer page with both flat and hierarchical views
+ * Renders the main certificate manager page with both flat and hierarchical views
  */
 const getStyles = require('../templates/styles');
 const layout = require('../templates/layout');
@@ -23,7 +23,7 @@ function renderTable({ certificates, hierarchy }) {
     const content = `
     <div class="container">
         <header>
-            <h1>Certificate Viewer</h1>
+            <h1>Local Certificate Manager</h1>
             <div class="search-container">
                 <input type="text" id="searchInput" placeholder="Search certificates..." autofocus>
             </div>
@@ -77,7 +77,7 @@ function renderTable({ certificates, hierarchy }) {
     </script>`;
 
     // Return the complete HTML
-    return layout('Certificate Viewer', getStyles(), content);
+    return layout('Certificate Manager', getStyles(), content);
 }
 
 module.exports = {
