@@ -6,7 +6,7 @@ class Logger {
     constructor(options = {}) {
         this.logDir = options.logDir || '/logs';
         this.logFile = options.logFile || 'cert-manager.log';
-        this.logLevel = options.logLevel || 'info'; // debug, info, warn, error
+        this.logLevel = options.logLevel || 'debug'; // debug, info, warn, error
         this.maxSize = options.maxSize || 5 * 1024 * 1024; // 5MB default
         this.keepLogs = options.keepLogs || 5;
         this.logToConsole = options.logToConsole !== false;

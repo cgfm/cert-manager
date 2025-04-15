@@ -1,0 +1,273 @@
+/* Tab styles */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    padding: 10px 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-right: 15px;
+    font-weight: 500;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+    border-bottom: 3px solid #0078d7;
+    color: #0078d7;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Settings specific styles */
+.settings-section {
+    margin-bottom: 1.5rem;
+}
+
+.settings-section h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    color: #444;
+}
+
+/* Form groups within tabs */
+.tab-content .form-group {
+    margin-bottom: 1rem;
+}
+
+.tab-content .form-group label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+}
+
+.tab-content .form-group input[type="text"],
+.tab-content .form-group input[type="number"],
+.tab-content .form-group input[type="password"],
+.tab-content .form-group select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.tab-content .form-group input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+/* Info rows in tabs */
+.cert-info {
+    background-color: var(--bg-light);
+    padding: 1rem;
+    border-radius: 6px;
+    margin: 1rem 0;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: 0.5rem;
+}
+
+.info-label {
+    min-width: 120px;
+    font-weight: 500;
+}
+
+/* Domain management */
+.domains-list {
+    margin: 1rem 0;
+}
+
+.domain-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--bg-light);
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+}
+
+.domain-item.pending-removal-item {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.domain-name {
+    flex-grow: 1;
+}
+
+.stage-remove-domain-btn {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+}
+
+.stage-remove-domain-btn:hover {
+    color: #c82333;
+}
+
+.add-domain-container {
+    margin: 1rem 0;
+}
+
+.add-domain-container .form-group {
+    display: flex;
+}
+
+.add-domain-container input {
+    flex-grow: 1;
+    margin-right: 0.5rem;
+}
+
+/* Pending changes */
+.pending-changes-list {
+    background: var(--bg-light);
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+}
+
+.changes-buttons {
+    margin: 1rem 0;
+}
+
+/* Actions for deployment */
+.actions-container {
+    margin: 1rem 0;
+}
+
+.action-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--bg-light);
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+}
+
+.action-content {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+}
+
+.action-icon {
+    margin-right: 0.5rem;
+    width: 20px;
+    text-align: center;
+}
+
+.action-details {
+    flex-grow: 1;
+}
+
+.action-type {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.action-param {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.delete-action-btn {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+}
+
+.add-action-container {
+    margin: 1rem 0;
+}
+
+.browse-btn {
+    margin-left: 0.5rem;
+}
+
+/* Danger zone */
+.danger-zone {
+    margin-top: 2rem;
+    padding: 1rem;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 4px;
+}
+
+.danger-zone h4 {
+    color: var(--danger-color);
+    margin-bottom: 0.75rem;
+}
+
+.danger-btn {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.danger-btn:hover {
+    background-color: #c82333;
+}
+
+/* Info boxes */
+.info-box {
+    display: flex;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+    background-color: var(--bg-light);
+    align-items: flex-start;
+}
+
+.warning-box {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 3px solid var(--warning-color);
+}
+
+.info-box i {
+    margin-right: 0.5rem;
+    margin-top: 3px;
+    color: var(--warning-color);
+}
+
+.info-box p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* File browser specific styles */
+.small-btn {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    margin-left: 8px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.small-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.small-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

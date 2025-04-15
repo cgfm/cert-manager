@@ -1,84 +1,108 @@
 const express = require('express');
 const router = express.Router();
-const logger = require('../services/logger');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../services/logger');
 
-// GET /api/logs - Get recent logs from in-memory history
-router.get('/', (req, res) => {
-    try {
-        const options = {
-            level: req.query.level,
-            limit: req.query.limit ? parseInt(req.query.limit) : 100,
-            startTime: req.query.start ? new Date(req.query.start) : null,
-            endTime: req.query.end ? new Date(req.query.end) : null
-        };
-        
-        const logs = logger.getLogHistory(options);
-        
-        res.json({
-            success: true,
-            logs
-        });
-    } catch (error) {
-        logger.error('Error retrieving logs', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-// GET /api/logs/file - Download the current log file
-router.get('/file', (req, res) => {
-    try {
-        const logDir = process.env.LOG_DIR || '/logs';
-        const logFile = process.env.LOG_FILE || 'cert-manager.log';
-        const logPath = path.join(logDir, logFile);
-        
-        if (!fs.existsSync(logPath)) {
-            return res.status(404).json({
+function initialize() {
+    // Get application logs
+    router.get('/', async (req, res) => {
+        try {
+            const logsDir = process.env.LOGS_DIR || '/logs';
+            const logFile = path.join(logsDir, 'app.log');
+            
+            // Check if log file exists
+            if (!fs.existsSync(logFile)) {
+                return res.json({
+                    success: true,
+                    logs: [],
+                    message: 'No logs available'
+                });
+            }
+            
+            // Read the last 200 lines of the log file
+            const logs = await readLastLines(logFile, 200);
+            
+            return res.json({
+                success: true,
+                logs: logs.map(parseLine)
+            });
+        } catch (error) {
+            logger.error('Error retrieving logs:', error);
+            return res.status(500).json({
                 success: false,
-                error: 'Log file not found'
+                error: 'Error retrieving logs: ' + error.message,
+                logs: []
             });
         }
-        
-        res.download(logPath, logFile);
-    } catch (error) {
-        logger.error('Error downloading log file', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
+    });
 
-// POST /api/logs/client - Receive logs from client-side
-router.post('/client', (req, res) => {
-    try {
-        const { level, message, data } = req.body;
-        
-        // Validate the level
-        if (!['debug', 'info', 'warn', 'error'].includes(level)) {
-            return res.status(400).json({
+    // Post client logs
+    router.post('/client', (req, res) => {
+        try {
+            const { level, message, data } = req.body;
+            
+            // Validate log level
+            const validLevels = ['info', 'warn', 'error', 'debug'];
+            const logLevel = validLevels.includes(level) ? level : 'info';
+            
+            // Log with client prefix
+            logger[logLevel](`[CLIENT] ${message}`, data);
+            
+            return res.json({
+                success: true
+            });
+        } catch (error) {
+            logger.error('Error logging client message:', error);
+            return res.status(500).json({
                 success: false,
-                error: 'Invalid log level'
+                error: 'Error logging message: ' + error.message
             });
         }
-        
-        // Log the message with the appropriate level
-        logger[level](`[CLIENT] ${message}`, data);
-        
-        res.json({
-            success: true
-        });
-    } catch (error) {
-        logger.error('Error processing client log', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
+    });
 
-module.exports = router;
+    // Helper function to read last N lines of file
+    async function readLastLines(filePath, maxLines) {
+        try {
+            const fileContent = await fs.promises.readFile(filePath, 'utf8');
+            const lines = fileContent.split('\n').filter(line => line.trim());
+            
+            // Return only the last maxLines
+            return lines.slice(Math.max(0, lines.length - maxLines));
+        } catch (error) {
+            logger.error(`Error reading log file ${filePath}:`, error);
+            throw error;
+        }
+    }
+
+    // Helper function to parse log lines
+    function parseLine(line) {
+        try {
+            // Example log format: [2023-04-09T15:42:12.123Z] [INFO] Message
+            const timestampMatch = line.match(/\[([^\]]+)\]/);
+            const levelMatch = line.match(/\[[^\]]+\]\s+\[([^\]]+)\]/);
+            const timestamp = timestampMatch ? timestampMatch[1] : '';
+            const level = levelMatch ? levelMatch[1].toLowerCase() : 'info';
+            
+            // Extract message (everything after the second bracket pair)
+            const message = line.replace(/\[[^\]]+\]\s+\[[^\]]+\]\s+/, '');
+            
+            return {
+                timestamp,
+                level,
+                message
+            };
+        } catch (error) {
+            logger.warn('Error parsing log line:', error);
+            return {
+                timestamp: '',
+                level: 'unknown',
+                message: line
+            };
+        }
+    }
+    
+    return router;
+}
+
+module.exports = { router, initialize };

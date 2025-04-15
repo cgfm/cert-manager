@@ -2,15 +2,37 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const logger = require('./services/logger');
+const logger = require('./logger');
 
 class RenewalManager {
-    constructor(configManager, certsDir) {
+    constructor(configManager, certsDir, certificateService) {
         this.configManager = configManager;
         this.certsDir = certsDir;
+        this.certificateService = certificateService;
+        
+        // Validate that certificateService is provided and has required methods
+        if (!this.certificateService) {
+            logger.warn('CertificateService not provided to RenewalManager. Some functionality may not work.');
+        } else {
+            logger.info('RenewalManager initialized with CertificateService');
+        }
     }
 
     async checkCertificatesForRenewal(certificates) {
+        // If certificates aren't provided, try to get them from the service
+        if (!certificates) {
+            try {
+                if (!this.certificateService) {
+                    throw new Error('Certificate service not available');
+                }
+                logger.info('Fetching certificates from certificate service');
+                certificates = await this.certificateService.getAllCertificates();
+            } catch (error) {
+                logger.error('Failed to fetch certificates for renewal check:', error);
+                return;
+            }
+        }
+        
         const now = new Date();
         
         // First check for any certificates that need renewal
@@ -25,16 +47,22 @@ class RenewalManager {
             // Get cert config with defaults
             const config = this.configManager.getCertConfig(cert.fingerprint);
             
-            if (!config.autoRenew || !cert.expiryDate) {
+            // Check if cert has validTo instead of expiryDate
+            const expiryDate = cert.expiryDate || cert.validTo;
+            
+            if (!config.autoRenew || !expiryDate) {
                 continue;
             }
+            
+            // Ensure expiryDate is a Date object
+            const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
             
             // Calculate threshold date for renewal
             const renewalThreshold = new Date();
             renewalThreshold.setDate(renewalThreshold.getDate() + config.renewDaysBeforeExpiry);
             
-            if (cert.expiryDate <= renewalThreshold) {
-                console.log(`Certificate ${cert.name} needs renewal (expires ${cert.expiryDate})`);
+            if (expiry <= renewalThreshold) {
+                logger.info(`Certificate ${cert.name} needs renewal (expires ${expiry.toISOString()})`);
                 certsToRenew.push({ cert, config });
             }
         }
@@ -45,7 +73,7 @@ class RenewalManager {
                 await this.renewCertificate(cert);
                 await this.runDeployActions(cert, config.deployActions);
             } catch (error) {
-                console.error(`Failed to renew certificate ${cert.name}:`, error);
+                logger.error(`Failed to renew certificate ${cert.name}:`, error);
             }
         }
         
@@ -58,9 +86,15 @@ class RenewalManager {
             
             const config = this.configManager.getCertConfig(cert.fingerprint);
             
-            if (!config.autoRenew || !cert.expiryDate) {
+            // Check if cert has validTo instead of expiryDate
+            const expiryDate = cert.expiryDate || cert.validTo;
+            
+            if (!config.autoRenew || !expiryDate) {
                 continue;
             }
+            
+            // Ensure expiryDate is a Date object
+            const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
             
             // For CAs, we want a more conservative approach - renew when they reach 25% of validity left
             const defaults = this.configManager.getGlobalDefaults();
@@ -71,17 +105,17 @@ class RenewalManager {
             // This is a more aggressive renewal strategy for critical infrastructure
             const renewThresholdDays = Math.floor(totalValidityDays * 0.25);
             
-            const expiryTime = cert.expiryDate.getTime();
+            const expiryTime = expiry.getTime();
             const nowTime = now.getTime();
             const daysUntilExpiry = Math.floor((expiryTime - nowTime) / (1000 * 60 * 60 * 24));
             
             if (daysUntilExpiry <= renewThresholdDays) {
-                console.log(`CA Certificate ${cert.name} needs renewal (${daysUntilExpiry} days until expiry, threshold: ${renewThresholdDays})`);
+                logger.info(`CA Certificate ${cert.name} needs renewal (${daysUntilExpiry} days until expiry, threshold: ${renewThresholdDays})`);
                 try {
                     await this.renewCACertificate(cert);
                     await this.runDeployActions(cert, config.deployActions);
                 } catch (error) {
-                    console.error(`Failed to renew CA certificate ${cert.name}:`, error);
+                    logger.error(`Failed to renew CA certificate ${cert.name}:`, error);
                 }
             }
         }
@@ -757,7 +791,6 @@ class RenewalManager {
         }
     }
 
-    // Add this helper method to handle backups
     async backupCertificateIfNeeded(keyPath, certPath) {
         // Check global backup settings
         const defaults = this.configManager.getGlobalDefaults();
@@ -812,8 +845,22 @@ class RenewalManager {
                 keyPath: renewalResult.keyPath
             });
             
-            // After renewal, get the updated certificate data to find the new fingerprint
-            const updatedCertData = await parseCertificates(this.certsDir);
+            // Use certificateService to get updated certificates
+            let updatedCertData;
+            try {
+                if (!this.certificateService) {
+                    throw new Error('Certificate service not available');
+                }
+                updatedCertData = {
+                    certificates: await this.certificateService.getAllCertificates()
+                };
+            } catch (error) {
+                logger.error('Failed to get updated certificates after renewal:', error);
+                return {
+                    success: false,
+                    message: 'Certificate renewed but failed to fetch updated certificate data'
+                };
+            }
             
             // Look for the updated certificate using multiple methods
             let updatedCert = null;
@@ -852,11 +899,10 @@ class RenewalManager {
                 
                 logger.info(`Certificate renewed with new fingerprint: ${updatedCert.fingerprint}`);
                 
-                // Transfer configuration to the new fingerprint
+                // Transfer configuration from the old certificate to the new one
+                const updatedConfig = this.configManager.getCertConfig(originalFingerprint);
                 this.configManager.setCertConfig(updatedCert.fingerprint, updatedConfig);
                 logger.info('Transferred config to new certificate fingerprint');
-                
-                result.newFingerprint = updatedCert.fingerprint;
                 
                 // Run deployment actions with the updated certificate that has correct paths
                 if (deployActions && deployActions.length > 0) {
@@ -873,8 +919,27 @@ class RenewalManager {
                         logger.error('Error running deployment actions', deployError);
                     }
                 }
+                
+                return {
+                    success: true,
+                    message: 'Certificate renewed with updated domains',
+                    newFingerprint: updatedCert.fingerprint
+                };
+            } else {
+                logger.warn('Could not find renewed certificate in updated certificate data');
+                return {
+                    success: true,
+                    message: 'Certificate renewed but could not locate updated certificate data',
+                    certPath: renewalResult.certPath,
+                    keyPath: renewalResult.keyPath
+                };
             }
         }
+        
+        return {
+            success: false,
+            message: 'No renewal requested'
+        };
     }
 }
 

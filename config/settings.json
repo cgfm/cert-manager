@@ -1,0 +1,13 @@
+{
+  "certPath": "/certs",
+  "renewalDays": 30,
+  "autoRenewDefault": true,
+  "acmeServer": "letsencrypt",
+  "customAcmeUrl": "",
+  "defaultEmail": "",
+  "keySize": 2048,
+  "enableAuth": false,
+  "username": "",
+  "httpsPort": 4443,
+  "enableDebugLogs": false
+}

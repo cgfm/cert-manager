@@ -11,14 +11,30 @@ class DockerService {
 
     initDocker() {
         try {
-            // Check if Docker socket is accessible
-            if (fs.existsSync('/var/run/docker.sock')) {
+            if (process.platform === 'win32') {
+                // Windows-specific Docker socket path
+                this.docker = new Docker({ socketPath: '//./pipe/docker_engine' });
+                this.isAvailable = true;
+                logger.info('Docker integration initialized successfully (Windows)');
+            } 
+            else if (fs.existsSync('/var/run/docker.sock')) {
+                // Linux/Mac Docker socket path
                 this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
                 this.isAvailable = true;
                 logger.info('Docker integration initialized successfully');
-            } else {
-                logger.info('Docker socket not found, Docker integration disabled');
-                this.isAvailable = false;
+            } 
+            else {
+                // Try to initialize Docker from environment variables as fallback
+                this.docker = new Docker();
+                
+                // Test the connection
+                this.docker.ping().then(() => {
+                    this.isAvailable = true;
+                    logger.info('Docker integration initialized from environment');
+                }).catch(err => {
+                    logger.warn('Docker not available:', err.message);
+                    this.isAvailable = false;
+                });
             }
         } catch (error) {
             logger.error('Error initializing Docker client:', error);

@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:23-slim
 
 RUN apt-get update && apt-get install -y openssl && apt-get clean
 
@@ -20,7 +20,7 @@ EXPOSE 3000 4443
 
 VOLUME ["/certs", "/config", "/logs"]
 
-CMD ["node", "src/index.js"]
+CMD ["node", "src/app.js"]
 
 LABEL org.opencontainers.image.title="cert-manager" \
       org.opencontainers.image.description="Certificate management tool for self signed certificates." \

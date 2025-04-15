@@ -1,0 +1,537 @@
+:root {
+  --primary-color: #3a86ff;
+  --primary-dark: #2667cc;
+  --secondary-color: #f0f0f0;
+  --text-color: #333;
+  --danger-color: #e63946;
+  --warning-color: #fca311;
+  --success-color: #2a9d3d;
+  --border-color: #ddd;
+  --bg-light: #f8f9fa;
+  --bg-dark: #343a40;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text-color);
+  background-color: var(--bg-light);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Header styles */
+.app-header {
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
+  margin-right: 0;
+}
+
+.app-title i {
+  color: var(--primary-color);
+  font-size: 1.8rem;
+  margin-right: 0.5rem;
+}
+
+.app-title h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 0;
+}
+
+/* Slider Toggle Switch Styles */
+.toggle-container {
+  position: relative;
+  display: inline-block;
+  width: 140px;
+  height: 30px;
+}
+
+.toggle-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-label {
+  position: relative;
+  display: block;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.3s;
+  overflow: hidden;
+}
+
+.toggle-inner {
+  display: block;
+  width: 200%;
+  margin-left: -100%;
+  transition: margin 0.3s ease-in-out;
+}
+
+.toggle-inner:before, .toggle-inner:after {
+  content: "";
+  display: block;
+  float: left;
+  width: 50%;
+  height: 30px;
+  padding: 0;
+  line-height: 30px;
+  font-size: 14px;
+  color: white;
+  font-weight: 500;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.toggle-inner:before {
+  content: attr(data-flat);
+  padding-left: 10px;
+  padding-right: 40px;
+  background-color: var(--primary-color);
+  color: #fff;
+}
+
+.toggle-inner:after {
+  content: attr(data-hierarchy);
+  padding-left: 40px;
+  background-color: #4a4a4a;
+  color: #fff;
+}
+
+.toggle-switch {
+  position: absolute;
+  display: block;
+  width: 24px;
+  height: 24px;
+  margin: 3px;
+  background: #fff;
+  border-radius: 24px;
+  top: 0;
+  right: 95px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s;
+}
+
+.toggle-checkbox:checked + .toggle-label .toggle-inner {
+  margin-left: 0;
+}
+
+.toggle-checkbox:checked + .toggle-label .toggle-switch {
+  right: 3px;
+}
+
+/* Hover effect for better UX */
+.toggle-label:hover {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.toggle-label:active .toggle-switch {
+  width: 28px;
+}
+
+/* Update header view controls */
+.header-view-controls {
+  margin-left: auto;
+  margin-right: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.header-view-controls span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-color);
+  margin-right: 10px;
+}
+
+.header-btn {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.header-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+.header-btn i {
+  margin-right: 0.25rem;
+}
+
+.primary-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.primary-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Main content styles */
+.app-container {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.certificate-panel {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h2 {
+  font-size: 1.25rem;
+}
+
+.search-container {
+  position: relative;
+}
+
+#certSearch {
+  padding: 0.5rem 0.5rem 0.5rem 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 250px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+}
+
+/* Table styles */
+.table-container {
+  overflow-x: auto;
+}
+
+.certificates-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.certificates-table th,
+.certificates-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.certificates-table th {
+  background-color: var(--bg-light);
+  font-weight: 600;
+}
+
+.sort-header {
+  cursor: pointer;
+}
+
+.sort-header i {
+  margin-left: 0.25rem;
+  opacity: 0.5;
+}
+
+.sort-header.active i {
+  opacity: 1;
+}
+
+.cert-row:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Certificate status indicators */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-valid {
+  background-color: var(--success-color);
+}
+
+.status-warning {
+  background-color: var(--warning-color);
+}
+
+.status-expired {
+  background-color: var(--danger-color);
+}
+
+.status-ca {
+  background-color: #9c27b0;
+}
+
+.status-intermediate-ca {
+  background-color: #5e35b1;
+}
+
+/* Domain tags */
+.domain-tag {
+  display: inline-block;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin: 2px;
+  font-size: 0.85rem;
+}
+
+/* Certificate types */
+.cert-type {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.cert-type-root {
+  background-color: #9c27b0;
+  color: black;
+}
+
+.cert-type-intermediate {
+  background-color: #5e35b1;
+  color: black;
+}
+
+/* Action buttons */
+.cert-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.config-btn, .renew-btn {
+  padding: 0.4rem 0.6rem;
+  margin-left: 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.renew-btn:hover {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.config-btn:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* Footer styles */
+.app-footer {
+  background-color: white;
+  border-top: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: auto;
+}
+
+.footer-status {
+  display: flex;
+  gap: 1rem;
+}
+
+#docker-status i {
+  font-size: 0.7rem;
+  margin-right: 3px;
+}
+
+#docker-status.active i {
+  color: var(--success-color);
+}
+
+#docker-status.inactive i {
+  color: var(--danger-color);
+}
+
+/* Loading indicators */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.loading-container i {
+  margin-right: 0.5rem;
+  color: var(--primary-color);
+}
+
+/* Modal styles will be added dynamically */
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .panel-header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .search-container {
+    width: 100%;
+  }
+  
+  #certSearch {
+    width: 100%;
+  }
+  
+  .certificates-table th,
+  .certificates-table td {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .cert-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .config-btn, .renew-btn {
+    margin-left: 0;
+  }
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(3px);
+}
+
+.loading-content {
+  background-color: #fff;
+  padding: 30px 40px;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  min-width: 200px;
+}
+
+.loading-content i {
+  color: #0078d7;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.loading-content p {
+  margin: 0;
+  color: #333;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Animation for the spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.fa-spinner {
+  animation: spin 1.5s linear infinite;
+}
+
+/* Hierarchy view styles */
+.root-cert {
+    font-weight: 500;
+    background-color: rgba(0, 120, 215, 0.05);
+}
+
+.intermediate-cert {
+    background-color: rgba(0, 120, 215, 0.02);
+}
+
+.indent-marker {
+    display: inline-block;
+    width: 20px;
+}
+
+.hierarchy-toggle {
+    cursor: pointer;
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+}
+
+.separator-row {
+    background-color: #f9f9f9;
+}
+
+.separator-label {
+    padding: 8px 15px;
+    font-weight: 500;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.orphaned-cert {
+    opacity: 0.9;
+}
