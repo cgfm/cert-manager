@@ -1293,122 +1293,6 @@ function createLoadingOverlay(message = 'Loading...') {
 }
 
 /**
- * Show a notification message
- * @param {string} message - Message to display
- * @param {string} type - Type of notification (success, error, warning, info)
- */
-function showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    
-    // Set icon based on type
-    let icon;
-    switch (type) {
-        case 'success': icon = '<i class="fas fa-check-circle"></i>'; break;
-        case 'error': icon = '<i class="fas fa-exclamation-circle"></i>'; break;
-        case 'warning': icon = '<i class="fas fa-exclamation-triangle"></i>'; break;
-        default: icon = '<i class="fas fa-info-circle"></i>';
-    }
-    
-    notification.innerHTML = `
-        ${icon}
-        <span class="notification-message">${message}</span>
-        <button class="notification-close"><i class="fas fa-times"></i></button>
-    `;
-    
-    // Add styles if needed
-    if (!document.getElementById('notification-styles')) {
-        const style = document.createElement('style');
-        style.id = 'notification-styles';
-        style.textContent = `
-            .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 4px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                display: flex;
-                align-items: center;
-                min-width: 300px;
-                max-width: 450px;
-                z-index: 10000;
-                animation: notify-in 0.3s ease-out;
-            }
-            
-            @keyframes notify-in {
-                0% { transform: translateY(-50px); opacity: 0; }
-                100% { transform: translateY(0); opacity: 1; }
-            }
-            
-            .notification i {
-                margin-right: 10px;
-                font-size: 1.2em;
-            }
-            
-            .notification-message {
-                flex-grow: 1;
-            }
-            
-            .notification-close {
-                background: none;
-                border: none;
-                cursor: pointer;
-                opacity: 0.7;
-                transition: opacity 0.2s;
-            }
-            
-            .notification-close:hover {
-                opacity: 1;
-            }
-            
-            .notification.success {
-                background-color: #d4edda;
-                color: #155724;
-                border-left: 4px solid #28a745;
-            }
-            
-            .notification.error {
-                background-color: #f8d7da;
-                color: #721c24;
-                border-left: 4px solid #dc3545;
-            }
-            
-            .notification.warning {
-                background-color: #fff3cd;
-                color: #856404;
-                border-left: 4px solid #ffc107;
-            }
-            
-            .notification.info {
-                background-color: #d1ecf1;
-                color: #0c5460;
-                border-left: 4px solid #17a2b8;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // Add to document
-    document.body.appendChild(notification);
-    
-    // Add close button handler
-    notification.querySelector('.notification-close').addEventListener('click', () => {
-        document.body.removeChild(notification);
-    });
-    
-    // Auto-remove after 5 seconds for non-error notifications
-    if (type !== 'error') {
-        setTimeout(() => {
-            if (document.body.contains(notification)) {
-                document.body.removeChild(notification);
-            }
-        }, 5000);
-    }
-}
-
-/**
  * Load certificates for HTTPS configuration
  * @param {HTMLElement} modal - The modal element containing the certificate dropdown
  */
@@ -1570,6 +1454,127 @@ function showCustomConfirm(message, onConfirm, onCancel) {
     });
 }
 
+
+/**
+ * Show a toast notification
+ * @param {string} message - Message to display
+ * @param {string} type - Notification type (success, error, warning, info)
+ * @param {number} duration - How long to show the notification in ms
+ */
+function showNotification(message, type = 'info', duration = 5000) {
+    // Create container if it doesn't exist
+    let container = document.querySelector('.notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'notification-container';
+        container.style.position = 'fixed';
+        container.style.top = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.style.backgroundColor = type === 'success' ? '#d4edda' :
+                                        type === 'error' ? '#f8d7da' :
+                                        type === 'warning' ? '#fff3cd' : '#d1ecf1';
+    notification.style.color = type === 'success' ? '#155724' :
+                              type === 'error' ? '#721c24' :
+                              type === 'warning' ? '#856404' : '#0c5460';
+    notification.style.padding = '15px';
+    notification.style.marginBottom = '10px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    notification.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+    notification.style.transform = 'translateX(100%)';
+    notification.style.opacity = '0';
+    
+    // Add marker to track removal status
+    notification.dataset.beingRemoved = 'false';
+    
+    // Add icon based on type
+    const icon = type === 'success' ? 'fa-check-circle' :
+                type === 'error' ? 'fa-exclamation-circle' :
+                type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    
+    notification.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <i class="fas ${icon}" style="margin-right: 10px;"></i>
+                ${message}
+            </div>
+            <button class="close-notification" style="background: none; border: none; cursor: pointer; font-size: 16px;">
+                &times;
+            </button>
+        </div>
+    `;
+    
+    // Add to container
+    container.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+        notification.style.opacity = '1';
+    }, 10);
+    
+    // Create a safer close function that checks if element is still in DOM
+    function closeNotification(element) {
+        // Check if element is already being removed
+        if (element.dataset.beingRemoved === 'true') {
+            return; // Already in the process of being removed
+        }
+        
+        // Mark as being removed to prevent multiple removal attempts
+        element.dataset.beingRemoved = 'true';
+        
+        // Animate out
+        element.style.transform = 'translateX(100%)';
+        element.style.opacity = '0';
+        
+        // Remove after animation
+        setTimeout(() => {
+            try {
+                // Check if the notification is still in the DOM and if the container still exists
+                if (document.body.contains(element) && element.parentNode) {
+                    element.parentNode.removeChild(element);
+                    
+                    // Check if container exists and is empty
+                    if (container && document.body.contains(container) && container.children.length === 0) {
+                        document.body.removeChild(container);
+                    }
+                }
+            } catch (error) {
+                console.warn('Error removing notification:', error);
+                // Fallback: just hide it with CSS if we can't remove it
+                if (document.body.contains(element)) {
+                    element.style.display = 'none';
+                }
+            }
+        }, 300);
+    }
+    
+    // Set up close button
+    const closeButton = notification.querySelector('.close-notification');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            closeNotification(notification);
+        });
+    }
+    
+    // Auto close after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            closeNotification(notification);
+        }, duration);
+    }
+    
+    // Return the notification element in case it needs to be referenced
+    return notification;
+}
+
 // Make the utilities available globally
 if (typeof window !== 'undefined') {
     window.modalUtils = {
@@ -1584,13 +1589,13 @@ if (typeof window !== 'undefined') {
         showCertificateConfigModal: showCertificateConfigModal,
         renewCertificate: renewCertificate,
         createLoadingOverlay: createLoadingOverlay,
-        showNotification: showNotification,
         showCustomConfirm: showCustomConfirm,
         createGlobalSettingsModal: createGlobalSettingsModal,
         showGlobalSettingsModal: showGlobalSettingsModal,
         setupGlobalSettingsModalEvents: setupGlobalSettingsModalEvents,
         saveGlobalSettings: saveGlobalSettings,
         loadCertificatesForHttps: loadCertificatesForHttps,
+        showNotification: showNotification,
         isLoaded: function() { return true; }
     };
     console.log("Modal utilities registered in window object");

@@ -941,6 +941,308 @@ class RenewalManager {
             message: 'No renewal requested'
         };
     }
+
+    /**
+     * Copy certificate files to a specific directory
+     * @param {Object} certificate - Certificate object
+     * @param {Array} files - Array of file objects to copy
+     * @param {string} destinationDir - Destination directory
+     * @param {boolean} overwrite - Whether to overwrite existing files
+     * @returns {Object} - Results of the copy operation
+     */
+    async copyFilesToDirectory(certificate, files, destinationDir, overwrite = true) {
+        logger.info(`Copying certificate files to directory: ${destinationDir}`);
+        
+        // Verify destination directory exists or create it
+        if (!fs.existsSync(destinationDir)) {
+            try {
+                fs.mkdirSync(destinationDir, { recursive: true });
+                logger.info(`Created destination directory: ${destinationDir}`);
+            } catch (error) {
+                logger.error(`Failed to create destination directory: ${error.message}`);
+                throw new Error(`Failed to create destination directory: ${error.message}`);
+            }
+        }
+        
+        const results = {
+            success: true,
+            copiedFiles: [],
+            errors: []
+        };
+        
+        // Process each file
+        for (const file of files) {
+            try {
+                // Get source path based on file type
+                let sourcePath = null;
+                let fileName = null;
+                
+                switch (file.type) {
+                    case 'cert':
+                        sourcePath = certificate.path;
+                        fileName = path.basename(sourcePath);
+                        break;
+                    case 'key':
+                        sourcePath = certificate.keyPath;
+                        fileName = path.basename(sourcePath);
+                        break;
+                    case 'ca':
+                        sourcePath = certificate.caPath;
+                        fileName = path.basename(sourcePath);
+                        break;
+                    case 'chain':
+                        sourcePath = certificate.chainPath;
+                        fileName = path.basename(sourcePath);
+                        break;
+                    case 'fullchain':
+                        sourcePath = certificate.fullchainPath;
+                        fileName = path.basename(sourcePath);
+                        break;
+                    default:
+                        sourcePath = file.path; // Direct path provided in the file object
+                        fileName = path.basename(sourcePath);
+                }
+                
+                // Check if source file exists
+                if (!sourcePath || !fs.existsSync(sourcePath)) {
+                    const error = `Source file not found: ${sourcePath} (type: ${file.type})`;
+                    logger.error(error);
+                    results.errors.push({ type: file.type, error });
+                    continue;
+                }
+                
+                // Determine destination path
+                const destinationPath = path.join(destinationDir, fileName);
+                
+                // Check if destination exists and should be overwritten
+                if (fs.existsSync(destinationPath) && !overwrite) {
+                    logger.warn(`Destination file exists and overwrite is false: ${destinationPath}`);
+                    results.errors.push({ 
+                        type: file.type, 
+                        path: destinationPath, 
+                        error: 'File exists and overwrite is disabled' 
+                    });
+                    continue;
+                }
+                
+                // Copy the file
+                logger.info(`Copying ${sourcePath} to ${destinationPath}`);
+                fs.copyFileSync(sourcePath, destinationPath);
+                
+                // Set appropriate permissions for key files
+                if (file.type === 'key') {
+                    try {
+                        // Set user read/write only permissions (0600)
+                        fs.chmodSync(destinationPath, 0o600);
+                        logger.info(`Set secure permissions on key file: ${destinationPath}`);
+                    } catch (permError) {
+                        logger.warn(`Failed to set secure permissions on key file: ${permError.message}`);
+                    }
+                }
+                
+                results.copiedFiles.push({
+                    type: file.type,
+                    from: sourcePath,
+                    to: destinationPath
+                });
+                
+            } catch (error) {
+                logger.error(`Error copying file of type ${file.type}: ${error.message}`);
+                results.errors.push({ type: file.type, error: error.message });
+                results.success = false;
+            }
+        }
+        
+        // Report results
+        if (results.success) {
+            logger.info(`Successfully copied ${results.copiedFiles.length} files to ${destinationDir}`);
+        } else {
+            logger.error(`Errors occurred during copy to ${destinationDir}: ${results.errors.length} errors`);
+        }
+        
+        return results;
+    }
+
+    /**
+     * Copy certificate files to specific locations
+     * @param {Object} certificate - Certificate object
+     * @param {Array} fileMappings - Array of file mapping objects (sourcePath, destinationPath)
+     * @param {boolean} overwrite - Whether to overwrite existing files
+     * @returns {Object} - Results of the copy operation
+     */
+    async copyFilesToSpecificLocations(certificate, fileMappings, overwrite = true) {
+        logger.info(`Copying certificate files to specific locations`);
+        
+        const results = {
+            success: true,
+            copiedFiles: [],
+            errors: []
+        };
+        
+        // Process each file mapping
+        for (const mapping of fileMappings) {
+            try {
+                // Get source path based on file type or direct path
+                let sourcePath = mapping.sourcePath;
+                
+                if (!sourcePath && mapping.type) {
+                    // Derive from certificate and type if sourcePath not provided
+                    switch (mapping.type) {
+                        case 'cert':
+                            sourcePath = certificate.path;
+                            break;
+                        case 'key':
+                            sourcePath = certificate.keyPath;
+                            break;
+                        case 'ca':
+                            sourcePath = certificate.caPath;
+                            break;
+                        case 'chain':
+                            sourcePath = certificate.chainPath;
+                            break;
+                        case 'fullchain':
+                            sourcePath = certificate.fullchainPath;
+                            break;
+                    }
+                }
+                
+                // Check if source file exists
+                if (!sourcePath || !fs.existsSync(sourcePath)) {
+                    const error = `Source file not found: ${sourcePath} (type: ${mapping.type})`;
+                    logger.error(error);
+                    results.errors.push({ type: mapping.type, error });
+                    continue;
+                }
+                
+                // Get destination path
+                const destinationPath = mapping.destinationPath;
+                
+                // Check if destination exists and should be overwritten
+                if (fs.existsSync(destinationPath) && !overwrite) {
+                    logger.warn(`Destination file exists and overwrite is false: ${destinationPath}`);
+                    results.errors.push({
+                        type: mapping.type,
+                        path: destinationPath,
+                        error: 'File exists and overwrite is disabled'
+                    });
+                    continue;
+                }
+                
+                // Ensure destination directory exists
+                const destinationDir = path.dirname(destinationPath);
+                if (!fs.existsSync(destinationDir)) {
+                    fs.mkdirSync(destinationDir, { recursive: true });
+                    logger.info(`Created destination directory: ${destinationDir}`);
+                }
+                
+                // Copy the file
+                logger.info(`Copying ${sourcePath} to ${destinationPath}`);
+                fs.copyFileSync(sourcePath, destinationPath);
+                
+                // Set appropriate permissions for key files
+                if (mapping.type === 'key') {
+                    try {
+                        // Set user read/write only permissions (0600)
+                        fs.chmodSync(destinationPath, 0o600);
+                        logger.info(`Set secure permissions on key file: ${destinationPath}`);
+                    } catch (permError) {
+                        logger.warn(`Failed to set secure permissions on key file: ${permError.message}`);
+                    }
+                }
+                
+                results.copiedFiles.push({
+                    type: mapping.type,
+                    from: sourcePath,
+                    to: destinationPath
+                });
+                
+            } catch (error) {
+                logger.error(`Error copying file mapping: ${error.message}`, mapping);
+                results.errors.push({ mapping, error: error.message });
+                results.success = false;
+            }
+        }
+        
+        // Report results
+        if (results.success) {
+            logger.info(`Successfully copied ${results.copiedFiles.length} files to their destinations`);
+        } else {
+            logger.error(`Errors occurred during copy operations: ${results.errors.length} errors`);
+        }
+        
+        return results;
+    }
+
+    /**
+     * Restart a service after deployment
+     * @param {string} serviceName - Name of the service to restart
+     * @returns {Object} - Results of the restart operation
+     */
+    async restartService(serviceName) {
+        logger.info(`Restarting service: ${serviceName}`);
+        
+        try {
+            // First check if it's a Docker service
+            try {
+                const { stdout, stderr } = await this.executeCommandWithOutput('docker', ['ps', '--format', '{{.Names}}']);
+                const containerNames = stdout.split('\n').filter(name => name.trim() !== '');
+                
+                if (containerNames.includes(serviceName)) {
+                    logger.info(`Detected ${serviceName} as a Docker container, restarting...`);
+                    return await this.restartContainer(serviceName);
+                }
+            } catch (dockerError) {
+                logger.warn(`Docker check failed, trying system service: ${dockerError.message}`);
+            }
+            
+            // Try as a system service with systemctl
+            try {
+                const { stdout, stderr } = await this.executeCommandWithOutput('systemctl', ['is-active', serviceName]);
+                
+                if (stdout.trim() === 'active' || stdout.trim() === 'activating') {
+                    logger.info(`Restarting system service: ${serviceName}`);
+                    await this.executeCommandWithOutput('systemctl', ['restart', serviceName]);
+                    return {
+                        success: true,
+                        message: `System service ${serviceName} restarted successfully`,
+                        type: 'system'
+                    };
+                }
+            } catch (systemCtlError) {
+                logger.warn(`systemctl restart failed: ${systemCtlError.message}`);
+            }
+            
+            // Try service command as fallback
+            try {
+                logger.info(`Trying service command for: ${serviceName}`);
+                await this.executeCommandWithOutput('service', [serviceName, 'restart']);
+                return {
+                    success: true,
+                    message: `Service ${serviceName} restarted successfully using service command`,
+                    type: 'service'
+                };
+            } catch (serviceError) {
+                logger.warn(`service restart failed: ${serviceError.message}`);
+                
+                // Try a broader approach - just execute the restart command directly
+                try {
+                    const restartCommand = `service ${serviceName} restart || systemctl restart ${serviceName} || /etc/init.d/${serviceName} restart`;
+                    logger.info(`Trying general restart command: ${restartCommand}`);
+                    await this.executeCommand(restartCommand);
+                    return {
+                        success: true,
+                        message: `Service ${serviceName} restarted using fallback method`,
+                        type: 'fallback'
+                    };
+                } catch (fallbackError) {
+                    throw new Error(`All restart methods failed: ${fallbackError.message}`);
+                }
+            }
+        } catch (error) {
+            logger.error(`Failed to restart service ${serviceName}: ${error.message}`);
+            throw error;
+        }
+    }
 }
 
 module.exports = RenewalManager;

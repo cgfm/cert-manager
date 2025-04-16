@@ -26,11 +26,18 @@ if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
-// Create config manager
-const configManager = new ConfigManager();
-
-// Create certificate service
+// Initialize services
+const configManager = new ConfigManager(CONFIG_DIR);
 const certificateService = new CertificateService(CERTS_DIR, configManager);
+
+// Trigger an initial cache refresh to build cache
+certificateService.refreshCertificateCache()
+    .then(() => {
+        logger.info('Initial certificate cache refresh complete');
+    })
+    .catch(error => {
+        logger.error('Error during initial certificate cache refresh:', error);
+    });
 
 // Create renewal manager
 const renewalManager = new RenewalManager(configManager, CERTS_DIR, certificateService);
@@ -61,9 +68,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 const dockerApiRouter = require('./routes/docker-api');
 const filesystemApiRouter = require('./routes/filesystem-api');
 const logsApiRouter = require('./routes/logs-api');
+const certificateApi = require('./routes/certificate-api.cjs');
 
-// Initialize and use API routes
-app.use('/api/certificate', require('./routes/certificate-api'));
+app.use('/api/certificate', certificateApi.initialize({
+  certificateService,
+  configManager,
+  renewalManager
+}));
 app.use('/api/settings', require('./routes/settings-api').initialize(configManager));
 app.use('/api/docker', dockerApiRouter.initialize());
 app.use('/api/filesystem', filesystemApiRouter);

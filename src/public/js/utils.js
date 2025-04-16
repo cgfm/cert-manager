@@ -44,52 +44,6 @@ function isValidDomainOrIP(value) {
     return false;
 }
 
-/**
- * Display a notification message
- * @param {string} message - The message to display
- * @param {string} type - The type (success, error, warning)
- * @param {number} duration - How long to show the notification in ms
- */
-function showNotification(message, type = 'info', duration = 3000) {
-    // Remove any existing notifications
-    const existingNotification = document.getElementById('notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.id = 'notification';
-    notification.className = `notification notification-${type}`;
-    
-    // Add icon based on type
-    let icon = 'info-circle';
-    if (type === 'success') icon = 'check-circle';
-    if (type === 'error') icon = 'exclamation-circle';
-    if (type === 'warning') icon = 'exclamation-triangle';
-    
-    notification.innerHTML = `
-        <i class="fas fa-${icon}"></i>
-        <span>${message}</span>
-    `;
-    
-    // Add to body
-    document.body.appendChild(notification);
-    
-    // Show notification with animation
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 10);
-    
-    // Hide after duration
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            notification.remove();
-        }, 300); // Wait for fade-out animation
-    }, duration);
-}
-
 // Shared utility functions for the certificate manager
 
 const certUtils = {
@@ -209,4 +163,3 @@ window.certUtils = certUtils;
 
 // Export functions for use in other modules
 window.isValidDomainOrIP = isValidDomainOrIP;
-window.showNotification = showNotification;

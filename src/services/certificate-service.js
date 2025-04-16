@@ -8,60 +8,322 @@
 
 const fs = require('fs');
 const path = require('path');
-const certificateApi = require('../routes/certificate-api');
-const parseCertificates = certificateApi.parseCertificates;
-const processCertificate = certificateApi.processCertificate;
+const util = require('util');
+const certificateApi = require('../routes/certificate-api.cjs');
 const logger = require('./logger');
+
+// Convert callback-based fs functions to Promise-based functions
+const readDirAsync = util.promisify(fs.readdir);
+const statAsync = util.promisify(fs.stat);
 
 class CertificateService {
     constructor(certsDir, configManager) {
         this.certsDir = certsDir;
         this.configManager = configManager;
+        this.certificateCache = new Map(); // In-memory cache
+        this.lastRefreshTime = 0;
+        this.isRefreshing = false;
+        this.CACHE_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+        
         logger.info(`CertificateService initialized with certificates directory: ${certsDir}`);
     }
 
     /**
-     * Get all certificates, optionally with their configurations
+     * Get all certificates with optimized loading from cert-config.json
      * @param {boolean} includeConfig - Whether to include configuration data
+     * @param {boolean} forceRefresh - Force refresh of certificate cache
      * @returns {Array} - Array of certificate objects
      */
-    async getAllCertificates(includeConfig = false) {
+    async getAllCertificates(includeConfig = false, forceRefresh = false) {
         try {
-            const certData = await parseCertificates(this.certsDir);
+            // Check if we should refresh the cache
+            const now = Date.now();
+            const shouldRefresh = forceRefresh || 
+                                  this.certificateCache.size === 0 || 
+                                  (now - this.lastRefreshTime) > this.CACHE_REFRESH_INTERVAL;
             
-            // Process certificates to ensure they have all required properties
-            const processedCerts = certData.certificates
-                .filter(cert => cert !== null) // Remove null entries
-                .map(cert => {
-                    // Ensure all required properties exist
-                    return {
-                        ...cert,
-                        name: cert.name || 'Unnamed Certificate',
-                        domains: Array.isArray(cert.domains) ? cert.domains : [],
-                        subject: cert.subject || 'Unknown Subject',
-                        issuer: cert.issuer || 'Unknown Issuer',
-                        validFrom: cert.validFrom || null,
-                        validTo: cert.validTo || null,
-                        certType: cert.certType || 'standard',
-                        fingerprint: cert.fingerprint || ''
-                    };
-                });
-            
-            if (!includeConfig) {
-                return processedCerts;
+            if (shouldRefresh && !this.isRefreshing) {
+                await this.refreshCertificateCache();
             }
             
-            // Merge with configurations
-            return processedCerts.map(cert => {
-                const config = this.configManager.getCertConfig(cert.fingerprint) || {};
-                return { ...cert, config };
-            });
+            // Get certificates from cache
+            let certificates = Array.from(this.certificateCache.values());
+            
+            // Include configuration data if requested
+            if (includeConfig) {
+                certificates = certificates.map(cert => {
+                    const config = this.configManager.getCertConfig(cert.fingerprint) || {};
+                    return { ...cert, config };
+                });
+            }
+            
+            return certificates;
         } catch (error) {
             logger.error('Error getting all certificates:', error);
             return []; // Return empty array instead of throwing
         }
     }
 
+    /**
+     * Refresh the certificate cache by scanning the certificate directory
+     * and updating the cert-config.json with new certificate information
+     */
+    async refreshCertificateCache() {
+        if (this.isRefreshing) {
+            logger.debug('Certificate cache refresh already in progress, skipping');
+            return;
+        }
+        
+        this.isRefreshing = true;
+        logger.info('Refreshing certificate cache');
+        
+        try {
+            // First, load existing certificate data from config
+            await this.loadCertificateInfoFromConfig();
+            
+            // Now check for new or changed certificates in the filesystem
+            await this.scanCertificatesDirectory();
+            
+            // Save the updated certificate information to cert-config.json
+            await this.saveCertificateInfoToConfig();
+            
+            this.lastRefreshTime = Date.now();
+            logger.info(`Certificate cache refreshed, found ${this.certificateCache.size} certificates`);
+        } catch (error) {
+            logger.error('Error refreshing certificate cache:', error);
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+    
+    /**
+     * Load existing certificate info from cert-config.json
+     */
+    async loadCertificateInfoFromConfig() {
+        // Clear current cache
+        this.certificateCache.clear();
+        
+        // Get all cert configs
+        const allCertConfigs = this.configManager.getAllCertConfigs();
+        const certificates = allCertConfigs.certificates || {};
+        
+        // For each certificate in the config, load its details
+        for (const [fingerprint, certData] of Object.entries(certificates)) {
+            // Skip if no metadata available
+            if (!certData.metadata) {
+                continue;
+            }
+            
+            // Create certificate object from metadata + config
+            const cert = {
+                ...certData.metadata,
+                fingerprint,
+                domains: certData.domains || [],
+                autoRenew: certData.autoRenew,
+                renewDaysBeforeExpiry: certData.renewDaysBeforeExpiry,
+                deployActions: certData.deployActions || []
+            };
+            
+            // Add to cache
+            this.certificateCache.set(fingerprint, cert);
+        }
+        
+        logger.info(`Loaded ${this.certificateCache.size} certificates from cert-config.json`);
+    }
+    
+    /**
+     * Scan certificate directory for certificates not in cache or updated
+     */
+    async scanCertificatesDirectory() {
+        try {
+            // Get all subdirectories in the certs directory
+            const items = await readDirAsync(this.certsDir);
+            
+            // Process certificates in root directory
+            await this.scanDirectoryForCertificates(this.certsDir);
+            
+            // Process certificates in subdirectories
+            for (const item of items) {
+                const itemPath = path.join(this.certsDir, item);
+                try {
+                    const stats = await statAsync(itemPath);
+                    if (stats.isDirectory() && item !== 'backups' && item !== 'archive') {
+                        await this.scanDirectoryForCertificates(itemPath);
+                    }
+                } catch (err) {
+                    // Skip if can't stat
+                    logger.warn(`Could not stat ${itemPath}: ${err.message}`);
+                }
+            }
+        } catch (error) {
+            logger.error(`Error scanning certificates directory: ${error.message}`);
+        }
+    }
+   
+    /**
+     * Scan a specific directory for certificates
+     * @param {string} dirPath - Directory path to scan
+     */
+    async scanDirectoryForCertificates(dirPath) {
+        try {
+            const files = await readDirAsync(dirPath);
+            
+            // Look for certificate files
+            const certFiles = files.filter(file => {
+                const ext = path.extname(file).toLowerCase();
+                return ['.crt', '.pem', '.cer'].includes(ext);
+            });
+            
+            // Process each certificate file
+            for (const certFile of certFiles) {
+                const certPath = path.join(dirPath, certFile);
+                
+                try {
+                    // Check if the file has been modified since last refresh
+                    const stats = await statAsync(certPath);
+                    const fileModTime = stats.mtime.getTime();
+                    
+                    // Find if we already have this certificate in cache by path
+                    let existingCert = null;
+                    let existingFingerprint = null;
+                    
+                    for (const [fingerprint, cert] of this.certificateCache.entries()) {
+                        if (cert.path === certPath) {
+                            existingCert = cert;
+                            existingFingerprint = fingerprint;
+                            break;
+                        }
+                    }
+                    
+                    // Skip if certificate is already in cache and hasn't been modified
+                    if (existingCert && existingCert.modificationTime && 
+                        existingCert.modificationTime >= fileModTime) {
+                        continue;
+                    }
+                    
+                    // Process the certificate
+                    logger.debug(`Processing certificate file: ${certPath}`);
+                    const cert = await this.processCertificate(certPath);
+                    cert.modificationTime = fileModTime;
+                    
+                    // If the certificate was previously in the cache with a different fingerprint,
+                    // remove the old entry
+                    if (existingFingerprint && existingFingerprint !== cert.fingerprint) {
+                        this.certificateCache.delete(existingFingerprint);
+                    }
+                    
+                    // Add to cache
+                    this.certificateCache.set(cert.fingerprint, cert);
+                    
+                    logger.debug(`Added/updated certificate in cache: ${cert.name} (${cert.fingerprint})`);
+                } catch (error) {
+                    logger.error(`Error processing certificate ${certPath}: ${error.message}`);
+                }
+            }
+        } catch (error) {
+            logger.error(`Error scanning directory ${dirPath}: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Process a certificate file to extract its information
+     * @param {string} certPath - Path to certificate file
+     * @returns {Object} - Certificate information
+     */
+    async processCertificate(certPath) {
+        try {
+            // Use the certificate API to process the certificate
+            const cert = certificateApi.processCertificate(certPath, path.dirname(certPath));
+        
+            if (!cert || !cert.fingerprint) {
+                throw new Error('Failed to extract certificate information');
+            }
+            
+            // Look for a key file
+            const certDir = path.dirname(certPath);
+            const certName = path.basename(certPath, path.extname(certPath));
+            const possibleKeyPaths = [
+                path.join(certDir, `${certName}.key`),
+                path.join(certDir, `${certName}-key.pem`),
+                path.join(certDir, 'privkey.pem')
+            ];
+            
+            for (const keyPath of possibleKeyPaths) {
+                if (fs.existsSync(keyPath)) {
+                    cert.keyPath = keyPath;
+                    break;
+                }
+            }
+            
+            // Look for chain files
+            const possibleChainPaths = [
+                path.join(certDir, `${certName}-chain.pem`),
+                path.join(certDir, 'chain.pem'),
+                path.join(certDir, 'fullchain.pem')
+            ];
+            
+            for (const chainPath of possibleChainPaths) {
+                if (fs.existsSync(chainPath)) {
+                    cert.chainPath = chainPath;
+                    break;
+                }
+            }
+            
+            return cert;
+        } catch (error) {
+            logger.error(`Error processing certificate ${certPath}: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Save updated certificate information to cert-config.json
+     */
+    async saveCertificateInfoToConfig() {
+        try {
+            // Get current config
+            const config = this.configManager.getAllCertConfigs();
+            
+            // Make sure certificates object exists
+            if (!config.certificates) {
+                config.certificates = {};
+            }
+            
+            // Update each certificate in the config
+            for (const [fingerprint, cert] of this.certificateCache.entries()) {
+                // Create config entry if it doesn't exist
+                if (!config.certificates[fingerprint]) {
+                    config.certificates[fingerprint] = {
+                        autoRenew: config.globalDefaults?.autoRenewByDefault || false,
+                        renewDaysBeforeExpiry: config.globalDefaults?.renewDaysBeforeExpiry || 30,
+                        deployActions: [],
+                        domains: cert.domains || []
+                    };
+                }
+                
+                // Remove domains and config properties from metadata
+                const metadata = { ...cert };
+                delete metadata.autoRenew;
+                delete metadata.renewDaysBeforeExpiry;
+                delete metadata.deployActions;
+                
+                // Store metadata in config
+                config.certificates[fingerprint].metadata = metadata;
+                
+                // Ensure domains are set (prefer existing config domains if available)
+                if (!config.certificates[fingerprint].domains && cert.domains) {
+                    config.certificates[fingerprint].domains = cert.domains;
+                }
+            }
+            
+            // Save the updated config
+            await this.configManager.saveAllCertConfigs(config);
+            logger.info(`Saved certificate metadata for ${this.certificateCache.size} certificates to cert-config.json`);
+        } catch (error) {
+            logger.error(`Error saving certificate info to config: ${error.message}`);
+        }
+    }
+ 
     /**
      * Extract certificate dates using OpenSSL
      * @param {string} certPath - Path to the certificate file

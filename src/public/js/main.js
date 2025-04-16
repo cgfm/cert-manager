@@ -130,9 +130,9 @@ const logger = window.logger || {
         window.uiUtils = {};
     }
     
-    if (typeof window.uiUtils.showNotification !== 'function') {
-        console.warn('uiUtils.showNotification not found, adding fallback');
-        window.uiUtils.showNotification = function(message, type) {
+    if (typeof window.modalUtils.showNotification !== 'function') {
+        console.warn('modalUtils.showNotification not found, adding fallback');
+        window.modalUtils.showNotification = function(message, type) {
             console.log(`[${type || 'info'}] ${message}`);
             alert(message);
         };
@@ -979,7 +979,7 @@ function renewCertificate(fingerprint) {
         document.body.removeChild(loadingOverlay);
         
         if (data.success) {
-            window.uiUtils.showNotification('Certificate renewal started successfully.', 'success');
+            window.modalUtils.showNotification('Certificate renewal started successfully.', 'success');
             
             // Refresh certificates list after a short delay
             setTimeout(() => {
@@ -991,13 +991,13 @@ function renewCertificate(fingerprint) {
             }, 3000);
         } else {
             const errorMsg = data.error || 'Unknown error occurred';
-            window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+            window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
         }
     })
     .catch(error => {
         document.body.removeChild(loadingOverlay);
         console.error('Error renewing certificate:', error);
-        window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+        window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
     });
 }
 
@@ -1611,7 +1611,7 @@ function createNewCertificate(modal) {
             document.body.removeChild(modal);
             
             // Show success message
-            window.uiUtils.showNotification('Certificate creation process started', 'success');
+            window.modalUtils.showNotification('Certificate creation process started', 'success');
             
             // Refresh certificates list after a short delay
             setTimeout(() => {
@@ -1623,13 +1623,13 @@ function createNewCertificate(modal) {
             }, 3000);
         } else {
             const errorMsg = data.error || 'Unknown error occurred';
-            window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+            window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
         }
     })
     .catch(error => {
         document.body.removeChild(loadingOverlay);
         console.error('Error creating certificate:', error);
-        window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+        window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
     });
 }
 
@@ -1677,7 +1677,7 @@ function uploadCertificate(modal) {
             document.body.removeChild(modal);
             
             // Show success message
-            window.uiUtils.showNotification('Certificate uploaded successfully', 'success');
+            window.modalUtils.showNotification('Certificate uploaded successfully', 'success');
             
             // Refresh certificates list
             if (typeof fetchCertificates === 'function') {
@@ -1687,13 +1687,13 @@ function uploadCertificate(modal) {
             }
         } else {
             const errorMsg = data.error || 'Unknown error occurred';
-            window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+            window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
         }
     })
     .catch(error => {
         document.body.removeChild(loadingOverlay);
         console.error('Error uploading certificate:', error);
-        window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+        window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
     });
 }
 
@@ -2009,6 +2009,57 @@ let currentFetchTimeout = null;
 let initialFetchCompleted = false;
 let fetchInProgress = false;
 
+// In your fetchCertificates function, make sure it properly processes the metadata structure
+function processCertificateData(certificates) {
+    // Process the certificates data to ensure it has the right structure
+    return certificates.map(cert => {
+        // If the certificate has a metadata property, it means we're getting the old format
+        // from a non-updated endpoint
+        if (cert.metadata) {
+            return {
+                ...cert.metadata,
+                domains: cert.domains || [],
+                autoRenew: cert.autoRenew,
+                renewDaysBeforeExpiry: cert.renewDaysBeforeExpiry,
+                deployActions: cert.deployActions || []
+            };
+        }
+        // Otherwise, we already have the flattened structure
+        return cert;
+    });
+}
+
+/**
+ * Get the current view mode (flat or hierarchy)
+ * @returns {string} - The view mode ('flat' or 'hierarchy')
+ */
+function getViewMode() {
+    try {
+        // First try to get from toggle switch if it exists
+        const viewToggle = document.getElementById('view-mode-toggle');
+        if (viewToggle) {
+            return viewToggle.checked ? 'flat' : 'hierarchy';
+        }
+        
+        // Alternatively, check radio buttons if they exist
+        const hierarchyRadio = document.getElementById('hierarchy-view');
+        if (hierarchyRadio && hierarchyRadio.checked) {
+            return 'hierarchy';
+        }
+        
+        // Fall back to localStorage if available
+        const savedMode = localStorage.getItem('certViewMode');
+        if (savedMode) {
+            return savedMode;
+        }
+        
+        // Default to flat view
+        return 'flat';
+    } catch (e) {
+        console.warn('Error determining view mode:', e);
+        return 'flat'; // Default to flat view on error
+    }
+}
 
 /**
  * Modified fetchCertificates function that uses the current view mode
@@ -2048,7 +2099,7 @@ function fetchCertificates(forceRefresh = false) {
                              document.querySelector('.certificates-table tbody');
     
     if (certificatesTable) {
-    certificatesTable.innerHTML = `
+        certificatesTable.innerHTML = `
         <tr>
             <td colspan="4" class="loading-cell">
                 <div class="loading-indicator">
@@ -2056,8 +2107,8 @@ function fetchCertificates(forceRefresh = false) {
                 </div>
             </td>
         </tr>
-    `;
-}
+        `;
+    }
     
     // Create a new AbortController for this request
     currentFetchController = new AbortController();
@@ -2071,8 +2122,12 @@ function fetchCertificates(forceRefresh = false) {
         }
     }, 10000);
     
+    const url = forceRefresh ? 
+        '/api/certificate?refresh=true' : 
+        '/api/certificate';
+
     // Fetch certificates from API with timeout protection
-    fetch('/api/certificate', { signal })
+    fetch(url, { signal })
         .then(response => {
             // Clear the timeout as soon as we get a response
             clearTimeout(currentFetchTimeout);
@@ -2093,16 +2148,22 @@ function fetchCertificates(forceRefresh = false) {
             initialFetchCompleted = true;
             fetchInProgress = false;
 
+            // Process data to ensure consistent structure
+            const processedData = processCertificateData(data);
+            
+            // Cache certificates for use in other functions
+            window.cachedCertificates = processedData;
+            
             // Get current view mode
-            const viewMode = document.querySelector('input[name="view-mode"]:checked')?.value || 'flat';
+            const viewMode = getViewMode();
             console.log(`Current view mode: ${viewMode}`);
             
             // Render with the appropriate mode
-            renderCertificatesWithMode(data, viewMode);
+            renderCertificatesWithMode(processedData, viewMode);
             
             // Update certificate count if needed
-            if (Array.isArray(data) && typeof updateCertificateCount === 'function') {
-                updateCertificateCount(data.length);
+            if (Array.isArray(processedData) && typeof updateCertificateCount === 'function') {
+                updateCertificateCount(processedData.length);
             }
         })
         .catch(error => {
@@ -2136,8 +2197,8 @@ function fetchCertificates(forceRefresh = false) {
                 
                 // Show notification if possible
                 if (typeof window.uiUtils !== 'undefined' && 
-                    typeof window.uiUtils.showNotification === 'function') {
-                    window.uiUtils.showNotification(
+                    typeof window.modalUtils.showNotification === 'function') {
+                    window.modalUtils.showNotification(
                         `Failed to load certificates: ${error.message}`, 
                         'error'
                     );
@@ -2511,19 +2572,19 @@ function setupModalEventHandlers(modal, cert, fingerprint) {
             
             // Validate domain if we have the function
             if (typeof window.isValidDomainOrIP === 'function' && !window.isValidDomainOrIP(newDomain)) {
-                window.uiUtils.showNotification('Invalid domain format', 'error');
+                window.modalUtils.showNotification('Invalid domain format', 'error');
                 return;
             }
             
             // Check if domain already exists in the certificate
             if (cert.domains && cert.domains.includes(newDomain)) {
-                window.uiUtils.showNotification('Domain already exists in this certificate', 'warning');
+                window.modalUtils.showNotification('Domain already exists in this certificate', 'warning');
                 return;
             }
             
             // Check if domain is already in the add list
             if (window.pendingChanges.addDomains.includes(newDomain)) {
-                window.uiUtils.showNotification('Domain already in the pending add list', 'warning');
+                window.modalUtils.showNotification('Domain already in the pending add list', 'warning');
                 return;
             }
             
@@ -2629,7 +2690,7 @@ function setupModalEventHandlers(modal, cert, fingerprint) {
             const params = actionParams.value.trim();
             
             if (!params) {
-                window.uiUtils.showNotification('Please enter parameters for the action', 'error');
+                window.modalUtils.showNotification('Please enter parameters for the action', 'error');
                 return;
             }
             
@@ -2724,7 +2785,7 @@ function setupModalEventHandlers(modal, cert, fingerprint) {
                 document.body.removeChild(loadingOverlay);
                 
                 if (data.success && data.keyPath) {
-                    window.uiUtils.showNotification(`Key found at ${data.keyPath}`, 'success');
+                    window.modalUtils.showNotification(`Key found at ${data.keyPath}`, 'success');
                     
                     // Update UI
                     const keyPathElement = findKeyBtn.closest('.info-row').querySelector('.info-value');
@@ -2734,13 +2795,13 @@ function setupModalEventHandlers(modal, cert, fingerprint) {
                     }
                 } else {
                     const errorMsg = data.error || 'No matching key found';
-                    window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+                    window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
                 }
             })
             .catch(error => {
                 document.body.removeChild(loadingOverlay);
                 console.error('Error finding key:', error);
-                window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+                window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
             });
         });
     }
@@ -2986,7 +3047,7 @@ function saveCertificateConfiguration(cert, fingerprint, modal) {
             
             if (data.success) {
                 document.body.removeChild(modal);
-                window.uiUtils.showNotification('Certificate configuration saved successfully', 'success');
+                window.modalUtils.showNotification('Certificate configuration saved successfully', 'success');
                 
                 // Refresh certificates list
                 setTimeout(() => {
@@ -2998,13 +3059,13 @@ function saveCertificateConfiguration(cert, fingerprint, modal) {
                 }, 1000);
             } else {
                 const errorMsg = data.error || 'Unknown error occurred';
-                window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+                window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
             }
         })
         .catch(error => {
             document.body.removeChild(loadingOverlay);
             console.error('Error saving certificate config:', error);
-            window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+            window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
         });
 }
 
@@ -3153,7 +3214,7 @@ function proceedWithDomainChanges(cert, fingerprint, modal) {
             // Check if certificate has a new fingerprint after renewal
             if (data.newFingerprint && data.newFingerprint !== fingerprint) {
                 console.log(`Certificate renewed with new fingerprint: ${data.newFingerprint}`);
-                window.uiUtils.showNotification(
+                window.modalUtils.showNotification(
                     'Certificate renewed with new fingerprint', 
                     'info'
                 );
@@ -3165,7 +3226,7 @@ function proceedWithDomainChanges(cert, fingerprint, modal) {
             // Show success message with added domains
             const addedDomainsMsg = window.pendingChanges.addDomains.length > 0 ? 
                 ` Added: ${window.pendingChanges.addDomains.join(', ')}` : '';
-            window.uiUtils.showNotification(`Certificate domains updated.${addedDomainsMsg}`, 'success');
+            window.modalUtils.showNotification(`Certificate domains updated.${addedDomainsMsg}`, 'success');
             
             // Refresh certificates list after a short delay
             setTimeout(() => {
@@ -3177,13 +3238,13 @@ function proceedWithDomainChanges(cert, fingerprint, modal) {
             }, 3000);
         } else {
             const errorMsg = data.error || 'Unknown error occurred';
-            window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+            window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
         }
     })
     .catch(error => {
         document.body.removeChild(loadingOverlay);
         console.error('Error updating certificate domains:', error);
-        window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+        window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
     });
 }
 
@@ -3229,7 +3290,7 @@ function deleteCertificate(fingerprint, modal) {
                     document.body.removeChild(modal);
                     
                     // Show success message
-                    window.uiUtils.showNotification('Certificate deleted successfully', 'success');
+                    window.modalUtils.showNotification('Certificate deleted successfully', 'success');
                     
                     // Refresh certificates list
                     if (typeof fetchCertificates === 'function') {
@@ -3239,13 +3300,13 @@ function deleteCertificate(fingerprint, modal) {
                     }
                 } else {
                     const errorMsg = data.error || 'Unknown error occurred';
-                    window.uiUtils.showNotification(`Error: ${errorMsg}`, 'error');
+                    window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
                 }
             })
             .catch(error => {
                 document.body.removeChild(loadingOverlay);
                 console.error('Error deleting certificate:', error);
-                window.uiUtils.showNotification(`Error: ${error.message}`, 'error');
+                window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
             });
         }
     );

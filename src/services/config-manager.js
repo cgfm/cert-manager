@@ -1,55 +1,21 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 class ConfigManager {
-    constructor(configPath) {
-        // Define config directory from environment or default
-        const configDir = process.env.CONFIG_DIR || '/config';
+    constructor(configDir) {
+        this.configDir = configDir;
+        this.certConfigPath = path.join(configDir, 'cert-config.json');
         
-        // Use environment variable for config path if available
-        this.configPath = process.env.CONFIG_PATH || configPath || path.join(configDir, 'cert-config.json');
-        
-        // Define additional config paths
-        this.certInfoPath = process.env.CERT_INFO_PATH || path.join(configDir, 'cert-info.json');
-        this.settingsPath = process.env.SETTINGS_PATH || path.join(configDir, 'settings.json');
-        
-        this.configs = {};
-        
-        // Default values which will be overridden by env vars if present
-        this.defaultSettings = {
-            autoRenewByDefault: process.env.AUTO_RENEW_DEFAULT === 'true',
-            renewDaysBeforeExpiry: parseInt(process.env.RENEW_DAYS_BEFORE_EXPIRY) || 30,
-            caValidityPeriod: {
-                rootCA: parseInt(process.env.ROOT_CA_VALIDITY_DAYS) || 3650, // 10 years in days
-                intermediateCA: parseInt(process.env.INTERMEDIATE_CA_VALIDITY_DAYS) || 1825, // 5 years in days
-                standard: parseInt(process.env.STANDARD_CERT_VALIDITY_DAYS) || 90 // 3 months in days
-            },
-            enableCertificateBackups: process.env.ENABLE_CERTIFICATE_BACKUPS !== 'false',
-            enableHttps: false,
-            httpsCertPath: '',
-            httpsKeyPath: '',
-            httpsPort: parseInt(process.env.HTTPS_PORT) || 4443,
-            // Add backupRetention setting
-            backupRetention: parseInt(process.env.BACKUP_RETENTION_DAYS) || 30
-        };
-        
-        // Load global config or use defaults
-        try {
-            this.loadConfig();
-        } catch (error) {
-            console.error(`Failed to load config: ${error.message}`);
-            console.info('Using default configuration');
-            this.configs.global = { ...this.defaultSettings };
-            
-            // Try to write the default config
-            try {
-                this.saveConfig();
-                console.info(`Created default config at ${this.configPath}`);
-            } catch (writeError) {
-                console.error(`Failed to write default config: ${writeError.message}`);
-            }
+        // Ensure the config directory exists
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
         }
+        
+        // Load configuration
+        this.loadConfig();
     }
+    
 
     // Helper method to get boolean env var
     getBooleanEnv(name, defaultValue) {
@@ -66,121 +32,200 @@ class ConfigManager {
         return isNaN(parsed) ? defaultValue : parsed;
     }
 
+    /**
+     * Load configuration from file
+     */
     loadConfig() {
-        // Implement loading configuration from file
-        if (fs.existsSync(this.configPath)) {
-            try {
-                const data = fs.readFileSync(this.configPath, 'utf8');
-                this.configs = JSON.parse(data);
+        try {
+            if (fs.existsSync(this.certConfigPath)) {
+                const configData = fs.readFileSync(this.certConfigPath, 'utf8');
+                this.certConfig = JSON.parse(configData);
                 
-                // Ensure we have global config
-                if (!this.configs.global) {
-                    this.configs.global = { ...this.defaultSettings };
+                // Ensure required structures exist
+                if (!this.certConfig.globalDefaults) {
+                    this.certConfig.globalDefaults = {
+                        autoRenewByDefault: false,
+                        renewDaysBeforeExpiry: 30,
+                        caValidityPeriod: {
+                            rootCA: 3650,
+                            intermediateCA: 1825,
+                            standard: 90
+                        },
+                        enableCertificateBackups: true
+                    };
                 }
-            } catch (err) {
-                console.error(`Error reading config file: ${err.message}`);
-                this.configs = { global: { ...this.defaultSettings } };
+                
+                if (!this.certConfig.certificates) {
+                    this.certConfig.certificates = {};
+                }
+                
+                logger.info(`Loaded configuration with ${Object.keys(this.certConfig.certificates).length} certificates`);
+            } else {
+                // Create default configuration
+                this.certConfig = {
+                    globalDefaults: {
+                        autoRenewByDefault: false,
+                        renewDaysBeforeExpiry: 30,
+                        caValidityPeriod: {
+                            rootCA: 3650,
+                            intermediateCA: 1825,
+                            standard: 90
+                        },
+                        enableCertificateBackups: true
+                    },
+                    certificates: {}
+                };
+                
+                // Save the default configuration
+                this.saveConfig();
+                logger.info('Created default configuration');
             }
-        } else {
-            console.log(`Config file not found at ${this.configPath}, using defaults`);
-            this.configs = { global: { ...this.defaultSettings } };
-            this.saveConfig(); // Create the config file with defaults
-        }
-    }
-
-    saveConfig() {
-        // Make sure directory exists
-        const dir = path.dirname(this.configPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        
-        // Write config to file
-        fs.writeFileSync(this.configPath, JSON.stringify(this.configs, null, 2));
-    }
-
-    getCertConfig(fingerprint) {
-        if (!this.configs.certs) {
-            this.configs.certs = {};
-        }
-        
-        if (!this.configs.certs[fingerprint]) {
-            // Return default settings for new certificates
-            return {
-                autoRenew: this.configs.global.autoRenewByDefault || false,
-                renewDaysBeforeExpiry: this.configs.global.renewDaysBeforeExpiry || 30,
-                deployActions: []
+        } catch (error) {
+            logger.error(`Error loading configuration: ${error.message}`);
+            
+            // Create default configuration in case of error
+            this.certConfig = {
+                globalDefaults: {
+                    autoRenewByDefault: false,
+                    renewDaysBeforeExpiry: 30,
+                    caValidityPeriod: {
+                        rootCA: 3650,
+                        intermediateCA: 1825,
+                        standard: 90
+                    },
+                    enableCertificateBackups: true
+                },
+                certificates: {}
             };
         }
-        
-        return this.configs.certs[fingerprint];
     }
-
-    setCertConfig(fingerprint, config) {
-        if (!this.configs.certs) {
-            this.configs.certs = {};
+    
+    /**
+     * Save configuration to file
+     */
+    saveConfig() {
+        try {
+            const configData = JSON.stringify(this.certConfig, null, 2);
+            fs.writeFileSync(this.certConfigPath, configData, 'utf8');
+            logger.info('Configuration saved successfully');
+        } catch (error) {
+            logger.error(`Error saving configuration: ${error.message}`);
         }
-        
-        this.configs.certs[fingerprint] = { ...config };
-        this.saveConfig();
     }
-
-    deleteCertConfig(fingerprint) {
-        if (this.configs.certs && this.configs.certs[fingerprint]) {
-            delete this.configs.certs[fingerprint];
-            this.saveConfig();
-            return true;
-        }
-        return false;
-    }
-
-    getGlobalConfig() {
-        // Ensure we have a global config
-        if (!this.configs.global) {
-            this.configs.global = { ...this.defaultSettings };
+    
+    /**
+     * Get configuration for a specific certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @returns {Object|null} - Certificate configuration
+     */
+    getCertConfig(fingerprint) {
+        // Normalize fingerprint by removing prefix if present
+        const normalizedFingerprint = fingerprint.replace(/^sha256\s+Fingerprint=\s*/i, '');
+        
+        // First try exact match
+        if (this.certConfig.certificates[fingerprint]) {
+            return this.certConfig.certificates[fingerprint];
         }
         
-        // Make sure required structures exist to prevent errors later
-        if (!this.configs.global.caValidityPeriod) {
-            this.configs.global.caValidityPeriod = { ...this.defaultSettings.caValidityPeriod };
+        // Then try normalized match
+        if (this.certConfig.certificates[normalizedFingerprint]) {
+            return this.certConfig.certificates[normalizedFingerprint];
         }
         
-        // Make sure validity periods have values
-        ['rootCA', 'intermediateCA', 'standard'].forEach(certType => {
-            if (!this.configs.global.caValidityPeriod[certType]) {
-                this.configs.global.caValidityPeriod[certType] = this.defaultSettings.caValidityPeriod[certType];
+        // Try to find by normalized fingerprint in all keys
+        for (const [key, value] of Object.entries(this.certConfig.certificates)) {
+            const normalizedKey = key.replace(/^sha256\s+Fingerprint=\s*/i, '');
+            if (normalizedKey === normalizedFingerprint) {
+                return value;
             }
-        });
+        }
         
-        return this.configs.global;
+        // No matching configuration found
+        return null;
     }
-
-    setGlobalConfig(settings) {
-        this.configs.global = { ...settings };
+    
+    /**
+     * Set configuration for a specific certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {Object} config - Certificate configuration
+     */
+    setCertConfig(fingerprint, config) {
+        // Create default config if none exists
+        this.certConfig.certificates[fingerprint] = {
+            ...config,
+            // Preserve metadata if it exists
+            metadata: this.certConfig.certificates[fingerprint]?.metadata || {}
+        };
+        
         this.saveConfig();
     }
 
+    /**
+     * Get global defaults
+     * @returns {Object} - Global defaults
+     */
     getGlobalDefaults() {
-        return { ...this.defaultSettings };
+        return this.certConfig.globalDefaults;
     }
-
-    getAllConfigs() {
-        return this.configs;
-    }
-
-    updateGlobalDefaults(newDefaults) {
-        if (!newDefaults || typeof newDefaults !== 'object') {
-            throw new Error('Invalid global defaults object');
-        }
-        
-        if (!newDefaults.caValidityPeriod && this.configs.global.caValidityPeriod) {
-            newDefaults.caValidityPeriod = this.configs.global.caValidityPeriod;
-        }
-        
-        this.configs.global = newDefaults;
+    
+    /**
+     * Set global defaults
+     * @param {Object} defaults - Global defaults
+     */
+    setGlobalDefaults(defaults) {
+        this.certConfig.globalDefaults = defaults;
         this.saveConfig();
+    }
+
+    /**
+     * Get all certificate configurations
+     * @returns {Object} - All certificate configurations
+     */
+    getAllCertConfigs() {
+        return this.certConfig;
+    }
+    
+    /**
+     * Save all certificate configurations
+     * @param {Object} config - Certificate configurations
+     */
+    saveAllCertConfigs(config) {
+        this.certConfig = config;
+        this.saveConfig();
+    }
+    
+    /**
+     * Get certificate metadata by fingerprint
+     * @param {string} fingerprint - Certificate fingerprint
+     * @returns {Object|null} - Certificate metadata
+     */
+    getCertificateMetadata(fingerprint) {
+        const config = this.getCertConfig(fingerprint);
+        return config?.metadata || null;
+    }
+    
+    /**
+     * Get all certificates with metadata
+     * @returns {Array} - Array of certificate objects with metadata
+     */
+    getAllCertificatesWithMetadata() {
+        const result = [];
         
-        return true;
+        for (const [fingerprint, config] of Object.entries(this.certConfig.certificates)) {
+            // Only include certificates with metadata
+            if (config.metadata) {
+                result.push({
+                    ...config.metadata,
+                    fingerprint,
+                    domains: config.domains || [],
+                    autoRenew: config.autoRenew,
+                    renewDaysBeforeExpiry: config.renewDaysBeforeExpiry,
+                    deployActions: config.deployActions || []
+                });
+            }
+        }
+        
+        return result;
     }
 }
 

@@ -2,11 +2,11 @@
   "name": "cert-manager",
   "version": "1.0.0",
   "description": "A comprehensive certificate management tool for creating, viewing, and renewing SSL certificates",
-  "main": "src/index.js",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/app.js"
   },
   "dependencies": {
     "dockerode": "^4.0.0",
