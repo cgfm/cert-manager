@@ -401,6 +401,15 @@ body {
   color: var(--danger-color);
 }
 
+/* Add to your CSS file or in style tag */
+#ws-status.connected .status-text {
+  color: #28a745;
+}
+
+#ws-status:not(.connected) .status-text {
+  color: #dc3545;
+}
+
 /* Loading indicators */
 .loading-container {
   display: flex;

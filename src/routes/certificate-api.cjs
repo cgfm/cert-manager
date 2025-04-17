@@ -619,18 +619,15 @@ function initRouter(services) {
     router.get('/:fingerprint', async (req, res) => {
         try {
             const { fingerprint } = req.params;
-            
-            // Clean up the fingerprint (remove 'sha256 Fingerprint=' prefix if present)
-            const cleanFingerprint = fingerprint.replace(/^sha256\s+Fingerprint=\s*/i, '');
+        
+            // Normalize the fingerprint
+            const normalizedFingerprint = normalizeFingerprint(fingerprint);
             
             // Get all certificates
             const certs = await getAllCertificates();
             
-            // Find the matching certificate
-            const cert = certs.find(c => {
-                const certFingerprint = c.fingerprint.replace(/^sha256\s+Fingerprint=\s*/i, '');
-                return certFingerprint === cleanFingerprint;
-            });
+            // Find the matching certificate using normalized fingerprints
+            const cert = certs.find(c => normalizeFingerprint(c.fingerprint) === normalizedFingerprint);
             
             if (!cert) {
                 return res.status(404).json({ error: 'Certificate not found' });
@@ -1068,84 +1065,72 @@ function initRouter(services) {
             
             logger.info(`POST /api/certificate/${fingerprint}/renew - Renewing certificate`);
             
-            // Clean up the fingerprint
-            let cleanFingerprint = fingerprint;
-            while (cleanFingerprint.includes('sha256 Fingerprint=')) {
-                cleanFingerprint = cleanFingerprint.replace('sha256 Fingerprint=', '');
-            }
+            // Clean up the fingerprint with more robust normalization
+            const cleanFingerprint = normalizeFingerprint(fingerprint);
             
             // Find the certificate in the directory
             const certificates = await getAllCertificates();
-            const cert = certificates.find(c => {
-                let certFingerprint = c.fingerprint;
-                while (certFingerprint.includes('sha256 Fingerprint=')) {
-                    certFingerprint = certFingerprint.replace('sha256 Fingerprint=', '');
+            let cert = null;
+        
+            // Try different fingerprint formats and normalizations
+            for (const certificate of certificates) {
+                // Normalize the certificate fingerprint the same way
+                const normalizedCertFingerprint = normalizeFingerprint(certificate.fingerprint);
+                
+                // Check if the normalized fingerprints match
+                if (normalizedCertFingerprint === cleanFingerprint) {
+                    cert = certificate;
+                    logger.info(`Found certificate match: ${certificate.name || 'Unnamed'}`);
+                    break;
                 }
-                return certFingerprint === cleanFingerprint;
-            });
+            }
             
             if (!cert) {
+                // Debug: Log all available fingerprints
                 logger.warn(`Certificate not found with fingerprint: ${cleanFingerprint}`);
+                logger.warn(`Available fingerprints: ${certificates.map(c => normalizeFingerprint(c.fingerprint)).join(', ')}`);
+                
                 return res.status(404).json({
                     success: false,
                     error: 'Certificate not found'
                 });
             }
             
-            // Get cert config to retrieve deployment actions
-            const certConfig = configManager.getCertConfig(cert.fingerprint) || {};
-            
-            // Use renewalManager to handle the actual renewal process
-            logger.info(`Starting renewal for certificate ${cert.name}`);
-            
-            // Start the renewal process
-            // This should be done as a background operation in production
-            const renewalResult = await renewalManager.renewCertificate(cert);
-            
-            // If renewal succeeded, run deployment actions
-            if (renewalResult.success && certConfig.deployActions) {
-                try {
-                    logger.info(`Running deployment actions for ${cert.name}`);
-                    const deployResult = await renewalManager.runDeployActions(cert, certConfig.deployActions);
-                    
-                    logger.info(`Deployment actions completed for ${cert.name}`, deployResult);
-                    
-                    // Return full success
-                    return res.json({
-                        success: true,
-                        message: 'Certificate renewed and deployment actions completed successfully',
-                        certPath: renewalResult.certPath,
-                        keyPath: renewalResult.keyPath,
-                        deploymentResults: deployResult.results
-                    });
-                    
-                } catch (deployError) {
-                    logger.error(`Error running deployment actions for ${cert.name}:`, deployError);
-                    
-                    // Return partial success
-                    return res.json({
-                        success: true,
-                        message: 'Certificate renewed but deployment actions failed',
-                        certPath: renewalResult.certPath,
-                        keyPath: renewalResult.keyPath,
-                        deployError: deployError.message
-                    });
-                }
+            // Ensure renewal manager is available
+            if (!services.renewalManager) {
+                logger.error('Renewal manager is not available');
+                return res.status(500).json({
+                    success: false,
+                    error: 'Certificate renewal service is not available'
+                });
             }
             
-            // Return success response
-            return res.json({
-                success: true,
-                message: 'Certificate renewed successfully',
-                certPath: renewalResult.certPath,
-                keyPath: renewalResult.keyPath
-            });
+            // After renewal is complete and before sending response
+            if (result.success && result.oldFingerprint && result.newFingerprint) {
+                logger.info(`Certificate renewal completed successfully. Old: ${result.oldFingerprint}, New: ${result.newFingerprint}`);
+                
+                // Force a re-scan of certificates to ensure our cache is updated
+                // This ensures the UI will show the correct list without the old certificate
+                await services.certificateService.refreshCertificateCache();
+            }
             
+            try {
+                // Get renewal results
+                const result = await services.renewalManager.renewCertificate(cert);
+                return res.json(result);
+            } catch (renewalError) {
+                logger.error(`Error in renewal manager:`, renewalError);
+                return res.status(500).json({
+                    success: false,
+                    error: `Renewal error: ${renewalError.message}`
+                });
+            }
         } catch (error) {
-            logger.error(`Error renewing certificate: ${error.message}`);
-            res.status(500).json({
+            logger.error(`Error in certificate renewal endpoint:`, error);
+            return res.status(500).json({
                 success: false,
-                error: `Failed to renew certificate: ${error.message}`
+                error: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
             });
         }
     });
@@ -1281,6 +1266,29 @@ function initRouter(services) {
     return router;
 }
 
+/**
+ * Normalize fingerprint to a consistent format
+ * @param {string} fingerprint - The fingerprint to normalize
+ * @returns {string} - Normalized fingerprint
+ */
+function normalizeFingerprint(fingerprint) {
+    if (!fingerprint) return '';
+    
+    // Convert to string if needed
+    const fp = String(fingerprint);
+    
+    // Remove common prefixes
+    let normalized = fp.replace(/^sha256\s+Fingerprint=\s*/i, '')
+                    .replace(/^SHA256 Fingerprint=\s*/i, '')
+                    .replace(/^SHA-256 Fingerprint=\s*/i, '');
+    
+    // Remove all colons and spaces
+    normalized = normalized.replace(/[:\s]/g, '');
+    
+    // Convert to uppercase for consistency
+    return normalized.toUpperCase();
+}
+
 // Helper function to get all certificates
 async function getAllCertificates() {
     try {
@@ -1296,12 +1304,10 @@ async function getAllCertificates() {
         logger.info(`Retrieved ${certificates.length} certificates from config cache`);
         return certificates;
     } catch (error) {
-        logger.error(`Error retrieving certificates: ${error.message}`);
-        // Fall back to scanning files directly if there's an error
-        return await scanCertificateFiles();
+        logger.error('Error getting all certificates:', error);
+        throw error;
     }
 }
-
 
 /**
  * Scan certificate files directly (fallback method)

@@ -18,6 +18,14 @@ class RenewalManager {
         }
     }
 
+    /**
+     * Set the Socket.io instance for real-time updates
+     * @param {Object} socketIo - The Socket.io instance
+     */
+    setSocketIo(socketIo) {
+        this.io = socketIo;
+    }
+
     async checkCertificatesForRenewal(certificates) {
         // If certificates aren't provided, try to get them from the service
         if (!certificates) {
@@ -131,6 +139,11 @@ class RenewalManager {
         // Determine validity period
         const validityDays = config.validityDays || defaults.caValidityPeriod.standard;
         
+        // Store the old fingerprint to remove later
+        const oldFingerprint = cert.fingerprint;
+        const oldCertPath = cert.path;
+        const oldKeyPath = cert.keyPath;
+        
         try {
             // Extract the actual directory and filenames from cert.path
             let outputDir, keyFilename, certFilename;
@@ -177,12 +190,73 @@ class RenewalManager {
             
             logger.info(`Certificate will be renewed at: ${certPath}`);
             logger.info(`Private key will be saved at: ${keyPath}`);
+
+            // Backup existing certificate and key if they exist
+            await this.backupCertificateIfNeeded(keyPath, certPath);
             
-            // Rest of the renewal code...
+            // Generate the OpenSSL command based on the certificate domains
+            let openSslCommand;
             
-            // After renewal completes successfully, update the cert object with correct paths
-            cert.path = certPath;
-            cert.keyPath = keyPath;
+            if (cert.certType === 'rootCA') {
+                // Generate a self-signed root CA certificate
+                openSslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096` +
+                    ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${cert.name}"` +
+                    ` -addext "subjectAltName=DNS:${cert.name}"` +
+                    ` -addext "basicConstraints=critical,CA:true"` +
+                    ` -addext "keyUsage=critical,keyCertSign,cRLSign"`;
+            } else if (cert.certType === 'intermediateCA') {
+                // For intermediate CA renewals, we need to sign with the root CA
+                const csrPath = path.join(outputDir, 'intermediate.csr');
+                
+                // Find the root CA
+                const rootCAs = await this.findRootCACertificates();
+                if (rootCAs.length === 0) {
+                    throw new Error('No root CA found to sign the intermediate certificate');
+                }
+                
+                const rootCA = rootCAs[0];
+                
+                // Create a CSR first
+                openSslCommand = `openssl req -new -sha256 -nodes -newkey rsa:4096` +
+                    ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${cert.name}" &&` +
+                    ` openssl x509 -req -in "${csrPath}" -CA "${rootCA.path}" -CAkey "${rootCA.keyPath}"` +
+                    ` -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256` +
+                    ` -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\\nkeyUsage=critical,keyCertSign,cRLSign\\nsubjectAltName=DNS:${cert.name}")`;
+            } else {
+                // Standard certificate renewal
+                // Create SAN extension with all domains
+                let sanExtension = '';
+                if (cert.domains && cert.domains.length > 0) {
+                    // Use the first domain as common name
+                    const commonName = cert.domains[0];
+                    
+                    // Create SAN extension with all domains
+                    sanExtension = cert.domains.map(domain => `DNS:${domain}`).join(',');
+                    
+                    // Create self-signed certificate with all domains in the SAN
+                    openSslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
+                        ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
+                        ` -subj "/CN=${commonName}" -addext "subjectAltName=${sanExtension}"`;
+                } else {
+                    // Fallback to using cert name if no domains are specified
+                    openSslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
+                        ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
+                        ` -subj "/CN=${cert.name}" -addext "subjectAltName=DNS:${cert.name}"`;
+                }
+            }
+            
+            // Split the command into executable and arguments for spawn
+            const parts = openSslCommand.split(' ');
+            const command = parts[0];
+            const args = parts.slice(1);
+            
+            logger.info(`Executing OpenSSL command for certificate renewal`);
+            logger.debug(`Full command: ${openSslCommand}`);
+            
+            // Execute OpenSSL command
+            const result = await this.executeCommandWithOutput(command, args);
+            
+            logger.info(`Certificate renewal completed successfully`);
             
             // Make sure the key file actually exists after renewal
             if (!fs.existsSync(keyPath)) {
@@ -190,16 +264,248 @@ class RenewalManager {
             } else {
                 logger.info(`Key file confirmed at path: ${keyPath}`);
             }
+        
+            // Set appropriate file permissions for key file
+            try {
+                fs.chmodSync(keyPath, 0o600); // Set read/write for owner only
+                logger.debug(`Set secure permissions on key file: ${keyPath}`);
+            } catch (permError) {
+                logger.warn(`Failed to set secure permissions on key file: ${permError.message}`);
+            }
+
+            // Process the new certificate to get its details
+            const newCertDetails = await this.processCertificate(certPath);
             
-            return {
+            // Update certificate paths
+            newCertDetails.path = certPath;
+            newCertDetails.keyPath = keyPath;
+            // Remove the old certificate from config but preserve its settings
+            if (oldFingerprint && oldFingerprint !== newCertDetails.fingerprint) {
+                const oldConfig = this.configManager.getCertConfig(oldFingerprint);
+                
+                // Create entry for new certificate with old settings
+                if (oldConfig) {
+                    this.configManager.setCertConfig(newCertDetails.fingerprint, {
+                        autoRenew: oldConfig.autoRenew,
+                        renewDaysBeforeExpiry: oldConfig.renewDaysBeforeExpiry,
+                        deployActions: oldConfig.deployActions || [],
+                        domains: newCertDetails.domains || oldConfig.domains,
+                        metadata: newCertDetails
+                    });
+                    
+                    // Remove old certificate entry
+                    this.configManager.removeCertConfig(oldFingerprint);
+                    logger.info(`Removed old certificate entry with fingerprint: ${oldFingerprint}`);
+                }
+            }
+            
+            // After successful renewal and before returning the result
+            if (oldFingerprint && oldFingerprint !== newCertDetails.fingerprint) {
+                // Add cleanup step for old certificate
+                await this.cleanupOldCertificate(oldFingerprint, newCertDetails.fingerprint, newCertDetails);
+                
+                // If using metadata tracking
+                if (oldConfig) {
+                    // Copy any important metadata/settings from old to new certificate
+                    const newConfig = this.configManager.getCertConfig(newCertDetails.fingerprint) || {};
+                    newConfig.autoRenew = oldConfig.autoRenew || false;
+                    newConfig.renewDaysBeforeExpiry = oldConfig.renewDaysBeforeExpiry || 30;
+                    newConfig.deployActions = oldConfig.deployActions || [];
+                    
+                    // Save the updated config
+                    this.configManager.setCertConfig(newCertDetails.fingerprint, newConfig);
+                }
+            }
+            
+            // Return success
+            const renewalResult = {
                 success: true,
                 message: `Certificate for ${cert.domains ? cert.domains[0] : cert.name} renewed successfully`,
+                oldFingerprint: oldFingerprint,
+                newFingerprint: newCertDetails.fingerprint,
                 certPath: certPath,
-                keyPath: keyPath
+                keyPath: keyPath,
+                oldRemoved: true // Add flag to indicate old certificate was removed
             };
+            
+            // Emit a certificate-renewed event if WebSocket service is available
+            if (this.io) {
+                this.io.emit('certificate-renewed', {
+                    oldFingerprint: oldFingerprint,
+                    newFingerprint: newCertDetails ? newCertDetails.fingerprint : null,
+                    name: newCertDetails.name || 'Unnamed Certificate',
+                    domains: newCertDetails.domains || []
+                });
+            }
+
+            return renewalResult;
         } catch (error) {
             logger.error(`Renewal failed:`, error);
             throw new Error(`Failed to renew certificate: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Clean up old certificate after renewal
+     * @param {string} oldFingerprint - The fingerprint of the old certificate
+     * @param {string} newFingerprint - The fingerprint of the new certificate
+     * @param {Object} newCertDetails - Details of the new certificate
+     */
+    async cleanupOldCertificate(oldFingerprint, newFingerprint, newCertDetails) {
+        try {
+            if (!oldFingerprint || !newFingerprint || oldFingerprint === newFingerprint) {
+                return false;
+            }
+            
+            // Log the cleanup operation
+            this.logger.info(`Cleaning up old certificate ${oldFingerprint} after renewal`);
+            
+            // 1. Remove the old certificate from certificate config
+            if (this.configManager) {
+                this.configManager.removeCertConfig(oldFingerprint);
+                this.logger.info(`Removed old certificate ${oldFingerprint} from configuration`);
+            }
+            
+            // 2. Try to remove the old certificate file if it exists and is different
+            try {
+                const oldCertPath = this.certificateService.getCertificatePath(oldFingerprint);
+                const oldKeyPath = this.certificateService.getPrivateKeyPath(oldFingerprint);
+                
+                if (oldCertPath && fs.existsSync(oldCertPath) && 
+                    oldCertPath !== newCertDetails.path) {
+                    fs.unlinkSync(oldCertPath);
+                    this.logger.info(`Deleted old certificate file: ${oldCertPath}`);
+                }
+                
+                if (oldKeyPath && fs.existsSync(oldKeyPath) &&
+                    oldKeyPath !== newCertDetails.keyPath) {
+                    fs.unlinkSync(oldKeyPath);
+                    this.logger.info(`Deleted old key file: ${oldKeyPath}`);
+                }
+            } catch (error) {
+                this.logger.warn(`Error removing old certificate files: ${error.message}`);
+                // Continue with the renewal process even if file deletion fails
+            }
+            
+            return true;
+        } catch (error) {
+            this.logger.error(`Error cleaning up old certificate: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * Process a certificate file to extract its details
+     * @param {string} certPath - Path to certificate file
+     * @returns {Object} Certificate details
+     */
+    async processCertificate(certPath) {
+        try {
+            // Use OpenSSL to get certificate information
+            const certOutput = execSync(`openssl x509 -in "${certPath}" -text -noout`).toString();
+            const fingerprint = execSync(`openssl x509 -in "${certPath}" -fingerprint -sha256 -noout`).toString().trim();
+            
+            // Parse the certificate details
+            const subject = certOutput.match(/Subject:.*?CN\s*=\s*([^,\n]+)/);
+            const issuer = certOutput.match(/Issuer:.*?CN\s*=\s*([^,\n]+)/);
+            const validFromMatch = certOutput.match(/Not Before\s*:\s*(.+?)\s*GMT/);
+            const validToMatch = certOutput.match(/Not After\s*:\s*(.+?)\s*GMT/);
+            const subjectAltNameMatch = certOutput.match(/X509v3 Subject Alternative Name:\s*\n\s*(.+?)(?:\n|$)/);
+            
+            // Extract SAN domain names
+            let domains = [];
+            if (subjectAltNameMatch && subjectAltNameMatch[1]) {
+                domains = subjectAltNameMatch[1].split(/,\s*/).map(san => {
+                    const match = san.match(/DNS:(.+)/) || san.match(/IP Address:(.+)/);
+                    return match ? match[1].trim() : null;
+                }).filter(domain => domain);
+            }
+            
+            // Determine certificate type
+            let certType = 'standard';
+            if (certOutput.includes('CA:TRUE')) {
+                // Check if it's a root CA (self-signed)
+                const subjectStr = subject ? subject[1] : '';
+                const issuerStr = issuer ? issuer[1] : '';
+                if (subjectStr === issuerStr) {
+                    certType = 'rootCA';
+                } else {
+                    certType = 'intermediateCA';
+                }
+            }
+            
+            // Extract key identifiers
+            const subjectKeyIdMatch = certOutput.match(/X509v3 Subject Key Identifier:\s*\n\s*(.+?)(?:\n|$)/);
+            const authorityKeyIdMatch = certOutput.match(/X509v3 Authority Key Identifier:\s*\n\s*keyid:(.+?)(?:\n|$)/);
+            
+            return {
+                name: subject ? subject[1] : path.basename(certPath, path.extname(certPath)),
+                path: certPath,
+                domains: domains,
+                subject: subject ? `CN=${subject[1]}` : 'Unknown Subject',
+                issuer: issuer ? `CN=${issuer[1]}` : 'Unknown Issuer',
+                validFrom: validFromMatch ? `${validFromMatch[1]} GMT` : null,
+                validTo: validToMatch ? `${validToMatch[1]} GMT` : null,
+                certType: certType,
+                fingerprint: fingerprint,
+                subjectKeyId: subjectKeyIdMatch ? subjectKeyIdMatch[1].replace(/:/g, '').trim() : null,
+                authorityKeyId: authorityKeyIdMatch ? authorityKeyIdMatch[1].replace(/:/g, '').trim() : null
+            };
+        } catch (error) {
+            logger.error(`Error processing certificate ${certPath}: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Helper method to find all root CA certificates in the system
+     * @returns {Promise<Array>} Array of root CA certificate objects
+     */
+    async findRootCACertificates() {
+        try {
+            // Get all certificates
+            let certificates;
+            if (this.certificateService) {
+                certificates = await this.certificateService.getAllCertificates();
+            } else {
+                logger.warn('Certificate service not available, searching root CAs manually');
+                
+                // Manual search implementation if certificate service is not available
+                certificates = [];
+                const dirs = fs.readdirSync(this.certsDir);
+                
+                for (const dir of dirs) {
+                    const certPath = path.join(this.certsDir, dir, 'certificate.crt');
+                    if (fs.existsSync(certPath)) {
+                        try {
+                            const certOutput = execSync(`openssl x509 -in "${certPath}" -text -noout`).toString();
+                            if (certOutput.includes('CA:TRUE')) {
+                                // Check if it's self-signed (issuer = subject)
+                                const subject = certOutput.match(/Subject:.*?CN\s*=\s*([^,\n]+)/);
+                                const issuer = certOutput.match(/Issuer:.*?CN\s*=\s*([^,\n]+)/);
+                                
+                                if (subject && issuer && subject[1] === issuer[1]) {
+                                    // This is a root CA
+                                    certificates.push({
+                                        name: subject[1],
+                                        path: certPath,
+                                        keyPath: path.join(this.certsDir, dir, 'private.key'),
+                                        certType: 'rootCA'
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            logger.error(`Error examining certificate at ${certPath}:`, e);
+                        }
+                    }
+                }
+            }
+            
+            // Filter for root CAs
+            return certificates.filter(cert => cert.certType === 'rootCA');
+        } catch (error) {
+            logger.error('Error finding root CA certificates:', error);
+            return [];
         }
     }
 

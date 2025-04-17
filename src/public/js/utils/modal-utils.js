@@ -1254,8 +1254,6 @@ function renewCertificate(fingerprint) {
         document.body.removeChild(loadingOverlay);
         
         if (data.success) {
-            showNotification('Certificate renewal started successfully', 'success');
-            
             // Refresh certificates list
             setTimeout(() => {
                 if (typeof window.fetchCertificates === 'function') {
@@ -1454,6 +1452,8 @@ function showCustomConfirm(message, onConfirm, onCancel) {
     });
 }
 
+// Global tracking of active notifications to prevent duplicates
+const activeNotifications = new Map();
 
 /**
  * Show a toast notification
@@ -1462,6 +1462,26 @@ function showCustomConfirm(message, onConfirm, onCancel) {
  * @param {number} duration - How long to show the notification in ms
  */
 function showNotification(message, type = 'info', duration = 5000) {
+    // Check if the exact same notification is already active
+    const notificationKey = `${message}-${type}`;
+    if (activeNotifications.has(notificationKey)) {
+        // Instead of just returning the existing notification, 
+        // reset its timeout to ensure it stays visible
+        const existingNotification = activeNotifications.get(notificationKey);
+        if (existingNotification.autoCloseTimeout) {
+            clearTimeout(existingNotification.autoCloseTimeout);
+        }
+        
+        // Set a new timeout if duration > 0
+        if (duration > 0) {
+            existingNotification.autoCloseTimeout = setTimeout(() => {
+                removeNotification(existingNotification, notificationKey);
+            }, duration);
+        }
+        
+        return existingNotification;
+    }
+    
     // Create container if it doesn't exist
     let container = document.querySelector('.notification-container');
     if (!container) {
@@ -1474,9 +1494,14 @@ function showNotification(message, type = 'info', duration = 5000) {
         document.body.appendChild(container);
     }
     
-    // Create notification element
+    // Create notification element with a unique ID
+    const notificationId = `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const notification = document.createElement('div');
+    notification.id = notificationId;
     notification.className = `notification ${type}`;
+    notification.setAttribute('data-notification-key', notificationKey);
+    
+    // Apply styles
     notification.style.backgroundColor = type === 'success' ? '#d4edda' :
                                         type === 'error' ? '#f8d7da' :
                                         type === 'warning' ? '#fff3cd' : '#d1ecf1';
@@ -1487,12 +1512,13 @@ function showNotification(message, type = 'info', duration = 5000) {
     notification.style.marginBottom = '10px';
     notification.style.borderRadius = '4px';
     notification.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-    notification.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+    notification.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
     notification.style.transform = 'translateX(100%)';
     notification.style.opacity = '0';
+    notification.style.cursor = 'default'; // Add cursor style to indicate it's interactive
     
-    // Add marker to track removal status
-    notification.dataset.beingRemoved = 'false';
+    // Track mouse hover state to prevent closing while hovering
+    notification.isHovered = false;
     
     // Add icon based on type
     const icon = type === 'success' ? 'fa-check-circle' :
@@ -1511,8 +1537,133 @@ function showNotification(message, type = 'info', duration = 5000) {
         </div>
     `;
     
-    // Add to container
+    // Add to container first so we can reference it
     container.appendChild(notification);
+    
+    // Set up close button
+    const closeButton = notification.querySelector('.close-notification');
+    if (closeButton) {
+        closeButton.addEventListener('click', (e) => {
+            console.log("Close button clicked for notification:", notificationKey);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Call removeNotification with the correct parameters
+            removeNotification(notification, notificationKey);
+        });
+    }
+    
+    // Add mouseenter and mouseleave event listeners
+    notification.addEventListener('mouseenter', () => {
+        console.log('Mouse entered notification, pausing auto-close');
+        notification.isHovered = true;
+        
+        // Clear the auto-close timeout when hovering
+        if (notification.autoCloseTimeout) {
+            clearTimeout(notification.autoCloseTimeout);
+            notification.autoCloseTimeout = null;
+        }
+    });
+    
+    notification.addEventListener('mouseleave', () => {
+        console.log('Mouse left notification, resuming auto-close');
+        notification.isHovered = false;
+        
+        // Resume auto-close timeout when no longer hovering
+        if (duration > 0) {
+            notification.autoCloseTimeout = setTimeout(() => {
+                removeNotification(notification, notificationKey);
+            }, duration);
+        }
+    });
+    
+    // Function to safely remove a notification
+    function removeNotification(notif, key) {
+        console.log("Starting to remove notification:", key);
+        
+        // Check if notification is currently being hovered
+        if (notif.isHovered) {
+            console.log("Notification is being hovered, not removing");
+            return;
+        }
+        
+        const id = notif.id;
+        if (!id) {
+            console.error("Notification ID not found");
+            activeNotifications.delete(key);
+            return;
+        }
+        
+        try {
+            // Get notification element by ID to ensure we have the current DOM reference
+            const notifElement = document.getElementById(id);
+            if (!notifElement) {
+                console.log("Notification element not found in DOM, removing from tracking");
+                activeNotifications.delete(key);
+                return;
+            }
+            
+            // Clear any existing timeout
+            if (notif.autoCloseTimeout) {
+                clearTimeout(notif.autoCloseTimeout);
+                notif.autoCloseTimeout = null;
+            }
+            
+            // Apply the exit animation 
+            console.log("Applying exit animation");
+            notifElement.style.transform = 'translateX(100%)';
+            notifElement.style.transitionDuration = '500ms';
+            notifElement.style.opacity = '0';
+            
+            // Set a data attribute to mark it as being removed
+            notifElement.setAttribute('data-removing', 'true');
+            
+            // Wait for the animation to complete before removing from the DOM
+            setTimeout(() => {
+                try {
+                    // Get a fresh reference to ensure it still exists
+                    const elementToRemove = document.getElementById(id);
+                    if (!elementToRemove) {
+                        console.log("Element already removed during animation");
+                        activeNotifications.delete(key);
+                        return;
+                    }
+                    
+                    // Get the parent now while we know it exists
+                    const parent = elementToRemove.parentNode;
+                    if (!parent) {
+                        console.log("Parent node not found");
+                        activeNotifications.delete(key);
+                        return;
+                    }
+                    
+                    // Remove from DOM
+                    parent.removeChild(elementToRemove);
+                    console.log("Notification smoothly removed from DOM");
+                    
+                    // Clean up container if empty
+                    const container = document.querySelector('.notification-container');
+                    if (container && container.children.length === 0 && container.parentNode) {
+                        container.parentNode.removeChild(container);
+                        console.log("Empty notification container removed");
+                    }
+                    
+                    // Remove from tracking
+                    activeNotifications.delete(key);
+                } catch (err) {
+                    console.error("Error finalizing notification removal:", err);
+                    activeNotifications.delete(key);
+                }
+            }, 300); // Wait for the animation duration (300ms is typical)
+        } catch (error) {
+            console.error("Error in removeNotification:", error);
+            // Ensure we clean up tracking even on error
+            activeNotifications.delete(key);
+        }
+    }
+    
+    // Track this notification
+    activeNotifications.set(notificationKey, notification);
     
     // Animate in
     setTimeout(() => {
@@ -1520,54 +1671,11 @@ function showNotification(message, type = 'info', duration = 5000) {
         notification.style.opacity = '1';
     }, 10);
     
-    // Create a safer close function that checks if element is still in DOM
-    function closeNotification(element) {
-        // Check if element is already being removed
-        if (element.dataset.beingRemoved === 'true') {
-            return; // Already in the process of being removed
-        }
-        
-        // Mark as being removed to prevent multiple removal attempts
-        element.dataset.beingRemoved = 'true';
-        
-        // Animate out
-        element.style.transform = 'translateX(100%)';
-        element.style.opacity = '0';
-        
-        // Remove after animation
-        setTimeout(() => {
-            try {
-                // Check if the notification is still in the DOM and if the container still exists
-                if (document.body.contains(element) && element.parentNode) {
-                    element.parentNode.removeChild(element);
-                    
-                    // Check if container exists and is empty
-                    if (container && document.body.contains(container) && container.children.length === 0) {
-                        document.body.removeChild(container);
-                    }
-                }
-            } catch (error) {
-                console.warn('Error removing notification:', error);
-                // Fallback: just hide it with CSS if we can't remove it
-                if (document.body.contains(element)) {
-                    element.style.display = 'none';
-                }
-            }
-        }, 300);
-    }
-    
-    // Set up close button
-    const closeButton = notification.querySelector('.close-notification');
-    if (closeButton) {
-        closeButton.addEventListener('click', () => {
-            closeNotification(notification);
-        });
-    }
-    
     // Auto close after duration
     if (duration > 0) {
-        setTimeout(() => {
-            closeNotification(notification);
+        notification.autoCloseTimeout = setTimeout(() => {
+            console.log("Auto-close timeout triggered");
+            removeNotification(notification, notificationKey);
         }, duration);
     }
     

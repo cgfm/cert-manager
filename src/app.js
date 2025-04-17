@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const http = require('http');
+const socketIo = require('socket.io');
 const fs = require('fs');
 const ConfigManager = require('./services/config-manager');
 const RenewalManager = require('./services/renewal-manager');
@@ -8,6 +10,8 @@ const logger = require('./services/logger');
 
 // Initialize the application
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 const PORT = process.env.PORT || 3000;
 
 // Configuration paths
@@ -115,13 +119,36 @@ process.on('unhandledRejection', (reason, promise) => {
     // Log error but keep server running
 });
 
+// Set up Socket.io event handlers
+io.on('connection', (socket) => {
+    console.log('New client connected');
+    
+    // Update WebSocket status in UI for all clients
+    io.emit('server-status', { status: 'online', clients: io.engine.clientsCount });
+    
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+        // Update client count for remaining clients
+        io.emit('server-status', { status: 'online', clients: io.engine.clientsCount });
+    });
+});
+
+// Make io accessible to routes and services that need it
+app.set('io', io);
+renewalManager.setSocketIo(io);
+
 // Start the server
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+/*// Start the server
 app.listen(PORT, () => {
   logger.info(`Certificate Manager running on port ${PORT}`);
   
   // Set up automatic renewal checks
   setupRenewalChecks();
-});
+});*/
 
 // Add this to app.js
 logger.info('Configuration paths:');
@@ -157,3 +184,6 @@ async function checkForRenewals() {
     logger.error('Error during certificate renewal check:', error);
   }
 }
+
+// Export the app for testing
+module.exports = { app, server, io };

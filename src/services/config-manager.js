@@ -112,6 +112,25 @@ class ConfigManager {
             logger.error(`Error saving configuration: ${error.message}`);
         }
     }
+
+    // Add the normalizeFingerprint function
+    normalizeFingerprint(fingerprint) {
+        if (!fingerprint) return '';
+        
+        // Convert to string if needed
+        const fp = String(fingerprint);
+        
+        // Remove common prefixes
+        let normalized = fp.replace(/^sha256\s+Fingerprint=\s*/i, '')
+                        .replace(/^SHA256 Fingerprint=\s*/i, '')
+                        .replace(/^SHA-256 Fingerprint=\s*/i, '');
+        
+        // Remove all colons and spaces
+        normalized = normalized.replace(/[:\s]/g, '');
+        
+        // Convert to uppercase for consistency
+        return normalized.toUpperCase();
+    }
     
     /**
      * Get configuration for a specific certificate
@@ -119,23 +138,11 @@ class ConfigManager {
      * @returns {Object|null} - Certificate configuration
      */
     getCertConfig(fingerprint) {
-        // Normalize fingerprint by removing prefix if present
-        const normalizedFingerprint = fingerprint.replace(/^sha256\s+Fingerprint=\s*/i, '');
+        const normalizedFingerprint = this.normalizeFingerprint(fingerprint);
         
-        // First try exact match
-        if (this.certConfig.certificates[fingerprint]) {
-            return this.certConfig.certificates[fingerprint];
-        }
-        
-        // Then try normalized match
-        if (this.certConfig.certificates[normalizedFingerprint]) {
-            return this.certConfig.certificates[normalizedFingerprint];
-        }
-        
-        // Try to find by normalized fingerprint in all keys
-        for (const [key, value] of Object.entries(this.certConfig.certificates)) {
-            const normalizedKey = key.replace(/^sha256\s+Fingerprint=\s*/i, '');
-            if (normalizedKey === normalizedFingerprint) {
+        // Try to find with normalized fingerprint
+        for (const [key, value] of Object.entries(this.certConfig.certificates || {})) {
+            if (this.normalizeFingerprint(key) === normalizedFingerprint) {
                 return value;
             }
         }
@@ -158,6 +165,38 @@ class ConfigManager {
         };
         
         this.saveConfig();
+    }
+
+    /**
+     * Remove a certificate configuration
+     * @param {string} fingerprint - Certificate fingerprint
+     */
+    removeCertConfig(fingerprint) {
+        // Normalize fingerprint by removing prefix if present
+        const normalizedFingerprint = this.normalizeFingerprint(fingerprint);
+        
+        // First try exact match
+        if (this.certConfig.certificates[fingerprint]) {
+            delete this.certConfig.certificates[fingerprint];
+            this.saveConfig();
+            return;
+        }
+        
+        // Then try normalized match
+        if (this.certConfig.certificates[normalizedFingerprint]) {
+            delete this.certConfig.certificates[normalizedFingerprint];
+            this.saveConfig();
+            return;
+        }
+        
+        // Try to find by normalized fingerprint in all keys
+        for (const key of Object.keys(this.certConfig.certificates)) {
+            if (this.normalizeFingerprint(key) === normalizedFingerprint) {
+                delete this.certConfig.certificates[key];
+                this.saveConfig();
+                return;
+            }
+        }
     }
 
     /**

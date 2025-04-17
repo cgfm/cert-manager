@@ -10,207 +10,7 @@
     "enableCertificateBackups": true
   },
   "certificates": {
-    "sha256 Fingerprint=3DC78EA5AE11831E7491A7D7E5EB8EEC539378AC24C3A60D4B0F35E82321A724": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "1.2.3.4",
-        "1.2.3.4",
-        "192.168.178.240",
-        "seneca.local"
-      ]
-    },
-    "sha256 Fingerprint=1167FE9EF1E6183AAC34E7C35F5DB9EA218806197C94497273AA6CB622EE38A4": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "openhab.seneca.local",
-        "192.168.168.240",
-        "1.2.3.4"
-      ]
-    },
-    "sha256 Fingerprint=A6E714F143B2CBE4FFBF4567E1E231B2D373EB93E529EEA374B92C9CDEBFDDC0": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4"
-      ]
-    },
-    "sha256 Fingerprint=D40B30702DA18994BA37A1D81E85937A1F2B9391782811795D3D5B8A7F0DDCE7": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "2.2.2.2"
-      ]
-    },
-    "sha256 Fingerprint=1398B7A17C5614273B68779EF001E103FDE03213272FF161815BF73E0F28E605": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "2.2.2.2",
-        "seneca.local"
-      ]
-    },
-    "sha256 Fingerprint=C4D4B93D26E6F460AB51BE45E900D7AFAB4165D766A95E4904CC2230CCFF989A": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local"
-      ]
-    },
-    "sha256 Fingerprint=2C3809CB5236D9ED55A9FD71850D59506C49AF06CF2F9D5CA33E4F452D22E728": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2."
-      ]
-    },
-    "sha256 Fingerprint=079CF34B26F0A36F73F020A5BDE04B819F0203BAED6E72DC5302908C3796E621": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2.",
-        "3.3.3.3"
-      ]
-    },
-    "sha256 Fingerprint=718BD0F14D2E1A0186F9EB4F40BE019F585A4EA75D9791BABD959554102E3752": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2."
-      ]
-    },
-    "sha256 Fingerprint=7B9BE32D3C589773EE6878CFC97689EB55CEF97CD8A83A8F8F118FF1687870DD": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local"
-      ]
-    },
-    "sha256 Fingerprint=0CEB1D112C50CF308C937B80C0F2D641FA76D8CC45EB3017F4424FE165D6F4A4": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2"
-      ]
-    },
-    "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [
-        {
-          "type": "copy",
-          "destination": "/tmp"
-        }
-      ],
-      "metadata": {
-        "name": "openhablog.seneca.local",
-        "path": "/certs/openhablog.seneca.local.crt",
-        "keyPath": "/certs/openhablog.seneca.local.key",
-        "domains": [
-          "openhablog.seneca.local",
-          "1.2.3.4",
-          "seneca.local",
-          "2.2.2.2"
-        ],
-        "subject": "CN=openhablog.seneca.local",
-        "issuer": "CN=openhablog.seneca.local",
-        "validFrom": "Apr  8 20:06:03 2025 GMT",
-        "validTo": "Jul  7 20:06:03 2025 GMT",
-        "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B",
-        "subjectKeyId": "1D7CA62106490DEB475BE0FCA811CBEC6668DAC7",
-        "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
-        "modificationTime": 1744142763573
-      },
-      "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2"
-      ]
-    },
-    "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
+    "sha256 Fingerprint=7E521AD14CFEF02C43C117DE1EA3BE129BC6C82C2BEDE0A58A9DFF419B428B1E": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -224,28 +24,16 @@
         "domains": [
           "adguard-sync.seneca.local"
         ],
-        "subject": "CN=adguard-sync.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
-        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
-        "validFrom": "Jan  5 17:23:47 2023 GMT",
-        "validTo": "Apr  9 17:23:47 2025 GMT",
-        "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522",
-        "subjectKeyId": "C8E01D40FD1FA1447E6606468A6FE5781A952264",
+        "subject": "CN=adguard-sync.seneca.local",
+        "issuer": "CN=adguard-sync.seneca.local",
+        "validFrom": "Apr 16 18:30:29 2025 GMT",
+        "validTo": "Jul 15 18:30:29 2025 GMT",
+        "certType": "rootCA",
+        "fingerprint": "sha256 Fingerprint=7E521AD14CFEF02C43C117DE1EA3BE129BC6C82C2BEDE0A58A9DFF419B428B1E",
+        "subjectKeyId": "04E4F523CFD7FC8F7B6434412E724FBA46DDF57F",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
-        "modificationTime": 1672939431832
+        "config": {},
+        "modificationTime": 1744828230268
       }
     },
     "sha256 Fingerprint=A61217863CCC853E3C60E13BD2C030A4D373A7C38F214A954C4941F46F9EA18E": {
@@ -272,19 +60,7 @@
         "fingerprint": "sha256 Fingerprint=A61217863CCC853E3C60E13BD2C030A4D373A7C38F214A954C4941F46F9EA18E",
         "subjectKeyId": "F8221CA5C887FEE26E8BECAFEC1DB785EB31E196",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1740515638609
       }
     },
@@ -312,19 +88,7 @@
         "fingerprint": "sha256 Fingerprint=DC5B98421F69C5BFE80C6F355BF8C71FE6259CCB2EAE2C9D216C6EEED4590374",
         "subjectKeyId": "9E5D7EB3144C4CC86441622792143A46F60C72CE",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1740515672880
       }
     },
@@ -352,23 +116,11 @@
         "fingerprint": "sha256 Fingerprint=60FBA67EF33C7F7559BCA2DE43ADA1EA1311B951B22E9A98FD929756F26A0846",
         "subjectKeyId": "860658DA9B8FE5AA8A70440E8AE850A860CB46CB",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1735070156645
       }
     },
-    "sha256 Fingerprint=FA76FCFF16A56AF2CEE949DB422F07D91EDE638BF05DF19A3E04376A5FE10627": {
+    "sha256 Fingerprint=62E0028F99A38CA1B6733C272A4FAB7232B6A0F5C55AA97BE94D9BCE75AFDA20": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -382,28 +134,16 @@
         "domains": [
           "backup.seneca.local"
         ],
-        "subject": "CN=backup.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
-        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
-        "validFrom": "Jan  5 17:23:03 2023 GMT",
-        "validTo": "Apr  9 17:23:03 2025 GMT",
-        "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=FA76FCFF16A56AF2CEE949DB422F07D91EDE638BF05DF19A3E04376A5FE10627",
-        "subjectKeyId": "9AEC1F3D2D8E127D818A3B357A59DDB225C8F7AA",
+        "subject": "CN=backup.seneca.local",
+        "issuer": "CN=backup.seneca.local",
+        "validFrom": "Apr 17 09:43:45 2025 GMT",
+        "validTo": "Jul 16 09:43:45 2025 GMT",
+        "certType": "rootCA",
+        "fingerprint": "sha256 Fingerprint=62E0028F99A38CA1B6733C272A4FAB7232B6A0F5C55AA97BE94D9BCE75AFDA20",
+        "subjectKeyId": "1C1CA0DE819FA45CC3FACEB39877E8EC30EF6010",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
-        "modificationTime": 1672939386857
+        "config": {},
+        "modificationTime": 1744883025550
       }
     },
     "sha256 Fingerprint=255292F628328D9D0086B16400F5C1DCB8613603A0641290A8D816B6DB59DC16": {
@@ -434,19 +174,7 @@
         "fingerprint": "sha256 Fingerprint=255292F628328D9D0086B16400F5C1DCB8613603A0641290A8D816B6DB59DC16",
         "subjectKeyId": "CB5DFE0DB0827E0AE6D32B849CA0071877F97F0F",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1699434457404
       }
     },
@@ -472,19 +200,7 @@
         "fingerprint": "sha256 Fingerprint=59007D1D7C35988BE8F6164C177CCE339AF7CCDE3A5E62149F18DCB957331514",
         "subjectKeyId": "6E5D38F0881FF1312A0481763E8540FF9892F5F2",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1679146106005
       }
     },
@@ -514,19 +230,7 @@
         "fingerprint": "sha256 Fingerprint=32B85C820EB7520D9D9CA953F89CD6667D04FAB7F2DECEC87FC7555A5CDDE034",
         "subjectKeyId": "3EC83DE385FA297F46BA206515181B92F3E54940",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1700408494593
       }
     },
@@ -556,19 +260,7 @@
         "fingerprint": "sha256 Fingerprint=D330861280C56121A6F7B4BA8C5EEF5E3449043EF0D8DC82FC3A6252ACE907FD",
         "subjectKeyId": "D3734AE2DD366E92B0095242C1378C28ACF6AC4E",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1692182579584
       }
     },
@@ -598,19 +290,7 @@
         "fingerprint": "sha256 Fingerprint=947601A70A9D71D25F20F862A5A9D04B4B4EA2A61CF1854748D01C2B411E2355",
         "subjectKeyId": "76FD52253E323B00E8BC25692FCB42175ACF2F0F",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1726923153096
       }
     },
@@ -644,19 +324,7 @@
         "fingerprint": "sha256 Fingerprint=126DD196D8FCC07D43BAFEC267F47A73D4BC23DEDD5A42211AFFC6450265BB5C",
         "subjectKeyId": "CBBBBDC25AADC8944312B344E8A59FBF638651F2",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1740935573349
       }
     },
@@ -684,19 +352,7 @@
         "fingerprint": "sha256 Fingerprint=51CD75B5852E6D35DA0D2BDF3CE40FCC6F34604CDB3F16EDDD4DDF836D4EE7AB",
         "subjectKeyId": "613881E3147D536B95AEE94414D0EC5A788770A1",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1711402362471
       }
     },
@@ -722,19 +378,7 @@
         "fingerprint": "sha256 Fingerprint=1AFE97909D3DB138873464BDBC8CA652714DCDA84455342D9F7C4217776A17C3",
         "subjectKeyId": "1BC4F51B5CB99273899B7E524DDF843645859D52",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939347842
       }
     },
@@ -764,19 +408,7 @@
         "fingerprint": "sha256 Fingerprint=0772281F83FA096351B089449359448AE332AE315BADAFB8D9B1E309ED97F4D0",
         "subjectKeyId": "3421ADD831E6C9571DB9C2E704970DC2F5DEACEF",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1680882361919
       }
     },
@@ -802,19 +434,7 @@
         "fingerprint": "sha256 Fingerprint=B2611D4B8A6A913A009FD83D037E341F7B4895E0CD53B55EE8D9588D7B25C740",
         "subjectKeyId": "30E5E1347B821DFAA9B9A536C87F5788B1A23FBF",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1744134855469
       }
     },
@@ -842,19 +462,7 @@
         "fingerprint": "sha256 Fingerprint=9F5EA07526DECEF9F58D3748BAFE4AC49E2AC81588A44A18791237AB0E23D15D",
         "subjectKeyId": "B252FE98258830B8F659EDFEDA036C759B8D757D",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1706385537141
       }
     },
@@ -882,23 +490,11 @@
         "fingerprint": "sha256 Fingerprint=C267F01E5D1D44156266B6DF0E132052AA1FBEF3D1395AF48EFDB602076EC738",
         "subjectKeyId": "00F5EE13D616146C4451CF88AE3EDEA490858144",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1711349477863
       }
     },
-    "sha256 Fingerprint=7B5185D9BD60497BCAE5FB0B9B19500F18C0CD1FD05100CD3B0AB6328118A5A4": {
+    "sha256 Fingerprint=1246EE828C475329E443343D6DA19B0EF6A3742048FB5FEF5F981BB2BA8E82E7": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -912,28 +508,16 @@
         "domains": [
           "influx.seneca.local"
         ],
-        "subject": "CN=influx.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
-        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
-        "validFrom": "Jan  5 17:21:47 2023 GMT",
-        "validTo": "Apr  9 17:21:47 2025 GMT",
-        "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=7B5185D9BD60497BCAE5FB0B9B19500F18C0CD1FD05100CD3B0AB6328118A5A4",
-        "subjectKeyId": "AAC1389F2CAF90EDDDA3A0DED53AC662CE31A731",
+        "subject": "CN=influx.seneca.local",
+        "issuer": "CN=influx.seneca.local",
+        "validFrom": "Apr 17 09:25:53 2025 GMT",
+        "validTo": "Jul 16 09:25:53 2025 GMT",
+        "certType": "rootCA",
+        "fingerprint": "sha256 Fingerprint=1246EE828C475329E443343D6DA19B0EF6A3742048FB5FEF5F981BB2BA8E82E7",
+        "subjectKeyId": "53C125599551FB0E73DB2BCD8FF3722EB516953C",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
-        "modificationTime": 1672939310411
+        "config": {},
+        "modificationTime": 1744881954043
       }
     },
     "sha256 Fingerprint=296684653D3076F7DC40918262100E889EFA08E24964E2AA5676C3E8F9A38F14": {
@@ -968,19 +552,7 @@
         "fingerprint": "sha256 Fingerprint=296684653D3076F7DC40918262100E889EFA08E24964E2AA5676C3E8F9A38F14",
         "subjectKeyId": "CC1A92138ABBBDE077D2E509E266195C339FFB33",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1741940737787
       }
     },
@@ -1010,19 +582,7 @@
         "fingerprint": "sha256 Fingerprint=E24C943377E57B7E5EC40BF4CB4C434F1C65E660B566A4C6D3ECF35AD55ECA7D",
         "subjectKeyId": "59EBD2ED867B44EF775CD384E26A00FBAE462FEF",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1694776877476
       }
     },
@@ -1048,19 +608,7 @@
         "fingerprint": "sha256 Fingerprint=A829C3F4DB848DE1C8042A1249E6B9AC47D6E3EB63D18585F964694A34A28A9E",
         "subjectKeyId": "B8505ABA09C5A85A78A986AAB9A0DE3D5A88CC1A",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939278835
       }
     },
@@ -1088,19 +636,7 @@
         "fingerprint": "sha256 Fingerprint=BA0BF0B0940235FB57510C592AC877EA7EA8B188F78727B62AFB95676CF212AA",
         "subjectKeyId": "ED519B65575D4140F4AD33E96EBB79B979E8EB82",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1738007786352
       }
     },
@@ -1128,19 +664,7 @@
         "fingerprint": "sha256 Fingerprint=1958113E766DE7054C915B37FBFE0E344ADD69C59B7B4D81F59DF6ECD67F34D4",
         "subjectKeyId": "C18B8784D49A8C8E5F45EB138A86FCBC435074B2",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1743260391145
       }
     },
@@ -1168,19 +692,7 @@
         "fingerprint": "sha256 Fingerprint=A5A260FFE22365C0A0C8ECE58C2AC9BD455C014ACE49655849497110582EA9E4",
         "subjectKeyId": "28AFA899E96CA2FEE2C1FBFB304082E10485DB65",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1685222403678
       }
     },
@@ -1206,19 +718,7 @@
         "fingerprint": "sha256 Fingerprint=3F4E76D08CB82E57A6ADBA5C3BFCC4C428C429627F2B37F2B91DFFEC4D737AAF",
         "subjectKeyId": "5BDB2E5760586C87661A31A788D97FBF55DB5C6E",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939229360
       }
     },
@@ -1248,19 +748,7 @@
         "fingerprint": "sha256 Fingerprint=8A099D4B7D3FB515E4424449A75AC9265E37406DC79A2377CA23EEE3965BD8C5",
         "subjectKeyId": "8054FF8A9BC1EDDEA7FEDA3B424794F1B64C4461",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1740344847996
       }
     },
@@ -1290,19 +778,7 @@
         "fingerprint": "sha256 Fingerprint=F2275ED95D6D6A37C6940BB294AEEE19918FEEA66D893981826FC62BAD2FAD88",
         "subjectKeyId": "F9B57B2209F2850133682F327AC2C4307A5F88B3",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1697737315703
       }
     },
@@ -1328,19 +804,7 @@
         "fingerprint": "sha256 Fingerprint=2A547715569B988E0232C7BE53700897DA2A74C67F44EAF678E5106935AAA6E2",
         "subjectKeyId": "F50F7E0DDE702E46254E7363ADBE4C47EFE7EDF9",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1744136892174
       }
     },
@@ -1370,20 +834,40 @@
         "fingerprint": "sha256 Fingerprint=BFE313587E9C107E10C1173E0F158DA76BF0651415F1953A60A69148EC3E3568",
         "subjectKeyId": "B8A6DA4BBED4923D735019E43B09A1E8DA6DB546",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1744137720433
+      }
+    },
+    "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "openhablog.seneca.local",
+        "1.2.3.4",
+        "seneca.local",
+        "2.2.2.2"
+      ],
+      "metadata": {
+        "name": "openhablog.seneca.local",
+        "path": "/certs/openhablog.seneca.local.crt",
+        "keyPath": "/certs/openhablog.seneca.local.key",
+        "domains": [
+          "openhablog.seneca.local",
+          "1.2.3.4",
+          "seneca.local",
+          "2.2.2.2"
+        ],
+        "subject": "CN=openhablog.seneca.local",
+        "issuer": "CN=openhablog.seneca.local",
+        "validFrom": "Apr  8 20:06:03 2025 GMT",
+        "validTo": "Jul  7 20:06:03 2025 GMT",
+        "certType": "standard",
+        "fingerprint": "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B",
+        "subjectKeyId": "1D7CA62106490DEB475BE0FCA811CBEC6668DAC7",
+        "authorityKeyId": null,
+        "config": {},
+        "modificationTime": 1744142763573
       }
     },
     "sha256 Fingerprint=28DA03A11275A8BBEA9CF3E07A006187C33711F0215FB7611AC9EBBED86C5B22": {
@@ -1408,19 +892,7 @@
         "fingerprint": "sha256 Fingerprint=28DA03A11275A8BBEA9CF3E07A006187C33711F0215FB7611AC9EBBED86C5B22",
         "subjectKeyId": "FAA8377CD8B42DFC5E727E0F95BF0819BC0A0C29",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1673705884698
       }
     },
@@ -1452,19 +924,7 @@
         "fingerprint": "sha256 Fingerprint=B738FA88BB0EBF28F29552130AF362B09F89538301EE99270AEC15E4E7AFF3BD",
         "subjectKeyId": "0639888A19C374F365725B8608AEFF80F3143F84",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1693423067563
       }
     },
@@ -1494,19 +954,7 @@
         "fingerprint": "sha256 Fingerprint=DD792EACF154CA8B68F3E35D8B342AD4ACC549E576249B55BA60CC92FD853412",
         "subjectKeyId": "BFDC9C066A730113A1AB8014FAE95C0D38D14103",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1693422140134
       }
     },
@@ -1532,19 +980,7 @@
         "fingerprint": "sha256 Fingerprint=93E2387B6F1664C8D13D1BBE561D3A8F16DD33F2E07682D83FE6C6ABF69373A8",
         "subjectKeyId": "E9D8BCA06E191D3E8DE37A37A7FBF4C50C27E788",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939141598
       }
     },
@@ -1572,19 +1008,7 @@
         "fingerprint": "sha256 Fingerprint=0A204AD331E0AF0014F0F93404A9E11BF8A088406512B6960F0DC2E695B555EE",
         "subjectKeyId": "6816A3E3B243FB6F8753C74AAB5A93D386B7C3B1",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1740344733421
       }
     },
@@ -1614,19 +1038,7 @@
         "fingerprint": "sha256 Fingerprint=224EC9784349A2C32E60AA7D54265081CB508C891C21E0368F41D5D85FE757E7",
         "subjectKeyId": "B409601D8B226A1E6894304EEC693AAA5E71DCA6",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1739037006398
       }
     },
@@ -1652,19 +1064,7 @@
         "fingerprint": "sha256 Fingerprint=8AE5F619AD868511A3A1BBDB732F47CAC88DB864AA244BEEB66F9A354EBDAF40",
         "subjectKeyId": "FB3C854238E6124ED67CF1F4607766D6A0FAE45F",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1744134831948
       }
     },
@@ -1690,23 +1090,11 @@
         "fingerprint": "sha256 Fingerprint=E2C1E8040CE064EDB65E9D3BD7FA62DE0D18CBAB89ED3983B7C7FEA5D174625E",
         "subjectKeyId": "E3CA896A7031F943AC66C192DC4246D89C3F9B98",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1668812818461
       }
     },
-    "sha256 Fingerprint=73203D7DD8C8A3EBC29825795CD56B0B101A491159825874B56F7685F4733635": {
+    "sha256 Fingerprint=01029936210A1559766523ED26FC4C2FBE326D8753D1A441EB92464E5A216117": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -1720,28 +1108,16 @@
         "domains": [
           "test"
         ],
-        "subject": "CN=test,O=Your Organization,L=Your Locality,ST=Your State,C=DE",
-        "issuer": "CN=test,O=Your Organization,L=Your Locality,ST=Your State,C=DE",
-        "validFrom": "Feb 21 18:42:55 2025 GMT",
-        "validTo": "Feb 19 18:42:55 2035 GMT",
+        "subject": "CN=test",
+        "issuer": "CN=test",
+        "validFrom": "Apr 16 18:56:01 2025 GMT",
+        "validTo": "Jul 15 18:56:01 2025 GMT",
         "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=73203D7DD8C8A3EBC29825795CD56B0B101A491159825874B56F7685F4733635",
-        "subjectKeyId": "7CD797B0A89A1F28FE510803DE48F294626B3D0F",
+        "fingerprint": "sha256 Fingerprint=01029936210A1559766523ED26FC4C2FBE326D8753D1A441EB92464E5A216117",
+        "subjectKeyId": "835F2478FD9394B2316ECE64BD49D41CE7588D6E",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
-        "modificationTime": 1740163375924
+        "config": {},
+        "modificationTime": 1744829761858
       }
     },
     "sha256 Fingerprint=FB8B88474818762D50D8EBE421A4FD953B411E71E0B32FECD2E90C8D21AE3A43": {
@@ -1766,19 +1142,7 @@
         "fingerprint": "sha256 Fingerprint=FB8B88474818762D50D8EBE421A4FD953B411E71E0B32FECD2E90C8D21AE3A43",
         "subjectKeyId": "0F120BE380AC1DE4AF92CCB6267E391CF2FDC2B1",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1678633179258
       }
     },
@@ -1804,19 +1168,7 @@
         "fingerprint": "sha256 Fingerprint=2A5B04E5C5014FDD198632885ABE35463DB9555847E8028D5CBCB81B4678EC15",
         "subjectKeyId": "BD1B9F9FAAB9F72426A8D43AB28024203F36C73A",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939065412
       }
     },
@@ -1842,19 +1194,7 @@
         "fingerprint": "sha256 Fingerprint=C3A57D4B1519C626332BBB4E7B588F53F110FB3A8AE545C765BA878FAC967A06",
         "subjectKeyId": "6DA4C4EF2C15AF11FEE50BA721C6191623842E5C",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1672939092391
       }
     },
@@ -1888,19 +1228,7 @@
         "fingerprint": "sha256 Fingerprint=E1BA91AB7B453210BEB7790198D081FCD7DB51886D9947D16B8FDB5B57AADA67",
         "subjectKeyId": "7E085FCE84CC4E855075F761D7E92942AE5CE87F",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1743871633068
       }
     },
@@ -1930,20 +1258,34 @@
         "fingerprint": "sha256 Fingerprint=F589B8D842F10902B8F5B7F395D3F15BD4BFC339FD360A46421CBB82D612FEF6",
         "subjectKeyId": "FC8B8810FEDD18E314E48E964B1E4E28318DCEE3",
         "authorityKeyId": null,
-        "config": {
-          "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
-            "domains": [
-              "adguard-sync.seneca.local",
-              "192.168.178.240",
-              "1.2.3.4"
-            ],
-            "lastUpdated": "2025-04-14T14:02:50.556Z",
-            "autoRenew": false,
-            "renewDaysBeforeExpiry": 30,
-            "deployActions": []
-          }
-        },
+        "config": {},
         "modificationTime": 1711405861069
+      }
+    },
+    "sha256 Fingerprint=5120FDC70F3076A8F8B098EBB2C45813390197FB1E157969E92186EAB058A54B": {
+      "autoRenew": false,
+      "renewDaysBeforeExpiry": 30,
+      "deployActions": [],
+      "domains": [
+        "backup.seneca.local"
+      ],
+      "metadata": {
+        "name": "certificate",
+        "path": "/certs/backup.seneca.local/certificate.crt",
+        "keyPath": null,
+        "domains": [
+          "backup.seneca.local"
+        ],
+        "subject": "CN=backup.seneca.local",
+        "issuer": "CN=backup.seneca.local",
+        "validFrom": "Apr 17 19:54:04 2025 GMT",
+        "validTo": "Jul 16 19:54:04 2025 GMT",
+        "certType": "rootCA",
+        "fingerprint": "sha256 Fingerprint=5120FDC70F3076A8F8B098EBB2C45813390197FB1E157969E92186EAB058A54B",
+        "subjectKeyId": "6C4DD3DBE38B80DC63CDC89927E1239C9231EDE6",
+        "authorityKeyId": null,
+        "config": {},
+        "modificationTime": 1744919644073
       }
     }
   }

@@ -161,7 +161,6 @@ function buildCertificateHierarchy(certificates, caMap) {
             }
         });
         
-        // Rest of your existing code...
     } catch (error) {
         logger.error(`Error building certificate hierarchy: ${error.message}`);
         return [];

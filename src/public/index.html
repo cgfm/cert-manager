@@ -85,11 +85,14 @@
     <footer class="app-footer">
         <div class="footer-status">
             <span id="docker-status"><i class="fas fa-circle"></i> Docker: <span class="status-text">Checking...</span></span>
+            <span id="ws-status"><i class="fas fa-plug"></i> WebSocket: <span class="status-text">Disconnected</span></span>
         </div>
         <div class="footer-info">Certificate Manager v1.0</div>
     </footer>
 
     <!-- JavaScript files -->
+    <script src="/socket.io/socket.io.js"></script>
+
     <script src="/js/utils/domain-validator.js"></script>
     <script src="/js/utils.js"></script>
     <script src="/js/utils/modal-utils.js"></script> 

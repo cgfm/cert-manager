@@ -206,6 +206,10 @@ const certificateCache = {
     },
     invalidate: function(fingerprint) {
         delete this.data[fingerprint];
+    },
+    clear: function() {
+        console.log('Clearing certificate cache');
+        this.data = {};
     }
 };
 
@@ -213,24 +217,6 @@ const certificateCache = {
 function debugLog(message, data) {
     logger.debug(message, data);
 }
-
-// Main initialization function
-document.addEventListener('DOMContentLoaded', () => {
-    debugLog('Certificate manager initializing');
-
-    // Initialize page components
-    initializeUI();
-    initViewModeToggle();
-    initializeDomainValidation();
-    attachButtonEventHandlers();
-    fetchCertificates();
-
-    // Register utils in window object for backwards compatibility
-    window.modalUtils = modalUtils;
-    window.dateUtils = dateUtils;
-    window.dockerUtils = dockerUtils;
-    window.uiUtils = uiUtils;
-});
 
 // New function to attach event handlers to all buttons
 function attachButtonEventHandlers() {
@@ -971,25 +957,45 @@ function renewCertificate(fingerprint) {
     document.body.appendChild(loadingOverlay);
     
     // Call API to renew certificate
-    fetch(`/api/certificate/${fingerprint}/renew`, {
+    fetch(`/api/certificate/${encodeURIComponent(fingerprint)}/renew`, {
         method: 'POST'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('Certificate not found. It may have been deleted or moved.');
+            }
+            throw new Error(`Server returned status ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
-        document.body.removeChild(loadingOverlay);
-        
         if (data.success) {
-            window.modalUtils.showNotification('Certificate renewal started successfully.', 'success');
-            
-            // Refresh certificates list after a short delay
-            setTimeout(() => {
-                if (typeof fetchCertificates === 'function') {
-                    fetchCertificates();
-                } else {
-                    window.location.reload();
+            // Clear certificate caches
+            window.cachedCertificates = null;
+            if (window.certificateCache) {
+                window.certificateCache.clear();
+            } else {
+                // Create a clear method if it doesn't exist
+                if (window.certificateCache) {
+                    window.certificateCache.data = {};
                 }
-            }, 3000);
+            }
+            
+            console.log('Certificate cache cleared after renewal');
+            
+            // Wait a moment for the server to process the renewal before fetching
+            setTimeout(() => {
+                // Remove the loading overlay
+                document.body.removeChild(loadingOverlay);
+                
+                // Force fetch with refresh to ensure we get the latest data
+                fetchCertificates(true).catch(fetchError => {
+                    console.error('Error fetching certificates after renewal:', fetchError);
+                });
+            }, 1000);
         } else {
+            document.body.removeChild(loadingOverlay);
             const errorMsg = data.error || 'Unknown error occurred';
             window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
         }
@@ -1697,31 +1703,70 @@ function uploadCertificate(modal) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    debugLog('Certificate manager initializing');
-    
-    // Initialize page components first
-    initializeUI();
-    initializeDomainValidation();
-    attachButtonEventHandlers();
-    setupHeaderButtons();
-    checkDockerStatus();
-    
-    // Add view controls BEFORE fetching certificates
-    addViewModeControls();
-    initViewModeToggle();
+/**
+ * Initialize the search functionality
+ */
+function initializeSearch() {
+    const searchInput = document.getElementById('certSearch');
+    if (!searchInput) {
+        console.error('Search input element not found');
+        return;
+    }
 
-    // Add global event listeners
-    addGlobalEventListeners();
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        filterCertificates(searchTerm);
+    });
+
+    console.log('Search functionality initialized');
+}
+
+/**
+ * Filter certificates based on search term
+ * @param {string} searchTerm - The search term to filter by
+ */
+function filterCertificates(searchTerm) {
+    // Get the current view mode
+    const viewMode = getViewMode();
     
-    // Register global functions for backward compatibility
-    registerGlobalFunctions();
+    // If no search term, just render all certificates with the current view mode
+    if (!searchTerm) {
+        renderCertificatesWithMode(window.cachedCertificates, viewMode);
+        return;
+    }
     
-    // Finally, fetch certificates ONCE after everything is set up
-    setTimeout(() => {
-        fetchCertificates();
-    }, 100);
-});
+    // Filter certificates based on search term
+    const filteredCerts = window.cachedCertificates.filter(cert => {
+        // Search in name
+        if (cert.name && cert.name.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+        
+        // Search in domains
+        if (cert.domains && Array.isArray(cert.domains)) {
+            for (const domain of cert.domains) {
+                if (domain.toLowerCase().includes(searchTerm)) {
+                    return true;
+                }
+            }
+        }
+        
+        // Search in subject
+        if (cert.subject && cert.subject.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+        
+        // Search in issuer
+        if (cert.issuer && cert.issuer.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+        
+        return false;
+    });
+    
+    // Render the filtered certificates with the current view mode
+    renderCertificatesWithMode(filteredCerts, viewMode);
+}
 
 function initializeUI() {
     // Any unique UI initialization from main.js
@@ -2004,8 +2049,6 @@ function renderCertificatesWithMode(certificates, mode) {
     }
 }
 
-let currentFetchController = null;
-let currentFetchTimeout = null;
 let initialFetchCompleted = false;
 let fetchInProgress = false;
 
@@ -2042,6 +2085,11 @@ function getViewMode() {
         }
         
         // Alternatively, check radio buttons if they exist
+        const flatRadio = document.getElementById('flat-view');
+        if (flatRadio && flatRadio.checked) {
+            return 'flat';
+        }
+        
         const hierarchyRadio = document.getElementById('hierarchy-view');
         if (hierarchyRadio && hierarchyRadio.checked) {
             return 'hierarchy';
@@ -2060,41 +2108,10 @@ function getViewMode() {
         return 'flat'; // Default to flat view on error
     }
 }
-
 /**
- * Modified fetchCertificates function that uses the current view mode
+ * Show loading indicator in the certificates table
  */
-function fetchCertificates(forceRefresh = false) {
-    // Prevent multiple simultaneous fetch operations during initialization
-    if (fetchInProgress && !forceRefresh) {
-        console.log('Fetch already in progress, skipping duplicate call');
-        return;
-    }
-    
-    console.log('Fetching certificates...');
-    fetchInProgress = true;
-
-    // Cancel any existing fetch operations
-    if (currentFetchController) {
-        console.log('Canceling previous fetch operation');
-        currentFetchController.abort();
-    }
-    
-    if (currentFetchTimeout) {
-        console.log('Clearing previous fetch timeout');
-        clearTimeout(currentFetchTimeout);
-    }
-    
-    // If we have cached certificates and don't need a refresh, just render them
-    if (!forceRefresh && window.cachedCertificates && window.cachedCertificates.length > 0) {
-        console.log('Using cached certificates');
-        const viewMode = document.querySelector('input[name="view-mode"]:checked')?.value || 'flat';
-        renderCertificatesWithMode(window.cachedCertificates, viewMode);
-        fetchInProgress = false;
-        return;
-    }
-    
-    // Show loading indicator
+function showLoadingIndicator() {
     const certificatesTable = document.querySelector('#certificatesTable tbody') || 
                              document.querySelector('.certificates-table tbody');
     
@@ -2109,107 +2126,42 @@ function fetchCertificates(forceRefresh = false) {
         </tr>
         `;
     }
+}
+
+/**
+ * Hide loading indicator and show "no certificates" message if needed
+ */
+function hideLoadingIndicator() {
+    const certificatesTable = document.querySelector('#certificatesTable tbody') || 
+                             document.querySelector('.certificates-table tbody');
     
-    // Create a new AbortController for this request
-    currentFetchController = new AbortController();
-    const signal = currentFetchController.signal;
-    
-    // Set a timeout to abort the fetch after 10 seconds
-    currentFetchTimeout = setTimeout(() => {
-        console.log('Fetch timeout exceeded (10s)');
-        if (currentFetchController) {
-            currentFetchController.abort();
+    if (certificatesTable && !window.cachedCertificates?.length) {
+        certificatesTable.innerHTML = `
+            <tr>
+                <td colspan="4" class="no-certs-message">
+                    <i class="fas fa-info-circle"></i> No certificates found
+                </td>
+            </tr>
+        `;
+    }
+}
+
+/**
+ * Show a notification message
+ * @param {string} message - Message to display
+ * @param {string} type - Notification type (success, error, warning, info)
+ * @param {number} duration - How long to show the notification in ms
+ */
+function showNotification(message, type = 'info', duration = 5000) {
+    // Use modalUtils if available, otherwise show a basic alert
+    if (window.modalUtils && typeof window.modalUtils.showNotification === 'function') {
+        return window.modalUtils.showNotification(message, type, duration);
+    } else {
+        console.log(`[${type}] ${message}`);
+        if (type === 'error') {
+            alert(message);
         }
-    }, 10000);
-    
-    const url = forceRefresh ? 
-        '/api/certificate?refresh=true' : 
-        '/api/certificate';
-
-    // Fetch certificates from API with timeout protection
-    fetch(url, { signal })
-        .then(response => {
-            // Clear the timeout as soon as we get a response
-            clearTimeout(currentFetchTimeout);
-            currentFetchTimeout = null;
-            
-            if (!response.ok) {
-                throw new Error(`Server returned status: ${response.status}`);
-            }
-            
-            return response.json();
-        })
-        .then(data => {
-            // Clear controller reference since fetch completed successfully
-            currentFetchController = null;
-            
-            // Cache the certificates for potential reuse
-            window.cachedCertificates = data;
-            initialFetchCompleted = true;
-            fetchInProgress = false;
-
-            // Process data to ensure consistent structure
-            const processedData = processCertificateData(data);
-            
-            // Cache certificates for use in other functions
-            window.cachedCertificates = processedData;
-            
-            // Get current view mode
-            const viewMode = getViewMode();
-            console.log(`Current view mode: ${viewMode}`);
-            
-            // Render with the appropriate mode
-            renderCertificatesWithMode(processedData, viewMode);
-            
-            // Update certificate count if needed
-            if (Array.isArray(processedData) && typeof updateCertificateCount === 'function') {
-                updateCertificateCount(processedData.length);
-            }
-        })
-        .catch(error => {
-            // Clear timeout if it wasn't already cleared
-            if (currentFetchTimeout) {
-                clearTimeout(currentFetchTimeout);
-                currentFetchTimeout = null;
-            }
-            
-            fetchInProgress = false;
-            
-            // Only log actual errors, not aborts from switching views
-            if (error.name !== 'AbortError' || currentFetchController !== null) {
-                console.error('Error fetching certificates:', error);
-                
-                if (certificatesTable) {
-                    certificatesTable.innerHTML = `
-                        <tr>
-                            <td colspan="4" class="error-cell">
-                                <div class="error-message">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    Error loading certificates: ${error.message}
-                                    <button onclick="fetchCertificates(true)" class="retry-btn">
-                                        <i class="fas fa-sync"></i> Try Again
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                
-                // Show notification if possible
-                if (typeof window.uiUtils !== 'undefined' && 
-                    typeof window.modalUtils.showNotification === 'function') {
-                    window.modalUtils.showNotification(
-                        `Failed to load certificates: ${error.message}`, 
-                        'error'
-                    );
-                }
-            } else {
-                console.log('Fetch aborted due to view change or navigation');
-            }
-            
-            // Clear controller reference
-            currentFetchController = null;
-        });
+    }
 }
 
 function initCertificateActionListeners(){
@@ -3312,6 +3264,154 @@ function deleteCertificate(fingerprint, modal) {
     );
 }
 
+// Global variables for fetch control
+let currentFetchController = null;
+let currentFetchTimeout = null;
+
+/**
+ * Fetch certificates from API
+ * @param {boolean} forceRefresh - Whether to force a server-side refresh
+ * @returns {Promise} - Promise that resolves when certificates are loaded
+ */
+function fetchCertificates(forceRefresh = false) {
+    return new Promise((resolve, reject) => {
+        // Always force refresh after a renewal
+        if (window.justRenewed) {
+            forceRefresh = true;
+            window.justRenewed = false;
+        }
+        
+        // Show loading indicator
+        showLoadingIndicator();
+            
+        // Cancel any pending fetches
+        if (currentFetchController) {
+            console.log('Aborting previous fetch request');
+            currentFetchController.abort();
+            currentFetchController = null;
+        }
+        
+        if (currentFetchTimeout) {
+            clearTimeout(currentFetchTimeout);
+            currentFetchTimeout = null;
+        }
+        
+        // Create a new AbortController for this fetch
+        currentFetchController = new AbortController();
+        const signal = currentFetchController.signal;
+        
+        // Set a timeout to abort the fetch after 10 seconds
+        currentFetchTimeout = setTimeout(() => {
+            console.log('Fetch timeout exceeded (10s)');
+            if (currentFetchController) {
+                currentFetchController.abort('timeout');
+                currentFetchController = null;
+            }
+        }, 10000);
+        
+        const url = forceRefresh ? 
+            '/api/certificate?refresh=true' : 
+            '/api/certificate';
+        
+    console.log(`Fetching certificates from ${url}`);
+
+    // Fetch certificates from API with timeout protection
+    fetch(url, { signal })
+        .then(response => {
+            // Clear the timeout as soon as we get a response
+            if (currentFetchTimeout) {
+                clearTimeout(currentFetchTimeout);
+                currentFetchTimeout = null;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`Server returned status: ${response.status}`);
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            // Reset the controller since this fetch is complete
+            currentFetchController = null;
+            
+            // Store certificates in global cache
+            window.cachedCertificates = data;
+            
+            // Also update the certificate cache for individual lookup
+            if (window.certificateCache) {
+                // Clear first to remove old certificates 
+                window.certificateCache.clear();
+                
+                // Add each certificate to the cache
+                data.forEach(cert => {
+                    if (cert.fingerprint) {
+                        window.certificateCache.set(cert.fingerprint, cert);
+                    }
+                });
+            }
+            
+            // Get current view mode and apply any current search term
+            const viewMode = getViewMode();
+            const searchTerm = document.getElementById('certSearch')?.value.toLowerCase().trim();
+            
+            // Apply search filter if there is an active search
+            if (searchTerm) {
+                filterCertificates(searchTerm);
+            } else {
+                // Apply current sort if available
+                if (window.currentSort) {
+                    sortAndRenderCertificates();
+                } else {
+                    // Otherwise just render with the current view mode
+                    renderCertificatesWithMode(data, viewMode);
+                }
+            }
+            
+            // Initialize or re-initialize search and sorting if they're not initialized yet
+            if (!window.searchInitialized) {
+                initializeSearch();
+                window.searchInitialized = true;
+            }
+            
+            if (!window.sortingInitialized) {
+                initializeSorting();
+                window.sortingInitialized = true;
+            }
+            
+            // Hide loading indicator
+            hideLoadingIndicator();
+            
+            // Resolve the promise with the data
+            resolve(data);
+        })
+        .catch(error => {
+            // Clear timeout if it's still active
+            if (currentFetchTimeout) {
+                clearTimeout(currentFetchTimeout);
+                currentFetchTimeout = null;
+            }
+            
+            // If this was an abort that we triggered ourselves, handle quietly
+            if (error.name === 'AbortError' && error.message !== 'timeout') {
+                console.log('Fetch aborted - likely due to a new request');
+                reject(error);
+                return;
+            }
+            
+            console.error('Error fetching certificates:', error);
+            
+            // Show error message to user
+            window.modalUtils.showNotification(`Error loading certificates: ${error.message}`, 'error');
+            
+            // Hide loading indicator
+            hideLoadingIndicator();
+            
+            // Reject the promise with the error
+            reject(error);
+        });
+    });
+}
+
 /**
  * Handle closing a modal with unsaved changes check
  * @param {HTMLElement} modal - The modal to close
@@ -3360,6 +3460,346 @@ function debugFingerprint(fingerprint, stage) {
         firstChars: fingerprint.substring(0, 10)
     });
 }
+
+/**
+ * Initialize the sorting functionality
+ */
+function initializeSorting() {
+    const sortHeaders = document.querySelectorAll('.sort-header');
+    if (!sortHeaders.length) {
+        console.error('Sort headers not found');
+        return;
+    }
+
+    // Current sort state
+    window.currentSort = {
+        column: 'name',
+        direction: 'asc'
+    };
+
+    sortHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            const column = this.getAttribute('data-sort');
+            
+            // Toggle direction if clicking the same column
+            if (window.currentSort.column === column) {
+                window.currentSort.direction = window.currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                window.currentSort.column = column;
+                window.currentSort.direction = 'asc';
+            }
+            
+            // Update UI to show sort direction
+            updateSortUI(window.currentSort.column, window.currentSort.direction);
+            
+            // Sort and render certificates
+            sortAndRenderCertificates();
+        });
+    });
+
+    console.log('Sorting functionality initialized');
+}
+
+/**
+ * Update UI to show current sort column and direction
+ * @param {string} column - Column being sorted
+ * @param {string} direction - Sort direction ('asc' or 'desc')
+ */
+function updateSortUI(column, direction) {
+    const sortHeaders = document.querySelectorAll('.sort-header');
+    
+    sortHeaders.forEach(header => {
+        const headerColumn = header.getAttribute('data-sort');
+        const icon = header.querySelector('i');
+        
+        // Reset all icons first
+        icon.className = 'fas fa-sort';
+        
+        // Update icon for current sort column
+        if (headerColumn === column) {
+            icon.className = direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+        }
+    });
+}
+
+/**
+ * Check for certificate expirations and show warnings
+ */
+function checkCertificateExpirations() {
+    console.log('Checking certificate expirations...');
+    
+    // Skip if no certificates are loaded yet
+    if (!window.cachedCertificates || window.cachedCertificates.length === 0) {
+        console.log('No certificates cached, skipping expiration check');
+        return;
+    }
+    
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    
+    let expiredCount = 0;
+    let expiringCount = 0;
+    const expiredCerts = [];
+    const expiringCerts = [];
+    
+    // Check each certificate
+    window.cachedCertificates.forEach(cert => {
+        // Skip CA certificates - they usually have longer validity periods
+        if (cert.certType === 'rootCA' || cert.certType === 'intermediateCA') {
+            return;
+        }
+        
+        // Parse the expiry date
+        const expiryDate = new Date(cert.validTo || cert.expiryDate || cert.notAfter);
+        
+        // Skip if we couldn't parse the date
+        if (isNaN(expiryDate.getTime())) {
+            return;
+        }
+        
+        // Check if expired
+        if (expiryDate < now) {
+            expiredCount++;
+            expiredCerts.push(cert);
+        }
+        // Check if expiring soon
+        else if (expiryDate < thirtyDaysFromNow) {
+            expiringCount++;
+            expiringCerts.push(cert);
+        }
+    });
+    
+    // Show warnings if any certificates are expired or expiring
+    if (expiredCount > 0) {
+        const message = expiredCount === 1 
+            ? `1 certificate has expired` 
+            : `${expiredCount} certificates have expired`;
+            
+        window.modalUtils.showNotification(message, 'error', 0);
+    }
+    
+    if (expiringCount > 0) {
+        const message = expiringCount === 1 
+            ? `1 certificate will expire in the next 30 days` 
+            : `${expiringCount} certificates will expire in the next 30 days`;
+            
+        // Show after a small delay if there was also an expired notification
+        setTimeout(() => {
+            window.modalUtils.showNotification(message, 'warning', 0);
+        }, expiredCount > 0 ? 500 : 0);
+    }
+    
+    // Return the results in case they're needed
+    return {
+        expired: expiredCerts,
+        expiring: expiringCerts
+    };
+}
+
+/**
+ * Sort and render certificates based on current sort settings
+ */
+function sortAndRenderCertificates() {
+    if (!window.cachedCertificates || !window.cachedCertificates.length) {
+        return;
+    }
+    
+    const { column, direction } = window.currentSort;
+    
+    // Clone the array to avoid modifying the original
+    const sortedCerts = [...window.cachedCertificates];
+    
+    // Sort based on column
+    sortedCerts.sort((a, b) => {
+        let valueA, valueB;
+        
+        if (column === 'name') {
+            valueA = a.name || '';
+            valueB = b.name || '';
+        } else if (column === 'expiry') {
+            // Parse dates for comparison
+            valueA = a.validTo ? new Date(a.validTo) : new Date(0);
+            valueB = b.validTo ? new Date(b.validTo) : new Date(0);
+        } else {
+            // Default fallback to name
+            valueA = a.name || '';
+            valueB = b.name || '';
+        }
+        
+        // Compare the values
+        if (typeof valueA === 'string' && typeof valueB === 'string') {
+            return direction === 'asc' ? 
+                valueA.localeCompare(valueB) : 
+                valueB.localeCompare(valueA);
+        } else {
+            // For dates or numbers
+            return direction === 'asc' ? 
+                (valueA > valueB ? 1 : -1) :
+                (valueA < valueB ? 1 : -1);
+        }
+    });
+    
+    // Render the sorted certificates with the current view mode
+    renderCertificatesWithMode(sortedCerts, getViewMode());
+}
+
+// Add or update your Socket.io initialization function
+
+function initializeWebSocket() {
+    try {
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('WebSocket connected');
+            const wsStatus = document.querySelector('#ws-status');
+            if (wsStatus) {
+                wsStatus.innerHTML = '<i class="fas fa-plug" style="color: #28a745;"></i> WebSocket: <span class="status-text">Connected</span>';
+                wsStatus.classList.add('connected');
+            }
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('WebSocket disconnected');
+            const wsStatus = document.querySelector('#ws-status');
+            if (wsStatus) {
+                wsStatus.innerHTML = '<i class="fas fa-plug" style="color: #dc3545;"></i> WebSocket: <span class="status-text">Disconnected</span>';
+                wsStatus.classList.remove('connected');
+            }
+        });
+        
+        socket.on('certificate-renewed', (data) => {
+            console.log('Certificate renewed event received:', data);
+            
+            // Show a notification
+            window.modalUtils.showNotification(
+                `Certificate for ${data.domains ? data.domains[0] : data.name} renewed successfully`, 
+                'success'
+            );
+    
+            // Clear certificate caches
+            window.cachedCertificates = null;
+            if (window.certificateCache) {
+                window.certificateCache.clear();
+            }
+    
+            // Cancel any existing fetch operations before making a new one
+            if (currentFetchController) {
+                console.log('Canceling any existing fetch operations');
+                // Don't abort here as it causes the error - just clear the references
+                currentFetchController = null;
+            }
+            
+            if (currentFetchTimeout) {
+                clearTimeout(currentFetchTimeout);
+                currentFetchTimeout = null;
+            }
+            
+            // Add a small delay before fetching to ensure the server has finished updating
+            setTimeout(() => {
+                // Use a static fetch without AbortController to avoid the race condition
+                console.log('Fetching certificates after renewal notification');
+                
+                const url = '/api/certificate?refresh=true';
+                
+                // Simple fetch without abort controller for this specific case
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Server returned status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(`Successfully fetched ${data.length} certificates after renewal`);
+                        
+                        // Store certificates in global cache
+                        window.cachedCertificates = data;
+                        
+                        // Also update the certificate cache for individual lookup
+                        if (window.certificateCache) {
+                            // Add each certificate to the cache
+                            data.forEach(cert => {
+                                if (cert.fingerprint) {
+                                    window.certificateCache.set(cert.fingerprint, cert);
+                                }
+                            });
+                        }
+                        
+                        // Render certificates with current view mode
+                        const viewMode = getViewMode();
+                        renderCertificatesWithMode(data, viewMode);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching certificates after renewal notification:', error);
+                        window.modalUtils.showNotification(
+                            `Error refreshing certificates: ${error.message}. Please refresh manually.`, 
+                            'warning'
+                        );
+                    });
+            }, 1000);
+        });
+
+        // Listen for server status updates
+        socket.on('server-status', (data) => {
+            console.log('Server status update:', data);
+            const wsStatus = document.querySelector('#ws-status');
+            if (wsStatus && data.status === 'online') {
+                wsStatus.innerHTML = `<i class="fas fa-plug" style="color: #28a745;"></i> WebSocket: <span class="status-text">Connected (${data.clients} client${data.clients !== 1 ? 's' : ''})</span>`;
+            }
+        });
+        
+        return socket;
+    } catch (err) {
+        console.error('Error initializing WebSocket:', err);
+        return null;
+    }
+}
+
+// In your document ready handler:
+document.addEventListener('DOMContentLoaded', () => {
+    debugLog('Certificate manager initializing');
+
+    // Initialize WebSocket if available
+    if (typeof io !== 'undefined') {
+        window.socket = initializeWebSocket();
+    } else {
+        console.log('Socket.io not loaded - real-time updates disabled');
+    }
+
+    // Initialize page components first
+    initializeUI();
+    initializeDomainValidation();
+    attachButtonEventHandlers();
+    setupHeaderButtons();
+    checkDockerStatus();
+    
+    // Initialize certificate expiry checker
+    checkCertificateExpirations();
+
+    // Add view controls BEFORE fetching certificates
+    addViewModeControls();
+    initViewModeToggle();
+
+    // Add global event listeners
+    addGlobalEventListeners();
+    
+    // Register global functions for backward compatibility
+    registerGlobalFunctions();
+    
+    // Initialize sorting functionality
+    initializeSorting();
+    
+    // Initialize button handlers
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+        fetchCertificates(true);
+    });
+    
+    // Finally, fetch certificates ONCE after everything is set up
+    setTimeout(() => {
+        fetchCertificates();
+    }, 100);
+});
 
 // Add at the end of your initialization code
 window.addEventListener('unhandledrejection', event => {
