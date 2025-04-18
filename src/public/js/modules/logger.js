@@ -1,7 +1,17 @@
 /**
  * Client-side logger service
- * Provides centralized logging with support for different levels
+ * Provides centralized logging with support for different levels and remote logging to a server.
+ * @module logger
+ * @requires window
+ * @requires document
+ * @requires fetch
+ * @requires console
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description This module is designed to provide a consistent logging interface across the application. It allows for different log levels (debug, info, warn, error) and can send logs to a server for storage and analysis. The logger can be configured to only log messages above a certain level, reducing noise in the logs.
  */
+
 class Logger {
     constructor(minLevel = 'info') {
         this.levels = {
@@ -42,21 +52,41 @@ class Logger {
     }
 
     _log(level, message, data) {
-        // Log to console
+        // Check if data is undefined
+        const hasData = typeof data !== 'undefined';
+        
+        // Log to console - only include data if defined
         const logMethod = level === 'debug' ? 'log' : level;
-        console[logMethod](`[${level.toUpperCase()}] ${message}`, data);
+        
+        if (hasData) {
+            console[logMethod](`[${level.toUpperCase()}] ${message}`, data);
+        } else {
+            console[logMethod](`[${level.toUpperCase()}] ${message}`);
+        }
         
         // Send important logs to server (info and higher)
         if (this.levels[level] >= this.levels.info) {
+            // Only include data property in JSON if data exists
+            const logData = {
+                level,
+                message,
+                ...(hasData && { data })
+            };
+            
             fetch('/api/logs/client', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ level, message, data })
+                body: JSON.stringify(logData)
             }).catch(e => console.error('Failed to send log to server', e));
         }
     }
 }
 
-// Export a singleton instance
-const logger = new Logger(window.logLevel || 'info');
-export default logger;
+// Export a singleton instance if not already defined
+if (!window.logger) {
+    let logger = new Logger(window.logLevel || 'info');
+    
+    // Make it globally available
+    window.logger = logger;
+    console.log('Logger initialized with level:', window.logLevel || 'info');
+}

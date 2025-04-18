@@ -98,9 +98,9 @@ function initialize(configManagerInstance) {
                 });
             }            
 
-            const settings = configManager.getGlobalConfig();
+            const settings = configManager.getGlobalDefaults();
             logger.debug('Returning global settings', settings);
-                        res.json(settings);
+            res.json(settings);
         } catch (error) {
             logger.error('Error getting global settings:', error);
             res.status(500).json({ 
@@ -113,13 +113,12 @@ function initialize(configManagerInstance) {
     // Save global settings
     router.post('/global', (req, res) => {
         try {
-            logger.log('POST /api/settings/global requested');
+            logger.info('POST /api/settings/global requested');
             
             const settings = req.body;
-            logger.log('Saving global settings', settings);
+            logger.info('Saving global settings', settings);
             
-            // Save to config manager
-            configManager.setGlobalConfig(settings);
+            configManager.setGlobalDefaults(settings);
             
             res.json({ success: true });
         } catch (error) {

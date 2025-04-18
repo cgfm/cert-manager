@@ -21,14 +21,15 @@
             <i class="fas fa-certificate"></i>
             <h1>Certificate Manager</h1>
         </div>
-            
+        
         <div class="view-controls header-view-controls">
             <span>View:</span>
-            <div class="toggle-container">
-                <input type="checkbox" id="view-mode-toggle" class="toggle-checkbox">
-                <label for="view-mode-toggle" class="toggle-label">
-                    <span class="toggle-inner" data-flat="Flat" data-hierarchy="Hierarchy"></span>
-                    <span class="toggle-switch"></span>
+            <div class="view-toggle-container">
+                <input type="checkbox" id="view-mode-toggle" class="view-toggle-input">
+                <label for="view-mode-toggle" class="view-toggle-label">
+                    <span class="view-option view-option-flat">Flat</span>
+                    <span class="view-toggle-slider"></span>
+                    <span class="view-option view-option-hierarchy">Hierarchy</span>
                 </label>
             </div>
         </div>
@@ -45,53 +46,69 @@
             </button>
         </div>
     </header>
+    
+    <div class="main-content-wrapper">
+        <main class="app-container">
+            <div class="certificate-panel">
+                <div class="panel-header">
+                    <h2>Certificates</h2>
+                    <div class="search-container">
+                        <input type="text" id="certSearch" placeholder="Search certificates...">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                </div>
 
-    <main class="app-container">
-        <div class="certificate-panel">
-            <div class="panel-header">
-                <h2>Certificates</h2>
-                <div class="search-container">
-                    <input type="text" id="certSearch" placeholder="Search certificates...">
-                    <i class="fas fa-search search-icon"></i>
+                <div class="table-container">
+                    <table class="certificates-table">
+                        <thead>
+                            <tr>
+                                <th class="sort-header" data-sort="name">Name <i class="fas fa-sort"></i></th>
+                                <th>Domains</th>
+                                <th class="sort-header" data-sort="expiry">Expiry Date <i class="fas fa-sort"></i></th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="certificateTableBody">
+                            <!-- Certificate rows will be dynamically added here -->
+                            <tr class="loading-row">
+                                <td colspan="4">
+                                    <div class="loading-container">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Loading certificates...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <div class="table-container">
-                <table class="certificates-table">
-                    <thead>
-                        <tr>
-                            <th class="sort-header" data-sort="name">Name <i class="fas fa-sort"></i></th>
-                            <th>Domains</th>
-                            <th class="sort-header" data-sort="expiry">Expiry Date <i class="fas fa-sort"></i></th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="certificateTableBody">
-                        <!-- Certificate rows will be dynamically added here -->
-                        <tr class="loading-row">
-                            <td colspan="4">
-                                <div class="loading-container">
-                                    <i class="fas fa-spinner fa-spin"></i>
-                                    <span>Loading certificates...</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-
+        </main>
+    </div>
+    
     <footer class="app-footer">
         <div class="footer-status">
-            <span id="docker-status"><i class="fas fa-circle"></i> Docker: <span class="status-text">Checking...</span></span>
-            <span id="ws-status"><i class="fas fa-plug"></i> WebSocket: <span class="status-text">Disconnected</span></span>
+            <span id="docker-status">
+                <i class="fas fa-circle"></i> 
+                Docker: 
+                <span class="status-text">Checking...</span>
+            </span>
+            <span id="ws-status">
+                <i class="fas fa-plug"></i> 
+                WebSocket: 
+                <span class="status-text">Disconnected</span>
+            </span>
+                <!-- Scheduler status indicator -->
+            <span id="scheduler-status">
+                <i class="fas fa-circle-notch fa-spin"></i> 
+                <span class="status-text">Scheduler: Checking...</span>
+            </span>
         </div>
         <div class="footer-info">Certificate Manager v1.0</div>
     </footer>
 
     <!-- JavaScript files -->
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/modules/logger.js"></script>
 
     <script src="/js/utils/domain-validator.js"></script>
     <script src="/js/utils.js"></script>

@@ -1,5 +1,11 @@
 /**
  * Client-side utility functions for validating domains and IP addresses
+ * @module domain-validator - Utility functions for validating domain names and IP addresses
+ * @requires logger - Logger utility for debugging
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description This module provides functions to validate domain names and IP addresses (both IPv4 and IPv6). It includes regex patterns for validation and utility functions to check if a given string is a valid domain or IP address. The module is designed to be used in a web environment, making it suitable for client-side applications.
  */
 
 // Domain regex based on RFC 1034/1035 with some simplifications

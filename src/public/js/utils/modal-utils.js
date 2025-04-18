@@ -1,7 +1,19 @@
 /**
  * Modal utilities for consistent modal handling
+ * @module modal-utils - Modal utilities for creating and managing modals in the application.
+ * @requires ui-utils - UI utilities for common UI interactions
+ * @requires filesystem-service - Filesystem service for file operations
+ * @requires certificate-service - Certificate service for managing certificates
+ * @requires renewal-manager - Renewal manager for handling certificate renewals
+ * @requires scheduler-service - Scheduler service for managing scheduled tasks
+ * @requires config-manager - Configuration manager for loading and saving settings
+ * @requires logger - Logger utility for debugging
+ * @requires certificate-utils - Certificate utilities for handling certificate operations
+ * @requires filesystem-utils - Filesystem utilities for file operations
+ * @version 1.0.0
+ * @license MIT
+ * @description This module provides utility functions for creating and managing modals in the application. It includes functions for setting up modal behaviors, handling file browsing, and managing certificate actions. The modals are styled to be consistent with the application's design language.
  */
-
 
 // Create a function to set up common modal behaviors
 function setupModalBehavior(modal) {
@@ -115,7 +127,7 @@ function setupTabSwitching(modal) {
  */
 function ensureModalStyles() {
     if (!document.getElementById('modal-styles-js')) {
-        console.log('Adding modal styles dynamically');
+        logger.info('Adding modal styles dynamically');
         const styleSheet = document.createElement('style');
         styleSheet.id = 'modal-styles-js';
         styleSheet.innerHTML = `
@@ -261,9 +273,9 @@ function ensureModalStyles() {
             }
         `;
         document.head.appendChild(styleSheet);
-        console.log('Modal styles added');
+        logger.info('Modal styles added');
     } else {
-        console.log('Modal styles already exist');
+        logger.info('Modal styles already exist');
     }
 }
 
@@ -276,7 +288,7 @@ function createModal(options = {}) {
     // Ensure styles are loaded
     ensureModalStyles();
     
-    console.log('Creating modal with options:', options);
+    logger.info('Creating modal with options:', options);
     
     const defaultOptions = {
         title: 'Modal Title',
@@ -309,7 +321,7 @@ function createModal(options = {}) {
     
     // Add to document
     document.body.appendChild(modal);
-    console.log(`Modal created and added to document with ID: ${modal.id}`);
+    logger.info(`Modal created and added to document with ID: ${modal.id}`);
     
     // Add close handler
     const closeBtn = modal.querySelector('.close');
@@ -317,12 +329,12 @@ function createModal(options = {}) {
         closeBtn.addEventListener('click', () => {
             try {
                 document.body.removeChild(modal);
-                console.log(`Modal ${modal.id} closed`);
+                logger.info(`Modal ${modal.id} closed`);
                 if (typeof settings.onClose === 'function') {
                     settings.onClose();
                 }
             } catch (err) {
-                console.error('Error closing modal:', err);
+                logger.error('Error closing modal:', err);
             }
         });
     }
@@ -336,12 +348,12 @@ function createModal(options = {}) {
             try {
                 document.body.removeChild(modal);
                 document.removeEventListener('keydown', escHandler);
-                console.log(`Modal ${modal.id} closed via ESC key`);
+                logger.info(`Modal ${modal.id} closed via ESC key`);
                 if (typeof settings.onClose === 'function') {
                     settings.onClose();
                 }
             } catch (error) {
-                console.error('Error handling ESC key:', error);
+                logger.error('Error handling ESC key:', error);
             }
         }
     });
@@ -356,7 +368,7 @@ function createModal(options = {}) {
  */
 function showFileBrowser(parentModal, inputSelector) {
     return new Promise((resolve) => {
-        console.log("Opening file browser modal");
+        logger.info("Opening file browser modal");
     
         // Create a modal dialog for file browsing
         const modal = createModal({
@@ -390,7 +402,7 @@ function showFileBrowser(parentModal, inputSelector) {
         async function loadDirectory(path) {
             const fileList = document.getElementById('fileList');
             if (!fileList) {
-                console.error("File list element not found");
+                logger.error("File list element not found");
                 return;
             }
             
@@ -499,7 +511,7 @@ function showFileBrowser(parentModal, inputSelector) {
                 });
                 
             } catch (error) {
-                console.error('Error loading directory:', error);
+                logger.error('Error loading directory:', error);
                 fileList.innerHTML = `<div class="error-message">
                     <i class="fas fa-exclamation-triangle"></i> Error loading directory: ${error.message}
                     <div class="help-text">The API endpoint /api/filesystem may not be implemented on the server.</div>
@@ -543,9 +555,9 @@ function showFileBrowser(parentModal, inputSelector) {
                     
                 if (targetInput) {
                     targetInput.value = currentPath;
-                    console.log(`Updated input ${inputSelector} with path: ${currentPath}`);
+                    logger.info(`Updated input ${inputSelector} with path: ${currentPath}`);
                 } else {
-                    console.error(`Target input not found: ${inputSelector}`);
+                    logger.error(`Target input not found: ${inputSelector}`);
                 }
                 
                 // Always resolve the promise before removing the modal
@@ -561,7 +573,7 @@ function showFileBrowser(parentModal, inputSelector) {
 
 // Simple check function to verify the utilities are loaded
 function checkModalUtilsLoaded() {
-    console.log("Modal utilities loaded successfully!");
+    logger.info("Modal utilities loaded successfully!");
     return true;
 }
 
@@ -570,7 +582,7 @@ function checkModalUtilsLoaded() {
  * Uses event delegation for better performance and to handle dynamically added elements
  */
 function setupCertificateActionListeners() {
-    console.log('Setting up certificate action listeners');
+    logger.info('Setting up certificate action listeners');
     
     // Find all certificate tables or containers with more flexible selectors
     const certificateContainers = [
@@ -592,13 +604,13 @@ function setupCertificateActionListeners() {
     ].filter(el => el !== null);
     
     if (certificateContainers.length === 0) {
-        console.warn('No certificate containers found on page');
+        logger.warn('No certificate containers found on page');
         // Still set up global action buttons
         setupGlobalActionButtons();
         return;
     }
     
-    console.log(`Found ${certificateContainers.length} potential certificate containers`);
+    logger.info(`Found ${certificateContainers.length} potential certificate containers`);
     
     // Set up event delegation on each container
     certificateContainers.forEach(container => {
@@ -609,7 +621,7 @@ function setupCertificateActionListeners() {
                              container.querySelector('.renew-btn');
         
         if (hasCertElements) {
-            console.log(`Container ${container.id || container.className || 'unknown'} has certificate elements`);
+            logger.info(`Container ${container.id || container.className || 'unknown'} has certificate elements`);
             
             // Remove existing listeners by cloning the node
             const newContainer = container.cloneNode(true);
@@ -617,9 +629,9 @@ function setupCertificateActionListeners() {
             
             // Add event listener with event delegation
             newContainer.addEventListener('click', handleCertificateButtonClick);
-            console.log(`Set up event delegation on container: ${newContainer.id || newContainer.className || 'unknown'}`);
+            logger.info(`Set up event delegation on container: ${newContainer.id || newContainer.className || 'unknown'}`);
         } else {
-            console.log(`Container ${container.id || container.className || 'unknown'} has no certificate elements yet`);
+            logger.info(`Container ${container.id || container.className || 'unknown'} has no certificate elements yet`);
             
             // For containers without certificates yet, use a MutationObserver to detect when certificates are added
             const observer = new MutationObserver((mutations) => {
@@ -640,7 +652,7 @@ function setupCertificateActionListeners() {
                         });
                         
                         if (hasCertElements) {
-                            console.log('Certificate elements added to the DOM, setting up listeners');
+                            logger.info('Certificate elements added to the DOM, setting up listeners');
                             // Disconnect the observer to prevent multiple handlers
                             observer.disconnect();
                             // Set up listeners again
@@ -652,7 +664,7 @@ function setupCertificateActionListeners() {
             
             // Start observing the container for DOM changes
             observer.observe(container, { childList: true, subtree: true });
-            console.log(`Set up mutation observer on container: ${container.id || container.className || 'unknown'}`);
+            logger.info(`Set up mutation observer on container: ${container.id || container.className || 'unknown'}`);
         }
     });
     
@@ -708,11 +720,11 @@ function handleCertificateButtonClick(event) {
     
     // Verify we have a fingerprint
     if (!fingerprint) {
-        console.warn('Button clicked without associated fingerprint:', button);
+        logger.warn('Button clicked without associated fingerprint:', button);
         return;
     }
     
-    console.log(`Button clicked: ${button.className} for certificate: ${fingerprint}`);
+    logger.info(`Button clicked: ${button.className} for certificate: ${fingerprint}`);
     
     // Determine action based on the button's class
     if (button.classList.contains('config-btn') || 
@@ -775,7 +787,7 @@ function setupGlobalActionButtons() {
             event.preventDefault();
             showCreateCertificateModal();
         });
-        console.log(`Set up create certificate button: ${newButton.id || newButton.className}`);
+        logger.info(`Set up create certificate button: ${newButton.id || newButton.className}`);
     });
     
     // Settings buttons
@@ -797,7 +809,7 @@ function setupGlobalActionButtons() {
             event.preventDefault();
             showGlobalSettingsModal();
         });
-        console.log(`Set up settings button: ${newButton.id || newButton.className}`);
+        logger.info(`Set up settings button: ${newButton.id || newButton.className}`);
     });
 }
 
@@ -805,7 +817,7 @@ function setupGlobalActionButtons() {
  * Show global settings modal
  */
 function showGlobalSettingsModal() {
-    console.log('Showing global settings modal');
+    logger.info('Showing global settings modal');
     
     // Create a loading overlay while we fetch settings
     const loadingOverlay = createLoadingOverlay('Loading settings...');
@@ -832,7 +844,7 @@ function showGlobalSettingsModal() {
                 document.body.removeChild(loadingOverlay);
             }
             
-            console.error('Error loading settings:', error);
+            logger.error('Error loading settings:', error);
             
             // Show error notification
             showNotification(`Error loading settings: ${error.message}. Using defaults.`, 'error');
@@ -853,7 +865,9 @@ function showGlobalSettingsModal() {
                 httpsPort: 4443,
                 backupRetention: 30,
                 logLevel: 'info',
-                jsonOutput: false
+                jsonOutput: false,
+                enableAutoRenewalJob: false,
+                renewalSchedule: '0 0 * * *'
             };
             
             // Create the modal with default settings
@@ -878,6 +892,7 @@ function createGlobalSettingsModal(settings) {
                 <button class="tab-btn active" data-tab="general">General</button>
                 <button class="tab-btn" data-tab="https">HTTPS</button>
                 <button class="tab-btn" data-tab="backup">Backup</button>
+                <button class="tab-btn" data-tab="scheduler">Scheduler</button>
                 <button class="tab-btn" data-tab="advanced">Advanced</button>
             </div>
             
@@ -994,6 +1009,82 @@ function createGlobalSettingsModal(settings) {
                     </div>
                 </div>
                 
+                <!-- Scheduler tab -->
+                <div id="scheduler-tab" class="tab-content">
+                    <div class="scheduler-container">
+                        <div class="scheduler-header">
+                            <div class="status-indicator ${settings.enableAutoRenewalJob !== false ? 'status-active' : 'status-inactive'}"></div>
+                            <div class="status-text">${settings.enableAutoRenewalJob !== false ? 'Scheduler Active' : 'Scheduler Inactive'}</div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="enableAutoRenewalJob" ${settings.enableAutoRenewalJob !== false ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label-text">Enable scheduled certificate renewal checks</span>
+                            </label>
+                            <p class="form-help-text" style="margin-top: 10px; margin-left: 60px;">
+                                When enabled, the system will automatically check for and renew certificates according to the schedule
+                            </p>
+                        </div>
+                        
+                        <div id="scheduleSettingsGroup" class="schedule-setting" style="display: ${settings.enableAutoRenewalJob !== false ? 'block' : 'none'}">
+                            <h4><i class="fas fa-calendar-alt"></i> Schedule Configuration</h4>
+                            
+                            <label for="renewalSchedule">Renewal Schedule (Cron Format):</label>
+                            <div class="input-group">
+                                <input type="text" id="renewalSchedule" class="form-control" 
+                                       value="${settings.renewalSchedule || '0 0 * * *'}" 
+                                       placeholder="0 0 * * *">
+                                <div class="dropdown">
+                                    <button class="dropdown-toggle" type="button">
+                                        <i class="fas fa-clock"></i> Presets
+                                    </button>
+                                    <div class="dropdown-menu">
+                                        <a class="dropdown-item" href="#" data-schedule="0 0 * * *">
+                                            <i class="fas fa-moon"></i> Daily at midnight
+                                        </a>
+                                        <a class="dropdown-item" href="#" data-schedule="0 0 */2 * *">
+                                            <i class="fas fa-calendar-day"></i> Every 2 days
+                                        </a>
+                                        <a class="dropdown-item" href="#" data-schedule="0 0 * * 0">
+                                            <i class="fas fa-calendar-week"></i> Weekly (Sunday)
+                                        </a>
+                                        <a class="dropdown-item" href="#" data-schedule="0 0 1 * *">
+                                            <i class="fas fa-calendar"></i> Monthly (1st)
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="scheduler-info">
+                                <i class="fas fa-info-circle"></i>
+                                <div>
+                                    <p>Use cron format: <code>minute hour day-of-month month day-of-week</code></p>
+                                    <p>Example: <code>0 0 * * *</code> = Daily at midnight UTC</p>
+                                </div>
+                            </div>
+                            
+                            <div id="nextExecutionInfo" class="next-execution">
+                                <i class="fas fa-clock"></i> Next execution: Loading...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="manual-check-container">
+                        <h4><i class="fas fa-sync-alt"></i> Manual Certificate Check</h4>
+                        <p>Run a renewal check now to identify and renew certificates that are nearing expiration.</p>
+                        
+                        <button id="runManualCheck" class="primary-btn">
+                            <i class="fas fa-play-circle"></i> Run Certificate Renewal Check Now
+                        </button>
+                        
+                        <div id="lastCheckStatus" class="lastrun-indicator">
+                            <i class="fas fa-history"></i> Last check: Never
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Advanced tab -->
                 <div id="advanced-tab" class="tab-content">
                     <h3>Advanced Settings</h3>
@@ -1033,6 +1124,9 @@ function createGlobalSettingsModal(settings) {
     
     // Set up event handlers
     setupGlobalSettingsModalEvents(modal, settings);
+    
+    // Load scheduler status after modal is created
+    loadSchedulerStatus(modal);
 }
 
 /**
@@ -1079,6 +1173,8 @@ function setupGlobalSettingsModalEvents(modal, settings) {
         });
     }
     
+    setupSchedulerEvents(modal);
+
     // Handle close button
     const closeBtn = modal.querySelector('.close');
     if (closeBtn) {
@@ -1107,6 +1203,184 @@ function setupGlobalSettingsModalEvents(modal, settings) {
     if (modal.querySelector('#managedCertName') && 
         (!settings.httpsCertPath || certSourceSelect.value === 'managed')) {
         loadCertificatesForHttps(modal);
+    }
+}
+
+/**
+ * Load scheduler status and update the modal
+ * @param {HTMLElement} modal - The modal element
+ */
+function loadSchedulerStatus(modal) {
+    // Only proceed if the scheduler tab exists
+    const schedulerTab = modal.querySelector('#scheduler-tab');
+    if (!schedulerTab) return;
+    
+    fetch('/api/scheduler/status')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load scheduler status: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update the UI elements
+            const enableCheckbox = modal.querySelector('#enableAutoRenewalJob');
+            const scheduleInput = modal.querySelector('#renewalSchedule');
+            const scheduleSettingsGroup = modal.querySelector('#scheduleSettingsGroup');
+            const lastCheckStatus = modal.querySelector('#lastCheckStatus');
+            const statusIndicator = modal.querySelector('.status-indicator');
+            const statusText = modal.querySelector('.status-text');
+            
+            if (enableCheckbox) {
+                enableCheckbox.checked = data.enabled;
+                
+                if (scheduleSettingsGroup) {
+                    scheduleSettingsGroup.style.display = data.enabled ? 'block' : 'none';
+                }
+                
+                // Update status indicator
+                if (statusIndicator && statusText) {
+                    if (data.enabled) {
+                        statusIndicator.classList.remove('status-inactive');
+                        statusIndicator.classList.add('status-active');
+                        statusText.textContent = 'Scheduler Active';
+                    } else {
+                        statusIndicator.classList.remove('status-active');
+                        statusIndicator.classList.add('status-inactive');
+                        statusText.textContent = 'Scheduler Inactive';
+                    }
+                }
+            }
+            
+            if (scheduleInput) {
+                scheduleInput.value = data.schedule || '0 0 * * *';
+            }
+            
+            if (lastCheckStatus) {
+                if (data.lastRun) {
+                    const lastRunDate = new Date(data.lastRun);
+                    lastCheckStatus.innerHTML = `<i class="fas fa-history"></i> Last check: ${lastRunDate.toLocaleString()}`;
+                } else {
+                    lastCheckStatus.innerHTML = `<i class="fas fa-history"></i> Last check: Never`;
+                }
+            }
+            
+            // Display next execution info
+            const nextExecutionInfo = modal.querySelector('#nextExecutionInfo');
+            if (nextExecutionInfo && data.nextExecution) {
+                nextExecutionInfo.innerHTML = `<i class="fas fa-clock"></i> Next execution: ${data.nextExecution.message || 'Not scheduled'}`;
+                nextExecutionInfo.style.display = data.enabled ? 'block' : 'none';
+            }
+        })
+        .catch(error => {
+            logger.error('Error loading scheduler status:', error);
+            showNotification(`Error loading scheduler status: ${error.message}`, 'error');
+        });
+}
+
+/**
+ * Set up scheduler-specific events
+ * @param {HTMLElement} modal - The modal element
+ */
+function setupSchedulerEvents(modal) {
+    // Toggle settings visibility based on checkbox
+    const enableAutoRenewalJob = modal.querySelector('#enableAutoRenewalJob');
+    const scheduleSettingsGroup = modal.querySelector('#scheduleSettingsGroup');
+    const statusIndicator = modal.querySelector('.status-indicator');
+    const statusText = modal.querySelector('.status-text');
+    
+    if (enableAutoRenewalJob && scheduleSettingsGroup) {
+        enableAutoRenewalJob.addEventListener('change', () => {
+            scheduleSettingsGroup.style.display = enableAutoRenewalJob.checked ? 'block' : 'none';
+            
+            // Update status indicator
+            if (statusIndicator && statusText) {
+                if (enableAutoRenewalJob.checked) {
+                    statusIndicator.classList.remove('status-inactive');
+                    statusIndicator.classList.add('status-active');
+                    statusText.textContent = 'Scheduler Active';
+                } else {
+                    statusIndicator.classList.remove('status-active');
+                    statusIndicator.classList.add('status-inactive');
+                    statusText.textContent = 'Scheduler Inactive';
+                }
+            }
+        });
+    }
+    
+    // Set up dropdown toggle functionality
+    const dropdownToggle = modal.querySelector('.dropdown-toggle');
+    const dropdownMenu = modal.querySelector('.dropdown-menu');
+    
+    if (dropdownToggle && dropdownMenu) {
+        dropdownToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            dropdownMenu.classList.toggle('show');
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function closeDropdown(event) {
+                if (!event.target.closest('.dropdown')) {
+                    dropdownMenu.classList.remove('show');
+                    document.removeEventListener('click', closeDropdown);
+                }
+            });
+        });
+    }
+    
+    // Set up cron schedule presets
+    const presetItems = modal.querySelectorAll('.dropdown-item[data-schedule]');
+    const scheduleInput = modal.querySelector('#renewalSchedule');
+    
+    if (presetItems.length && scheduleInput) {
+        presetItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                scheduleInput.value = item.getAttribute('data-schedule');
+                dropdownMenu.classList.remove('show');
+            });
+        });
+    }
+    
+    // Set up manual check button
+    const runManualCheck = modal.querySelector('#runManualCheck');
+    if (runManualCheck) {
+        runManualCheck.addEventListener('click', () => {
+            // Update button state
+            const originalText = runManualCheck.innerHTML;
+            runManualCheck.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+            runManualCheck.disabled = true;
+            
+            // Call API
+            fetch('/api/scheduler/run', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Reset button state
+                runManualCheck.innerHTML = originalText;
+                runManualCheck.disabled = false;
+                
+                if (data.success) {
+                    showNotification('Certificate renewal check completed successfully', 'success');
+                    
+                    // Update last check status
+                    const lastCheckStatus = modal.querySelector('#lastCheckStatus');
+                    if (lastCheckStatus) {
+                        lastCheckStatus.innerHTML = `<i class="fas fa-history"></i> Last check: ${new Date().toLocaleString()}`;
+                    }
+                } else {
+                    showNotification(`Error: ${data.error || 'Failed to run check'}`, 'error');
+                }
+            })
+            .catch(error => {
+                logger.error('Error running manual check:', error);
+                showNotification(`Error running check: ${error.message}`, 'error');
+                
+                // Reset button state
+                runManualCheck.innerHTML = originalText;
+                runManualCheck.disabled = false;
+            });
+        });
     }
 }
 
@@ -1164,6 +1438,10 @@ function saveGlobalSettings(modal, origSettings) {
     
     updatedSettings.jsonOutput = modal.querySelector('#jsonOutput').checked;
     
+    // Scheduler tab
+    updatedSettings.enableAutoRenewalJob = modal.querySelector('#enableAutoRenewalJob')?.checked;
+    updatedSettings.renewalSchedule = modal.querySelector('#renewalSchedule')?.value || '0 0 * * *';
+    
     // Show loading overlay
     const loadingOverlay = createLoadingOverlay('Saving settings...');
     document.body.appendChild(loadingOverlay);
@@ -1182,7 +1460,26 @@ function saveGlobalSettings(modal, origSettings) {
         }
         return response.json();
     })
-    .then(result => {
+    .then(() => {
+        // Save scheduler settings separately
+        return fetch('/api/scheduler/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                enableAutoRenewalJob: updatedSettings.enableAutoRenewalJob,
+                renewalSchedule: updatedSettings.renewalSchedule
+            })
+        });
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Failed to save scheduler settings: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(() => {
         // Remove loading overlay
         document.body.removeChild(loadingOverlay);
         
@@ -1205,7 +1502,7 @@ function saveGlobalSettings(modal, origSettings) {
         // Remove loading overlay
         document.body.removeChild(loadingOverlay);
         
-        console.error('Error saving settings:', error);
+        logger.error('Error saving settings:', error);
         showNotification(`Error saving settings: ${error.message}`, 'error');
     });
 }
@@ -1215,7 +1512,7 @@ function saveGlobalSettings(modal, origSettings) {
  * @param {string} fingerprint - Certificate fingerprint
  */
 function showCertificateConfigModal(fingerprint) {
-    console.log(`Showing certificate config modal for: ${fingerprint}`);
+    logger.info(`Showing certificate config modal for: ${fingerprint}`);
     
     // Use the global function if available
     if (typeof window.showConfigModal === 'function') {
@@ -1230,7 +1527,7 @@ function showCertificateConfigModal(fingerprint) {
     }
     
     // If we don't have access to the proper function, show an error
-    console.error('showConfigModal function not found');
+    logger.error('showConfigModal function not found');
     alert('Certificate configuration functionality is not available. Please refresh the page.');
 }
 
@@ -1239,7 +1536,7 @@ function showCertificateConfigModal(fingerprint) {
  * @param {string} fingerprint - Certificate fingerprint
  */
 function renewCertificate(fingerprint) {
-    console.log(`Renewing certificate: ${fingerprint}`);
+    logger.info(`Renewing certificate: ${fingerprint}`);
     
     // Show loading indicator
     const loadingOverlay = createLoadingOverlay('Renewing certificate...');
@@ -1268,7 +1565,7 @@ function renewCertificate(fingerprint) {
     })
     .catch(error => {
         document.body.removeChild(loadingOverlay);
-        console.error('Error renewing certificate:', error);
+        logger.error('Error renewing certificate:', error);
         showNotification(`Error: ${error.message}`, 'error');
     });
 }
@@ -1295,11 +1592,11 @@ function createLoadingOverlay(message = 'Loading...') {
  * @param {HTMLElement} modal - The modal element containing the certificate dropdown
  */
 function loadCertificatesForHttps(modal) {
-    console.log('Loading certificates for HTTPS configuration');
+    logger.info('Loading certificates for HTTPS configuration');
     
     const managedCertSelect = modal.querySelector('#managedCertName');
     if (!managedCertSelect) {
-        console.error('Certificate select element not found');
+        logger.error('Certificate select element not found');
         return;
     }
     
@@ -1376,7 +1673,7 @@ function loadCertificatesForHttps(modal) {
             }
         })
         .catch(error => {
-            console.error('Error loading certificates:', error);
+            logger.error('Error loading certificates:', error);
             managedCertSelect.innerHTML = '<option value="">Error loading certificates</option>';
             managedCertSelect.disabled = false;
         });
@@ -1544,7 +1841,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     const closeButton = notification.querySelector('.close-notification');
     if (closeButton) {
         closeButton.addEventListener('click', (e) => {
-            console.log("Close button clicked for notification:", notificationKey);
+            logger.info("Close button clicked for notification:", notificationKey);
             e.preventDefault();
             e.stopPropagation();
             
@@ -1555,7 +1852,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     
     // Add mouseenter and mouseleave event listeners
     notification.addEventListener('mouseenter', () => {
-        console.log('Mouse entered notification, pausing auto-close');
+        logger.info('Mouse entered notification, pausing auto-close');
         notification.isHovered = true;
         
         // Clear the auto-close timeout when hovering
@@ -1566,7 +1863,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     });
     
     notification.addEventListener('mouseleave', () => {
-        console.log('Mouse left notification, resuming auto-close');
+        logger.info('Mouse left notification, resuming auto-close');
         notification.isHovered = false;
         
         // Resume auto-close timeout when no longer hovering
@@ -1579,17 +1876,17 @@ function showNotification(message, type = 'info', duration = 5000) {
     
     // Function to safely remove a notification
     function removeNotification(notif, key) {
-        console.log("Starting to remove notification:", key);
+        logger.info("Starting to remove notification:", key);
         
         // Check if notification is currently being hovered
         if (notif.isHovered) {
-            console.log("Notification is being hovered, not removing");
+            logger.info("Notification is being hovered, not removing");
             return;
         }
         
         const id = notif.id;
         if (!id) {
-            console.error("Notification ID not found");
+            logger.error("Notification ID not found");
             activeNotifications.delete(key);
             return;
         }
@@ -1598,7 +1895,7 @@ function showNotification(message, type = 'info', duration = 5000) {
             // Get notification element by ID to ensure we have the current DOM reference
             const notifElement = document.getElementById(id);
             if (!notifElement) {
-                console.log("Notification element not found in DOM, removing from tracking");
+                logger.info("Notification element not found in DOM, removing from tracking");
                 activeNotifications.delete(key);
                 return;
             }
@@ -1610,7 +1907,7 @@ function showNotification(message, type = 'info', duration = 5000) {
             }
             
             // Apply the exit animation 
-            console.log("Applying exit animation");
+            logger.info("Applying exit animation");
             notifElement.style.transform = 'translateX(100%)';
             notifElement.style.transitionDuration = '500ms';
             notifElement.style.opacity = '0';
@@ -1624,7 +1921,7 @@ function showNotification(message, type = 'info', duration = 5000) {
                     // Get a fresh reference to ensure it still exists
                     const elementToRemove = document.getElementById(id);
                     if (!elementToRemove) {
-                        console.log("Element already removed during animation");
+                        logger.info("Element already removed during animation");
                         activeNotifications.delete(key);
                         return;
                     }
@@ -1632,31 +1929,31 @@ function showNotification(message, type = 'info', duration = 5000) {
                     // Get the parent now while we know it exists
                     const parent = elementToRemove.parentNode;
                     if (!parent) {
-                        console.log("Parent node not found");
+                        logger.info("Parent node not found");
                         activeNotifications.delete(key);
                         return;
                     }
                     
                     // Remove from DOM
                     parent.removeChild(elementToRemove);
-                    console.log("Notification smoothly removed from DOM");
+                    logger.info("Notification smoothly removed from DOM");
                     
                     // Clean up container if empty
                     const container = document.querySelector('.notification-container');
                     if (container && container.children.length === 0 && container.parentNode) {
                         container.parentNode.removeChild(container);
-                        console.log("Empty notification container removed");
+                        logger.info("Empty notification container removed");
                     }
                     
                     // Remove from tracking
                     activeNotifications.delete(key);
                 } catch (err) {
-                    console.error("Error finalizing notification removal:", err);
+                    logger.error("Error finalizing notification removal:", err);
                     activeNotifications.delete(key);
                 }
             }, 300); // Wait for the animation duration (300ms is typical)
         } catch (error) {
-            console.error("Error in removeNotification:", error);
+            logger.error("Error in removeNotification:", error);
             // Ensure we clean up tracking even on error
             activeNotifications.delete(key);
         }
@@ -1674,7 +1971,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     // Auto close after duration
     if (duration > 0) {
         notification.autoCloseTimeout = setTimeout(() => {
-            console.log("Auto-close timeout triggered");
+            logger.info("Auto-close timeout triggered");
             removeNotification(notification, notificationKey);
         }, duration);
     }
@@ -1706,12 +2003,12 @@ if (typeof window !== 'undefined') {
         showNotification: showNotification,
         isLoaded: function() { return true; }
     };
-    console.log("Modal utilities registered in window object");
+    logger.info("Modal utilities registered in window object");
 }
 
 // Auto-initialize on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Modal utilities initializing...');
+    logger.info('Modal utilities initializing...');
     
     // Create styles
     ensureModalStyles();
@@ -1723,6 +2020,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.modalUtils.checkModalUtilsLoaded === 'function') {
         window.modalUtils.checkModalUtilsLoaded();
     } else {
-        console.error('Modal utility test function not available!');
+        logger.error('Modal utility test function not available!');
     }
 });

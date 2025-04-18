@@ -1,3 +1,20 @@
+/**
+ * Logs Viewer Module
+ * This module provides a UI for viewing system logs in a modal.
+ * It allows filtering logs by level and downloading the full log file.
+ * It uses the Fetch API to communicate with the server and update the UI accordingly.
+ * @module logs-viewer - Logs Viewer Module
+ * @requires logger - Logger utility for logging messages
+ * @requires modalUtils - Utility functions for modal handling
+ * @requires fetch - Fetch API for network requests
+ * @requires document - DOM manipulation
+ * @requires console - Console for logging messages
+ * @requires window - Global object for accessing browser APIs
+ * @license MIT
+ * @version 1.0.0
+ * @description This module provides a UI for viewing system logs in a modal. It allows filtering logs by level and downloading the full log file. It uses the Fetch API to communicate with the server and update the UI accordingly.
+ */
+
 // Initialize logs viewing functionality
 function initLogsViewer() {
     // Add logs button to header
@@ -307,7 +324,7 @@ async function loadLogs() {
         preventScrollPropagation();
         
     } catch (error) {
-        console.error('Error loading logs:', error);
+        logger.error('Error loading logs:', error);
         logsContent.innerHTML = `
             <p class="error-message">
                 <i class="fas fa-exclamation-triangle"></i> 

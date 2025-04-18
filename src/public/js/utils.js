@@ -1,5 +1,15 @@
 /**
  * Utility functions for the certificate manager 
+ * @module cert-utils
+ * @requires logger - Logger utility for debugging
+ * @requires modalUtils - Utility for showing notifications and modals
+ * @requires fetch - Fetch API for making HTTP requests
+ * @requires document - DOM manipulation
+ * @requires window - Global object for accessing browser APIs
+ * @license MIT
+ * @version 1.0.0
+ * @author Christian Meiners
+ * @description This script is part of the Certify The Web application and is responsible for managing certificate-related utilities.
  */
 
 /**
@@ -101,10 +111,10 @@ const certUtils = {
             }
             
             // Failed to parse date
-            console.warn(`Failed to parse certificate date: ${dateStr}`);
+            logger.warn(`Failed to parse certificate date: ${dateStr}`);
             return null;
         } catch (error) {
-            console.error('Error parsing certificate date:', error);
+            logger.error('Error parsing certificate date:', error);
             return null;
         }
     },

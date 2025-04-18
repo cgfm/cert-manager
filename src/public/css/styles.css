@@ -18,6 +18,14 @@
   padding: 0;
 }
 
+/* Sticky Header & Footer Setup */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent scrolling of the body itself */
+}
+
 body {
   font-family: var(--font-family);
   color: var(--text-color);
@@ -25,7 +33,6 @@ body {
   line-height: 1.6;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 
 /* Header styles */
@@ -36,12 +43,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap; /* Prevent wrapping of header elements */
+  height: 60px; /* Set explicit height for the header */
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .app-title {
   display: flex;
   align-items: center;
-  margin-right: 0;
+  margin-right: 20px; /* Add some margin to separate from view controls */
+  flex-shrink: 0; /* Prevent title from shrinking */
 }
 
 .app-title i {
@@ -59,91 +74,187 @@ body {
   display: flex;
   gap: 0.5rem;
   margin-left: 0;
+  flex-shrink: 0; /* Prevent buttons from shrinking */
+  align-items: center; /* Center buttons vertically */
+  height: 100%; /* Match header height */
 }
 
-/* Slider Toggle Switch Styles */
-.toggle-container {
+/* Toggle Switch */
+.toggle-switch {
   position: relative;
-  display: inline-block;
-  width: 140px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  padding-left: 60px; /* Increased space for the switch */
+  min-height: 30px; /* Ensure minimum height for the label */
+  font-weight: 500;
+  font-size: 1rem; /* Explicitly set font size */
+  margin-bottom: 5px;
+  width: 100%; /* Full width container */
 }
 
-.toggle-checkbox {
+.toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
 }
 
-.toggle-label {
-  position: relative;
-  display: block;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 30px;
+.toggle-slider {
+  position: absolute;
   cursor: pointer;
-  transition: all 0.3s;
-  overflow: hidden;
+  left: 0;
+  width: 50px; /* Slightly wider switch */
+  height: 26px; /* Slightly taller switch */
+  background-color: #ccc;
+  border-radius: 34px;
+  transition: .4s;
+  top: 0; /* Align at top if text wraps */
 }
 
-.toggle-inner {
-  display: block;
-  width: 200%;
-  margin-left: -100%;
-  transition: margin 0.3s ease-in-out;
-}
-
-.toggle-inner:before, .toggle-inner:after {
+.toggle-slider:before {
+  position: absolute;
   content: "";
-  display: block;
-  float: left;
-  width: 50%;
-  height: 30px;
-  padding: 0;
-  line-height: 30px;
-  font-size: 14px;
-  color: white;
+  height: 20px; /* Larger toggle circle */
+  width: 20px; /* Larger toggle circle */
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3); /* Add shadow for depth */
+}
+
+input:checked + .toggle-slider {
+  background-color: #0078d7;
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px #0078d7;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(24px); /* Match the wider switch */
+}
+
+.toggle-label-text {
+  font-size: 1rem;
   font-weight: 500;
-  box-sizing: border-box;
+  color: #333;
+  padding-top: 2px; /* Slightly align text with switch center */
+}
+
+/* Improved View Mode Toggle Switch Styles */
+.header-view-controls {
+  margin-left: auto;
+  margin-right: 20px;
+  display: flex;
+  align-items: center;
+  height: 100%; /* Match header height */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.header-view-controls span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.view-toggle-container {
+  position: relative;
+  display: inline-flex; /* Changed to inline-flex */
+  align-items: center; /* Center vertically */
+  width: 200px;
+  height: 34px;
+  margin-left: 10px;
+}
+
+.view-toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.view-toggle-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 34px;
+  background-color: #e4e4e4;
+  border-radius: 34px;
+  padding: 0 6px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.3s;
+}
+
+.view-option {
+  z-index: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  padding: 0 10px;
+  white-space: nowrap;
+  transition: color 0.3s;
+  width: 50%;
   text-align: center;
 }
 
-.toggle-inner:before {
-  content: attr(data-flat);
-  padding-left: 10px;
-  padding-right: 40px;
-  background-color: var(--primary-color);
-  color: #fff;
-}
-
-.toggle-inner:after {
-  content: attr(data-hierarchy);
-  padding-left: 40px;
-  background-color: #4a4a4a;
-  color: #fff;
-}
-
-.toggle-switch {
+.view-toggle-slider {
   position: absolute;
-  display: block;
-  width: 24px;
-  height: 24px;
-  margin: 3px;
-  background: #fff;
-  border-radius: 24px;
-  top: 0;
-  right: 95px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s;
+  left: 3px;
+  top: 3px;
+  width: 98px;
+  height: 28px;
+  background-color: white;
+  border-radius: 28px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.3s;
 }
 
-.toggle-checkbox:checked + .toggle-label .toggle-inner {
-  margin-left: 0;
+/* When checked (Flat view) - Slider on LEFT */
+.view-toggle-input:not(:checked) + .view-toggle-label .view-toggle-slider {
+  transform: translateX(0); /* Start position (Flat) */
 }
 
-.toggle-checkbox:checked + .toggle-label .toggle-switch {
-  right: 3px;
+/* When unchecked (Hierarchy view) - Slider on RIGHT */
+.view-toggle-input:checked + .view-toggle-label .view-toggle-slider {
+  transform: translateX(96px); /* End position (Hierarchy) */
+}
+
+.view-toggle-input:checked + .view-toggle-label {
+  background-color: #0078d7;
+}
+
+/* Flat text (left side) */
+.view-toggle-input:not(:checked) + .view-toggle-label .view-option-flat {
+  color: #333;
+}
+
+.view-toggle-input:checked + .view-toggle-label .view-option-flat {
+  color: white;
+}
+
+/* Hierarchy text (right side) */
+.view-toggle-input:checked + .view-toggle-label .view-option-hierarchy {
+  color: #333; /* Dark text when active, switched from white for readability */
+}
+
+.view-toggle-input:not(:checked) + .view-toggle-label .view-option-hierarchy {
+  color: #666; /* Grey text when not active */
+}
+
+/* Focus styles for accessibility */
+.view-toggle-input:focus + .view-toggle-label {
+  box-shadow: 0 0 0 2px rgba(0, 120, 215, 0.5);
+}
+
+/* Text weight changes */
+.view-toggle-input:checked + .view-toggle-label .view-option-hierarchy,
+.view-toggle-input:not(:checked) + .view-toggle-label .view-option-flat {
+  font-weight: 700;
 }
 
 /* Hover effect for better UX */
@@ -153,21 +264,6 @@ body {
 
 .toggle-label:active .toggle-switch {
   width: 28px;
-}
-
-/* Update header view controls */
-.header-view-controls {
-  margin-left: auto;
-  margin-right: 20px;
-  display: flex;
-  align-items: center;
-}
-
-.header-view-controls span {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-color);
-  margin-right: 10px;
 }
 
 .header-btn {
@@ -199,6 +295,16 @@ body {
   background-color: var(--primary-dark);
 }
 
+/* Scrollable main content area */
+.main-content-wrapper {
+  flex: 1;
+  overflow-y: auto; /* Enable scrolling for main content */
+  overflow-x: hidden;
+  min-height: 0; /* Important for Firefox */
+  display: flex;
+  flex-direction: column;
+}
+
 /* Main content styles */
 .app-container {
   flex: 1;
@@ -206,9 +312,14 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .certificate-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -248,7 +359,9 @@ body {
 
 /* Table styles */
 .table-container {
-  overflow-x: auto;
+  flex: 1; /* Allow table to grow */
+  overflow: auto; /* Enable scrolling for long tables */
+  min-height: 200px;
 }
 
 .certificates-table {
@@ -370,7 +483,7 @@ body {
   color: white;
 }
 
-/* Footer styles */
+/* Sticky footer */
 .app-footer {
   background-color: white;
   border-top: 1px solid var(--border-color);
@@ -380,7 +493,11 @@ body {
   align-items: center;
   font-size: 0.85rem;
   color: #666;
-  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 1000;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .footer-status {
@@ -401,13 +518,48 @@ body {
   color: var(--danger-color);
 }
 
-/* Add to your CSS file or in style tag */
 #ws-status.connected .status-text {
   color: #28a745;
 }
 
 #ws-status:not(.connected) .status-text {
   color: #dc3545;
+}
+
+.status-dot.active {
+  color: #28a745; /* Green for active */
+  box-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
+}
+
+.status-dot.inactive {
+  color: #dc3545; /* Red for inactive */
+  box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+}
+
+.status-dot.checking {
+  animation: pulse 1.5s infinite;
+  color: #0078d7; /* Blue while checking */
+}
+
+.status-dot.error {
+  background-color: #dc3545; /* Red for errors */
+  box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Loading indicators */
@@ -429,8 +581,12 @@ body {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .app-header {
+    height: auto; /* Allow header to grow on small screens */
     flex-direction: column;
     gap: 0.75rem;
+    padding: 0.75rem;
+    min-height: 60px;
+    position: sticky; /* Keep header sticky even on mobile */
   }
   
   .panel-header {
@@ -459,6 +615,12 @@ body {
   
   .config-btn, .renew-btn {
     margin-left: 0;
+  }
+  
+  .header-view-controls {
+    margin: 0.5rem 0; /* Add vertical margin when stacked */
+    width: 100%; /* Full width on small screens */
+    justify-content: center; /* Center the toggle */
   }
 }
 

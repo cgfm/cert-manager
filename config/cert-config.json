@@ -7,7 +7,18 @@
       "intermediateCA": 1825,
       "standard": 90
     },
-    "enableCertificateBackups": true
+    "enableCertificateBackups": true,
+    "lastRenewalCheck": "2025-04-17T21:09:37.331Z",
+    "enableHttps": false,
+    "httpsPort": 4443,
+    "httpsCertPath": "",
+    "httpsKeyPath": "",
+    "backupRetention": 30,
+    "openSSLPath": "openssl",
+    "logLevel": "info",
+    "jsonOutput": false,
+    "enableAutoRenewalJob": true,
+    "renewalSchedule": "0 0 * * *"
   },
   "certificates": {
     "sha256 Fingerprint=7E521AD14CFEF02C43C117DE1EA3BE129BC6C82C2BEDE0A58A9DFF419B428B1E": {

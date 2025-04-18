@@ -1,3 +1,19 @@
+/**
+ * Docker Utilities
+ * This module provides utility functions for interacting with Docker containers.
+ * It includes functions to fetch Docker containers, lazy load them, and manage caching.
+ * @module docker-utils - Docker Utilities
+ * @requires window - Global object for accessing browser APIs
+ * @requires document - DOM manipulation
+ * @requires fetch - Fetch API for making HTTP requests
+ * @requires console - Console for logging messages
+ * @requires logger - Logger utility for debugging
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description This module is designed to work with Docker containers, providing functions to fetch and display them in a user-friendly manner. It also includes caching mechanisms to optimize performance and reduce unnecessary API calls.
+ */
+
 // Cache for Docker containers data
 const dockerCache = {
     containers: null,
@@ -111,5 +127,5 @@ if (typeof window !== 'undefined') {
         fetchDockerContainers,
         lazyLoadDockerContainers
     };
-    console.log('Docker utilities registered in window object');
+    logger.info('Docker utilities registered in window object');
 }

@@ -62,19 +62,7 @@ class ConfigManager {
                 logger.info(`Loaded configuration with ${Object.keys(this.certConfig.certificates).length} certificates`);
             } else {
                 // Create default configuration
-                this.certConfig = {
-                    globalDefaults: {
-                        autoRenewByDefault: false,
-                        renewDaysBeforeExpiry: 30,
-                        caValidityPeriod: {
-                            rootCA: 3650,
-                            intermediateCA: 1825,
-                            standard: 90
-                        },
-                        enableCertificateBackups: true
-                    },
-                    certificates: {}
-                };
+                this.certConfig = this.getDefaultConfig();
                 
                 // Save the default configuration
                 this.saveConfig();
@@ -84,19 +72,7 @@ class ConfigManager {
             logger.error(`Error loading configuration: ${error.message}`);
             
             // Create default configuration in case of error
-            this.certConfig = {
-                globalDefaults: {
-                    autoRenewByDefault: false,
-                    renewDaysBeforeExpiry: 30,
-                    caValidityPeriod: {
-                        rootCA: 3650,
-                        intermediateCA: 1825,
-                        standard: 90
-                    },
-                    enableCertificateBackups: true
-                },
-                certificates: {}
-            };
+            this.certConfig = this.getDefaultConfig();
         }
     }
     
@@ -265,6 +241,29 @@ class ConfigManager {
         }
         
         return result;
+    }
+
+    /**
+     * Get default configuration
+     * @returns {Object} - Default configuration
+     */
+    getDefaultConfig() {
+        return {
+            certificates: {},
+            globalDefaults: {
+                caValidityPeriod: {
+                    rootCA: 3650, // 10 years
+                    intermediateCA: 1825, // 5 years
+                    standard: 365 // 1 year
+                },
+                renewDaysBeforeExpiry: 30,
+                enableAutoRenew: true,
+                // New scheduler settings
+                enableAutoRenewalJob: true,
+                renewalSchedule: '0 0 * * *', // Default: Run daily at midnight
+                lastRenewalCheck: null
+            }
+        };
     }
 }
 

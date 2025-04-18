@@ -1,5 +1,14 @@
 /**
  * UI utility functions for Certificate Manager
+ * @module ui-utils - UI utility functions for managing user interactions
+ * @requires logger - Logger utility for debugging
+ * @requires window - Global object for accessing browser APIs
+ * @requires document - DOM manipulation
+ * @requires Promise - Promise API for asynchronous operations
+ * @requires HTMLElement - DOM element interface for manipulating HTML elements
+ * @version 1.0.0
+ * @license MIT
+ * @description This module provides utility functions for UI interactions, including confirmation dialogs, notifications, and event delegation.
  */
 
 /**
@@ -110,7 +119,7 @@ function delegateEvent(container, selector, eventType, callback) {
         : container;
     
     if (!containerElement) {
-        console.error(`Container not found: ${container}`);
+        logger.error(`Container not found: ${container}`);
         return () => {};
     }
     
@@ -150,7 +159,7 @@ function setupDelegatedEvents(handlers, container = document.body) {
         : container;
         
     if (!containerElement) {
-        console.error(`Container not found: ${container}`);
+        logger.error(`Container not found: ${container}`);
         return;
     }
     
@@ -188,7 +197,7 @@ function getIconForType(type) {
  */
 function setupTabs(container) {
     if (!container) {
-        console.error('No container provided for setupTabs');
+        logger.error('No container provided for setupTabs');
         return null;
     }
     
@@ -196,11 +205,11 @@ function setupTabs(container) {
     const tabContents = container.querySelectorAll('.tab-content');
     
     if (!tabButtons.length || !tabContents.length) {
-        console.warn('No tabs found in container');
+        logger.warn('No tabs found in container');
         return null;
     }
     
-    console.log(`Setting up ${tabButtons.length} tabs in container`);
+    logger.info(`Setting up ${tabButtons.length} tabs in container`);
     
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -257,5 +266,5 @@ if (typeof window !== 'undefined') {
         setupDelegatedEvents,
         setupTabs
     };
-    console.log('UI utilities registered in window object');
+    logger.info('UI utilities registered in window object');
 }

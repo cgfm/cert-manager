@@ -6,6 +6,7 @@ const fs = require('fs');
 const ConfigManager = require('./services/config-manager');
 const RenewalManager = require('./services/renewal-manager');
 const CertificateService = require('./services/certificate-service');
+const SchedulerService = require('./services/scheduler'); // Add this
 const logger = require('./services/logger');
 
 // Initialize the application
@@ -21,7 +22,7 @@ const LOGS_DIR = process.env.LOGS_DIR || '/logs';
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
-    console.log(`Creating config directory: ${CONFIG_DIR}`);
+    logger.info(`Creating config directory: ${CONFIG_DIR}`);
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
 }
 
@@ -45,6 +46,22 @@ certificateService.refreshCertificateCache()
 
 // Create renewal manager
 const renewalManager = new RenewalManager(configManager, CERTS_DIR, certificateService);
+const schedulerService = new SchedulerService(configManager, renewalManager);
+
+// Start the scheduler
+schedulerService.initialize();
+
+// Set up the socket.io instance and pass it to the scheduler service
+schedulerService.setIo(io);
+
+// Make services available to routes
+const services = {
+    configManager,
+    certificateService,
+    renewalManager,
+    schedulerService,
+    io
+};
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -73,6 +90,8 @@ const dockerApiRouter = require('./routes/docker-api');
 const filesystemApiRouter = require('./routes/filesystem-api');
 const logsApiRouter = require('./routes/logs-api');
 const certificateApi = require('./routes/certificate-api.cjs');
+const schedulerApiRouter = require('./routes/scheduler-api.cjs')(services);
+app.use('/api/scheduler', schedulerApiRouter);
 
 app.use('/api/certificate', certificateApi.initialize({
   certificateService,
@@ -100,7 +119,7 @@ app.use((err, req, res, next) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
+    logger.error('Server error:', err);
     res.status(500).json({
         error: 'Internal server error',
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
@@ -109,25 +128,25 @@ app.use((err, req, res, next) => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
+    logger.error('Uncaught exception:', err);
     // Log error but keep server running
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    logger.error('Unhandled rejection at:', promise, 'reason:', reason);
     // Log error but keep server running
 });
 
 // Set up Socket.io event handlers
 io.on('connection', (socket) => {
-    console.log('New client connected');
+    logger.info('New client connected');
     
     // Update WebSocket status in UI for all clients
     io.emit('server-status', { status: 'online', clients: io.engine.clientsCount });
     
     socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
+        logger.info('Client disconnected:', socket.id);
         // Update client count for remaining clients
         io.emit('server-status', { status: 'online', clients: io.engine.clientsCount });
     });
@@ -139,7 +158,7 @@ renewalManager.setSocketIo(io);
 
 // Start the server
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 /*// Start the server

@@ -1,5 +1,16 @@
 /**
  * Date utility functions for Certificate Manager
+ * This module provides functions to parse, format, and manipulate dates related to certificates.
+ * @module date-utils - Date utility functions
+ * @requires window - Global object for accessing browser APIs
+ * @requires document - DOM manipulation
+ * @requires console - Console for logging messages
+ * @requires logger - Logger utility for debugging
+ * @requires fetch - Fetch API for making HTTP requests
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description This module is designed to work with dates, providing functions to parse, format, and calculate differences between dates. It also includes functions to handle certificate expiration and display relevant information in a user-friendly manner.
  */
 
 /**
@@ -14,7 +25,7 @@ function parseDate(dateStr) {
         const date = new Date(dateStr);
         return isNaN(date.getTime()) ? null : date;
     } catch (e) {
-        console.warn(`Failed to parse date: ${dateStr}`, e);
+        logger.warn(`Failed to parse date: ${dateStr}`, e);
         return null;
     }
 }
@@ -37,7 +48,7 @@ function formatDate(date) {
             minute: '2-digit'
         });
     } catch (error) {
-        console.error('Error formatting date:', error);
+        logger.error('Error formatting date:', error);
         return String(date);
     }
 }
@@ -212,10 +223,10 @@ function parseCertificateDate(dateStr) {
         }
         
         // Failed to parse date
-        console.warn(`Failed to parse certificate date: ${dateStr}`);
+        logger.warn(`Failed to parse certificate date: ${dateStr}`);
         return null;
     } catch (error) {
-        console.error('Error parsing certificate date:', error);
+        logger.error('Error parsing certificate date:', error);
         return null;
     }
 }
@@ -253,7 +264,7 @@ if (typeof window !== 'undefined') {
         parseCertificateDate,
         getDaysRemaining
     };
-    console.log('Date utilities registered in window object');
+    logger.info('Date utilities registered in window object');
 }
 
 // Expose to window object
