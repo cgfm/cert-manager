@@ -252,26 +252,6 @@
     font-size: 0.9rem;
 }
 
-/* File browser specific styles */
-.small-btn {
-    font-size: 0.8em;
-    padding: 2px 6px;
-    margin-left: 8px;
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    cursor: pointer;
-}
-
-.small-btn:hover {
-    background-color: #e0e0e0;
-}
-
-.small-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
 /* Scheduler Tab Styles */
 .scheduler-container {
     background-color: #f8f9fa;

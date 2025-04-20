@@ -144,6 +144,12 @@ input:checked + .toggle-slider:before {
   padding-top: 2px; /* Slightly align text with switch center */
 }
 
+.form-help-text {
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #666;
+}
+
 /* Improved View Mode Toggle Switch Styles */
 .header-view-controls {
   margin-left: auto;
@@ -705,4 +711,40 @@ input:checked + .toggle-slider:before {
 
 .orphaned-cert {
     opacity: 0.9;
+}
+
+/* Passphrase management styles */
+.passphrase-management {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.passphrase-management h4 {
+  margin-top: 0;
+  color: #333;
+}
+
+.status-positive {
+  color: #28a745;
+}
+
+.status-negative {
+  color: #dc3545;
+}
+
+.status-neutral {
+  color: #6c757d;
+}
+
+.passphrase-form {
+  margin-bottom: 20px;
+}
+
+.passphrase-form .help-text {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-top: 4px;
 }

@@ -288,7 +288,7 @@ function createModal(options = {}) {
     // Ensure styles are loaded
     ensureModalStyles();
     
-    logger.info('Creating modal with options:', options);
+    logger.debug('Creating modal with options:', options);
     
     const defaultOptions = {
         title: 'Modal Title',
@@ -359,6 +359,102 @@ function createModal(options = {}) {
     });
     
     return modal;
+}
+
+/**
+ * Display a modal dialog to enter a CA passphrase
+ * @param {Object} options - Options for the passphrase modal
+ * @param {string} options.requestId - Unique ID for this passphrase request
+ * @param {string} options.caName - Name of the CA certificate
+ * @param {string} options.caFingerprint - Fingerprint of the CA certificate
+ * @param {string} options.message - Message to display to the user
+ */
+function showCAPassphraseModal(options) {
+    const { requestId, caName, caFingerprint, message } = options;
+    
+    // Create the modal
+    const modal = createModal({
+        id: 'ca-passphrase-modal',
+        cssClass: 'ca-passphrase-modal',
+        closeOnClickOutside: false,
+        showClose: false,
+        title: '<i class="fas fa-key"></i> CA Passphrase Required'
+    });
+    
+    // Create content
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2><i class="fas fa-key"></i> CA Passphrase Required</h2>
+            <p>${message || `Please enter the passphrase for CA certificate "${caName}".`}</p>
+            
+            <div class="form-group">
+                <label for="ca-passphrase-input">Passphrase:</label>
+                <input type="password" id="ca-passphrase-input" class="form-control" 
+                       placeholder="Enter passphrase" autocomplete="off">
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="store-passphrase">
+                    Remember this passphrase (stored securely)
+                </label>
+            </div>
+            
+            <div class="button-group">
+                <button id="ca-passphrase-submit" class="primary-btn">Submit</button>
+                <button id="ca-passphrase-cancel" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    // Show the modal
+    showModal(modal);
+    
+    // Focus the input field
+    setTimeout(() => {
+        const inputField = modal.querySelector('#ca-passphrase-input');
+        if (inputField) {
+            inputField.focus();
+        }
+    }, 100);
+    
+    // Set up event listeners
+    const submitBtn = modal.querySelector('#ca-passphrase-submit');
+    const cancelBtn = modal.querySelector('#ca-passphrase-cancel');
+    const passphraseInput = modal.querySelector('#ca-passphrase-input');
+    const storePassphraseCheckbox = modal.querySelector('#store-passphrase');
+    
+    // Submit button
+    submitBtn.addEventListener('click', () => {
+        const passphrase = passphraseInput.value;
+        const storePassphrase = storePassphraseCheckbox.checked;
+        
+        // Send the passphrase to the server
+        socket.emit('ca-passphrase-submit', {
+            requestId,
+            passphrase,
+            storePassphrase
+        });
+        
+        // Close the modal
+        closeModal(modal);
+    });
+    
+    // Cancel button
+    cancelBtn.addEventListener('click', () => {
+        // Inform the server that the request was cancelled
+        socket.emit('ca-passphrase-cancel', { requestId });
+        
+        // Close the modal
+        closeModal(modal);
+    });
+    
+    // Allow submission with Enter key
+    passphraseInput.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') {
+            submitBtn.click();
+        }
+    });
 }
 
 /**
@@ -851,23 +947,26 @@ function showGlobalSettingsModal() {
             
             // Create modal with default settings
             const defaultSettings = {
-                autoRenewByDefault: false,
-                renewDaysBeforeExpiry: 30,
-                caValidityPeriod: {
-                    rootCA: 3650,
-                    intermediateCA: 1825,
-                    standard: 90
-                },
-                enableCertificateBackups: true,
                 enableHttps: false,
-                httpsCertPath: '',
-                httpsKeyPath: '',
                 httpsPort: 4443,
-                backupRetention: 30,
+                httpsCertPath: null,
+                httpsKeyPath: null,
+                openSSLPath: 'openssl',
+                caValidityPeriod: {
+                    rootCA: 3650, // 10 years
+                    intermediateCA: 1825, // 5 years
+                    standard: 90   // 3 months
+                },
+                autoRenewByDefault: true,
+                renewDaysBeforeExpiry: 30,
                 logLevel: 'info',
                 jsonOutput: false,
-                enableAutoRenewalJob: false,
-                renewalSchedule: '0 0 * * *'
+                enableCertificateBackups: true,
+                keepBackupsForever: true,
+                backupRetention: 90,
+                signStandardCertsWithCA: false,
+                enableAutoRenewalJob: true,
+                renewalSchedule: '0 0 * * *' // Daily at midnight
             };
             
             // Create the modal with default settings
@@ -901,9 +1000,10 @@ function createGlobalSettingsModal(settings) {
                 <div id="general-tab" class="tab-content active">
                     <h3>Default Behavior</h3>
                     <div class="form-group">
-                        <label>
+                        <label class="toggle-switch">
                             <input type="checkbox" id="autoRenewDefault" ${settings.autoRenewByDefault ? 'checked' : ''}>
-                            Auto-renew certificates by default
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Auto-renew certificates by default</span>
                         </label>
                     </div>
                     
@@ -912,6 +1012,16 @@ function createGlobalSettingsModal(settings) {
                         <input type="number" id="defaultRenewDays" value="${settings.renewDaysBeforeExpiry || 30}" min="1" max="90">
                     </div>
                     
+                    <!-- CA Signing default option -->
+                    <div class="form-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="signStandardCertsWithCA" ${settings.signStandardCertsWithCA ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Sign standard certificates with CA by default</span>
+                        </label>
+                        <p class="form-help-text">When enabled, newly created standard certificates will be signed by a CA instead of being self-signed</p>
+                    </div>
+
                     <h3>Certificate Validity Periods (days)</h3>
                     <div class="form-group">
                         <label>Root CA certificates:</label>
@@ -933,9 +1043,10 @@ function createGlobalSettingsModal(settings) {
                 <div id="https-tab" class="tab-content">
                     <h3>HTTPS Settings</h3>
                     <div class="form-group">
-                        <label>
+                        <label class="toggle-switch">
                             <input type="checkbox" id="enableHttps" ${settings.enableHttps ? 'checked' : ''}>
-                            Enable HTTPS
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Enable HTTPS</span>
                         </label>
                         <p class="form-help">When enabled, the application will be accessible via HTTPS.</p>
                     </div>
@@ -997,15 +1108,25 @@ function createGlobalSettingsModal(settings) {
                 <div id="backup-tab" class="tab-content">
                     <h3>Backup Settings</h3>
                     <div class="form-group">
-                        <label>
+                        <label class="toggle-switch">
                             <input type="checkbox" id="enableBackups" ${settings.enableCertificateBackups !== false ? 'checked' : ''}>
-                            Create backups when certificates are renewed
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Create backups when certificates are renewed</span>
                         </label>
                     </div>
                     
                     <div class="form-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="keepBackupsForever" ${settings.keepBackupsForever === true ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Keep backups forever (never delete)</span>
+                        </label>
+                    </div>
+                    
+                    <div id="backupRetentionGroup" class="form-group" ${settings.keepBackupsForever === true ? 'style="display: none;"' : ''}>
                         <label>Backup Retention (days):</label>
                         <input type="number" id="backupRetention" value="${settings.backupRetention || 30}" min="1">
+                        <p class="form-help-text">Backups older than this many days will be deleted during cleanup</p>
                     </div>
                 </div>
                 
@@ -1105,9 +1226,10 @@ function createGlobalSettingsModal(settings) {
                     </div>
                     
                     <div class="form-group">
-                        <label>
+                        <label class="toggle-switch">
                             <input type="checkbox" id="jsonOutput" ${settings.jsonOutput ? 'checked' : ''}>
-                            Enable JSON formatted logs
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Enable JSON formatted logs</span>
                         </label>
                     </div>
                 </div>
@@ -1155,6 +1277,15 @@ function setupGlobalSettingsModalEvents(modal, settings) {
                 managedSection.style.display = 'none';
                 customSection.style.display = '';
             }
+        });
+    }
+    
+    // Set up backup toggle interaction
+    const keepBackupsForever = modal.querySelector('#keepBackupsForever');
+    const backupRetentionGroup = modal.querySelector('#backupRetentionGroup');
+    if (keepBackupsForever && backupRetentionGroup) {
+        keepBackupsForever.addEventListener('change', () => {
+            backupRetentionGroup.style.display = keepBackupsForever.checked ? 'none' : '';
         });
     }
     
@@ -1396,6 +1527,7 @@ function saveGlobalSettings(modal, origSettings) {
     // General tab
     updatedSettings.autoRenewByDefault = modal.querySelector('#autoRenewDefault').checked;
     updatedSettings.renewDaysBeforeExpiry = parseInt(modal.querySelector('#defaultRenewDays').value);
+    updatedSettings.signStandardCertsWithCA = modal.querySelector('#signStandardCertsWithCA').checked;
     
     // CA validity periods
     if (!updatedSettings.caValidityPeriod) {
@@ -1428,6 +1560,7 @@ function saveGlobalSettings(modal, origSettings) {
     
     // Backup tab
     updatedSettings.enableCertificateBackups = modal.querySelector('#enableBackups').checked;
+    updatedSettings.keepBackupsForever = modal.querySelector('#keepBackupsForever').checked;
     updatedSettings.backupRetention = parseInt(modal.querySelector('#backupRetention').value);
     
     // Advanced tab

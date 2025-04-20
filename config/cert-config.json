@@ -1,27 +1,6 @@
 {
-  "globalDefaults": {
-    "autoRenewByDefault": false,
-    "renewDaysBeforeExpiry": 30,
-    "caValidityPeriod": {
-      "rootCA": 3650,
-      "intermediateCA": 1825,
-      "standard": 90
-    },
-    "enableCertificateBackups": true,
-    "lastRenewalCheck": "2025-04-17T21:09:37.331Z",
-    "enableHttps": false,
-    "httpsPort": 4443,
-    "httpsCertPath": "",
-    "httpsKeyPath": "",
-    "backupRetention": 30,
-    "openSSLPath": "openssl",
-    "logLevel": "info",
-    "jsonOutput": false,
-    "enableAutoRenewalJob": true,
-    "renewalSchedule": "0 0 * * *"
-  },
   "certificates": {
-    "sha256 Fingerprint=7E521AD14CFEF02C43C117DE1EA3BE129BC6C82C2BEDE0A58A9DFF419B428B1E": {
+    "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -35,16 +14,16 @@
         "domains": [
           "adguard-sync.seneca.local"
         ],
-        "subject": "CN=adguard-sync.seneca.local",
-        "issuer": "CN=adguard-sync.seneca.local",
-        "validFrom": "Apr 16 18:30:29 2025 GMT",
-        "validTo": "Jul 15 18:30:29 2025 GMT",
-        "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=7E521AD14CFEF02C43C117DE1EA3BE129BC6C82C2BEDE0A58A9DFF419B428B1E",
-        "subjectKeyId": "04E4F523CFD7FC8F7B6434412E724FBA46DDF57F",
+        "subject": "CN=adguard-sync.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Jan  5 17:23:47 2023 GMT",
+        "validTo": "Apr  9 17:23:47 2025 GMT",
+        "certType": "standard",
+        "fingerprint": "sha256 Fingerprint=5E6B8EF8E573146C786C9913B837EF85470B06CC6A06E908D6C87351F7F85522",
+        "subjectKeyId": "C8E01D40FD1FA1447E6606468A6FE5781A952264",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744828230268
+        "modificationTime": 1672939431832
       }
     },
     "sha256 Fingerprint=A61217863CCC853E3C60E13BD2C030A4D373A7C38F214A954C4941F46F9EA18E": {
@@ -131,7 +110,7 @@
         "modificationTime": 1735070156645
       }
     },
-    "sha256 Fingerprint=62E0028F99A38CA1B6733C272A4FAB7232B6A0F5C55AA97BE94D9BCE75AFDA20": {
+    "sha256 Fingerprint=FA76FCFF16A56AF2CEE949DB422F07D91EDE638BF05DF19A3E04376A5FE10627": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -145,16 +124,16 @@
         "domains": [
           "backup.seneca.local"
         ],
-        "subject": "CN=backup.seneca.local",
-        "issuer": "CN=backup.seneca.local",
-        "validFrom": "Apr 17 09:43:45 2025 GMT",
-        "validTo": "Jul 16 09:43:45 2025 GMT",
-        "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=62E0028F99A38CA1B6733C272A4FAB7232B6A0F5C55AA97BE94D9BCE75AFDA20",
-        "subjectKeyId": "1C1CA0DE819FA45CC3FACEB39877E8EC30EF6010",
+        "subject": "CN=backup.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Jan  5 17:23:03 2023 GMT",
+        "validTo": "Apr  9 17:23:03 2025 GMT",
+        "certType": "standard",
+        "fingerprint": "sha256 Fingerprint=FA76FCFF16A56AF2CEE949DB422F07D91EDE638BF05DF19A3E04376A5FE10627",
+        "subjectKeyId": "9AEC1F3D2D8E127D818A3B357A59DDB225C8F7AA",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744883025550
+        "modificationTime": 1672939386857
       }
     },
     "sha256 Fingerprint=255292F628328D9D0086B16400F5C1DCB8613603A0641290A8D816B6DB59DC16": {
@@ -423,7 +402,7 @@
         "modificationTime": 1680882361919
       }
     },
-    "sha256 Fingerprint=B2611D4B8A6A913A009FD83D037E341F7B4895E0CD53B55EE8D9588D7B25C740": {
+    "sha256 Fingerprint=E6C6AC6D9B1156D9B30439D76CB6CC9AC286E15F899C46E9CDBC6452D8FFA61F": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -437,16 +416,16 @@
         "domains": [
           "grafana.seneca.local"
         ],
-        "subject": "CN=grafana.seneca.local",
-        "issuer": "CN=grafana.seneca.local",
-        "validFrom": "Apr  8 17:54:15 2025 GMT",
-        "validTo": "Jul  7 17:54:15 2025 GMT",
+        "subject": "CN=grafana.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Nov 22 13:06:46 2022 GMT",
+        "validTo": "Feb 24 13:06:46 2025 GMT",
         "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=B2611D4B8A6A913A009FD83D037E341F7B4895E0CD53B55EE8D9588D7B25C740",
-        "subjectKeyId": "30E5E1347B821DFAA9B9A536C87F5788B1A23FBF",
+        "fingerprint": "sha256 Fingerprint=E6C6AC6D9B1156D9B30439D76CB6CC9AC286E15F899C46E9CDBC6452D8FFA61F",
+        "subjectKeyId": "CEFDA884ADB7D4441E30444EBF5D072D144F6BC1",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744134855469
+        "modificationTime": 1669122412030
       }
     },
     "sha256 Fingerprint=9F5EA07526DECEF9F58D3748BAFE4AC49E2AC81588A44A18791237AB0E23D15D": {
@@ -505,7 +484,7 @@
         "modificationTime": 1711349477863
       }
     },
-    "sha256 Fingerprint=1246EE828C475329E443343D6DA19B0EF6A3742048FB5FEF5F981BB2BA8E82E7": {
+    "sha256 Fingerprint=7B5185D9BD60497BCAE5FB0B9B19500F18C0CD1FD05100CD3B0AB6328118A5A4": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -519,16 +498,16 @@
         "domains": [
           "influx.seneca.local"
         ],
-        "subject": "CN=influx.seneca.local",
-        "issuer": "CN=influx.seneca.local",
-        "validFrom": "Apr 17 09:25:53 2025 GMT",
-        "validTo": "Jul 16 09:25:53 2025 GMT",
-        "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=1246EE828C475329E443343D6DA19B0EF6A3742048FB5FEF5F981BB2BA8E82E7",
-        "subjectKeyId": "53C125599551FB0E73DB2BCD8FF3722EB516953C",
+        "subject": "CN=influx.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Jan  5 17:21:47 2023 GMT",
+        "validTo": "Apr  9 17:21:47 2025 GMT",
+        "certType": "standard",
+        "fingerprint": "sha256 Fingerprint=7B5185D9BD60497BCAE5FB0B9B19500F18C0CD1FD05100CD3B0AB6328118A5A4",
+        "subjectKeyId": "AAC1389F2CAF90EDDDA3A0DED53AC662CE31A731",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744881954043
+        "modificationTime": 1672939310411
       }
     },
     "sha256 Fingerprint=296684653D3076F7DC40918262100E889EFA08E24964E2AA5676C3E8F9A38F14": {
@@ -793,7 +772,7 @@
         "modificationTime": 1697737315703
       }
     },
-    "sha256 Fingerprint=2A547715569B988E0232C7BE53700897DA2A74C67F44EAF678E5106935AAA6E2": {
+    "sha256 Fingerprint=3DC78EA5AE11831E7491A7D7E5EB8EEC539378AC24C3A60D4B0F35E82321A724": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -801,84 +780,48 @@
         "openhab.seneca.local"
       ],
       "metadata": {
-        "name": "openhab.seneca.local",
-        "path": "/certs/openhab.seneca.local.crt",
-        "keyPath": "/certs/openhab.seneca.local.key",
-        "domains": [
-          "openhab.seneca.local"
-        ],
-        "subject": "CN=openhab.seneca.local",
-        "issuer": "CN=openhab.seneca.local",
-        "validFrom": "Apr  8 18:28:12 2025 GMT",
-        "validTo": "Jul  7 18:28:12 2025 GMT",
-        "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=2A547715569B988E0232C7BE53700897DA2A74C67F44EAF678E5106935AAA6E2",
-        "subjectKeyId": "F50F7E0DDE702E46254E7363ADBE4C47EFE7EDF9",
-        "authorityKeyId": null,
-        "config": {},
-        "modificationTime": 1744136892174
-      }
-    },
-    "sha256 Fingerprint=BFE313587E9C107E10C1173E0F158DA76BF0651415F1953A60A69148EC3E3568": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "openhab.seneca.local",
-        "192.168.168.240",
-        "1.2.3.4"
-      ],
-      "metadata": {
         "name": "openhabChain",
         "path": "/certs/openhabChain.pem",
         "keyPath": null,
         "domains": [
-          "openhab.seneca.local",
-          "192.168.168.240",
-          "1.2.3.4"
+          "openhab.seneca.local"
         ],
-        "subject": "CN=openhab.seneca.local",
-        "issuer": "CN=openhab.seneca.local",
-        "validFrom": "Apr  8 18:42:00 2025 GMT",
-        "validTo": "Jul  7 18:42:00 2025 GMT",
+        "subject": "CN=openhab.seneca.local,O=Internet Widgits Pty Ltd,ST=Some-State,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Nov 18 23:59:44 2022 GMT",
+        "validTo": "Feb 20 23:59:44 2025 GMT",
         "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=BFE313587E9C107E10C1173E0F158DA76BF0651415F1953A60A69148EC3E3568",
-        "subjectKeyId": "B8A6DA4BBED4923D735019E43B09A1E8DA6DB546",
+        "fingerprint": "sha256 Fingerprint=3DC78EA5AE11831E7491A7D7E5EB8EEC539378AC24C3A60D4B0F35E82321A724",
+        "subjectKeyId": "76D42E65F18960BC9B2A7D7AFD6EB93D02F90BBE",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744137720433
+        "modificationTime": 1700074690283
       }
     },
-    "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B": {
+    "sha256 Fingerprint=A6E714F143B2CBE4FFBF4567E1E231B2D373EB93E529EEA374B92C9CDEBFDDC0": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
       "domains": [
-        "openhablog.seneca.local",
-        "1.2.3.4",
-        "seneca.local",
-        "2.2.2.2"
+        "openhablog.seneca.local"
       ],
       "metadata": {
         "name": "openhablog.seneca.local",
         "path": "/certs/openhablog.seneca.local.crt",
         "keyPath": "/certs/openhablog.seneca.local.key",
         "domains": [
-          "openhablog.seneca.local",
-          "1.2.3.4",
-          "seneca.local",
-          "2.2.2.2"
+          "openhablog.seneca.local"
         ],
-        "subject": "CN=openhablog.seneca.local",
-        "issuer": "CN=openhablog.seneca.local",
-        "validFrom": "Apr  8 20:06:03 2025 GMT",
-        "validTo": "Jul  7 20:06:03 2025 GMT",
+        "subject": "CN=openhablog.seneca.local,O=Seneca,L=Schwenningen,ST=Germany,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Jan  5 17:19:26 2023 GMT",
+        "validTo": "Apr  9 17:19:26 2025 GMT",
         "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=427948FC461B5F5B4766796E5EEAC0BC2ED82992C6D887533AC521BBCFE48A7B",
-        "subjectKeyId": "1D7CA62106490DEB475BE0FCA811CBEC6668DAC7",
+        "fingerprint": "sha256 Fingerprint=A6E714F143B2CBE4FFBF4567E1E231B2D373EB93E529EEA374B92C9CDEBFDDC0",
+        "subjectKeyId": "035B84F7375699B3C11F63CC8EB6851852DCED05",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744142763573
+        "modificationTime": 1672939168202
       }
     },
     "sha256 Fingerprint=28DA03A11275A8BBEA9CF3E07A006187C33711F0215FB7611AC9EBBED86C5B22": {
@@ -1053,7 +996,7 @@
         "modificationTime": 1739037006398
       }
     },
-    "sha256 Fingerprint=8AE5F619AD868511A3A1BBDB732F47CAC88DB864AA244BEEB66F9A354EBDAF40": {
+    "sha256 Fingerprint=3FC738106429483589D1310C74D27469AD4C6A4BCB4241CE722075447D412421": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -1067,16 +1010,16 @@
         "domains": [
           "seneca.local"
         ],
-        "subject": "CN=seneca.local",
-        "issuer": "CN=seneca.local",
-        "validFrom": "Apr  8 17:53:51 2025 GMT",
-        "validTo": "Jul  7 17:53:51 2025 GMT",
+        "subject": "CN=seneca.local,O=Internet Widgits Pty Ltd,ST=Some-State,C=DE",
+        "issuer": "CN=seneca.local,OU=Seneca,O=Seneca,L=Schwenningen,ST=Some-State,C=DE",
+        "validFrom": "Nov 20 14:44:43 2022 GMT",
+        "validTo": "Feb 22 14:44:43 2025 GMT",
         "certType": "standard",
-        "fingerprint": "sha256 Fingerprint=8AE5F619AD868511A3A1BBDB732F47CAC88DB864AA244BEEB66F9A354EBDAF40",
-        "subjectKeyId": "FB3C854238E6124ED67CF1F4607766D6A0FAE45F",
+        "fingerprint": "sha256 Fingerprint=3FC738106429483589D1310C74D27469AD4C6A4BCB4241CE722075447D412421",
+        "subjectKeyId": "D1D7993589EF09C306E613D4AC456A77284F4388",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744134831948
+        "modificationTime": 1668955494539
       }
     },
     "sha256 Fingerprint=E2C1E8040CE064EDB65E9D3BD7FA62DE0D18CBAB89ED3983B7C7FEA5D174625E": {
@@ -1105,7 +1048,7 @@
         "modificationTime": 1668812818461
       }
     },
-    "sha256 Fingerprint=01029936210A1559766523ED26FC4C2FBE326D8753D1A441EB92464E5A216117": {
+    "sha256 Fingerprint=73203D7DD8C8A3EBC29825795CD56B0B101A491159825874B56F7685F4733635": {
       "autoRenew": false,
       "renewDaysBeforeExpiry": 30,
       "deployActions": [],
@@ -1119,16 +1062,16 @@
         "domains": [
           "test"
         ],
-        "subject": "CN=test",
-        "issuer": "CN=test",
-        "validFrom": "Apr 16 18:56:01 2025 GMT",
-        "validTo": "Jul 15 18:56:01 2025 GMT",
+        "subject": "CN=test,O=Your Organization,L=Your Locality,ST=Your State,C=DE",
+        "issuer": "CN=test,O=Your Organization,L=Your Locality,ST=Your State,C=DE",
+        "validFrom": "Feb 21 18:42:55 2025 GMT",
+        "validTo": "Feb 19 18:42:55 2035 GMT",
         "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=01029936210A1559766523ED26FC4C2FBE326D8753D1A441EB92464E5A216117",
-        "subjectKeyId": "835F2478FD9394B2316ECE64BD49D41CE7588D6E",
+        "fingerprint": "sha256 Fingerprint=73203D7DD8C8A3EBC29825795CD56B0B101A491159825874B56F7685F4733635",
+        "subjectKeyId": "7CD797B0A89A1F28FE510803DE48F294626B3D0F",
         "authorityKeyId": null,
         "config": {},
-        "modificationTime": 1744829761858
+        "modificationTime": 1740163375924
       }
     },
     "sha256 Fingerprint=FB8B88474818762D50D8EBE421A4FD953B411E71E0B32FECD2E90C8D21AE3A43": {
@@ -1272,32 +1215,18 @@
         "config": {},
         "modificationTime": 1711405861069
       }
-    },
-    "sha256 Fingerprint=5120FDC70F3076A8F8B098EBB2C45813390197FB1E157969E92186EAB058A54B": {
-      "autoRenew": false,
-      "renewDaysBeforeExpiry": 30,
-      "deployActions": [],
-      "domains": [
-        "backup.seneca.local"
-      ],
-      "metadata": {
-        "name": "certificate",
-        "path": "/certs/backup.seneca.local/certificate.crt",
-        "keyPath": null,
-        "domains": [
-          "backup.seneca.local"
-        ],
-        "subject": "CN=backup.seneca.local",
-        "issuer": "CN=backup.seneca.local",
-        "validFrom": "Apr 17 19:54:04 2025 GMT",
-        "validTo": "Jul 16 19:54:04 2025 GMT",
-        "certType": "rootCA",
-        "fingerprint": "sha256 Fingerprint=5120FDC70F3076A8F8B098EBB2C45813390197FB1E157969E92186EAB058A54B",
-        "subjectKeyId": "6C4DD3DBE38B80DC63CDC89927E1239C9231EDE6",
-        "authorityKeyId": null,
-        "config": {},
-        "modificationTime": 1744919644073
-      }
     }
+  },
+  "globalDefaults": {
+    "caValidityPeriod": {
+      "rootCA": 3650,
+      "intermediateCA": 1825,
+      "standard": 365
+    },
+    "renewDaysBeforeExpiry": 30,
+    "enableAutoRenew": true,
+    "enableAutoRenewalJob": true,
+    "renewalSchedule": "0 0 * * *",
+    "lastRenewalCheck": null
   }
 }

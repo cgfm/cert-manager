@@ -1,15 +1,39 @@
+/**
+ * RenewalManager class handles the renewal of certificates and CA certificates.
+ * It checks for certificates that need renewal, performs the renewal process,
+ * and manages the deployment of new certificates.
+ * It also handles the passphrase requests for CA certificates via WebSocket.
+ * @module RenewalManager - Handles certificate renewal and deployment
+ * @requires child_process - ExecSync for executing shell commands
+ * @requires fs - File system for file operations
+ * @requires path - Path operations
+ * @requires logger - Logger for logging messages
+ * @requires dateUtils - Utility for date operations
+ * @requires configManager - Configuration manager for managing certificate configurations
+ * @requires certificateService - Service for managing certificates
+ * @requires io - Socket.IO instance for real-time communication
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description This module provides functionality to renew certificates and CA certificates,
+ *              manage their configurations, and handle passphrase requests via WebSocket.
+ */
+
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const logger = require('./logger');
+const dateUtils = require('../utils/date-utils');
 
 class RenewalManager {
-    constructor(configManager, certsDir, certificateService) {
+    constructor(configManager, certsDir, certificateService, io=null) {
         this.configManager = configManager;
         this.certsDir = certsDir;
         this.certificateService = certificateService;
-        
+        this.io = io;
+        this._passphraseCallbacks = new Map();
+
         // Validate that certificateService is provided and has required methods
         if (!this.certificateService) {
             logger.warn('CertificateService not provided to RenewalManager. Some functionality may not work.');
@@ -19,11 +43,11 @@ class RenewalManager {
     }
 
     /**
-     * Set the Socket.io instance for real-time updates
-     * @param {Object} socketIo - The Socket.io instance
+     * Set the Socket.IO instance
+     * @param {Object} io - Socket.IO instance
      */
-    setSocketIo(socketIo) {
-        this.io = socketIo;
+    setSocketIo(io) {
+        this.io = io;
     }
 
     async checkCertificatesForRenewal(certificates) {
@@ -129,6 +153,11 @@ class RenewalManager {
         }
     }
 
+    /**
+     * Renew a certificate
+     * @param {Object} cert - Certificate object to renew
+     * @returns {Promise<Object>} Result of renewal operation
+     */
     async renewCertificate(cert) {
         logger.info(`Renewing certificate for: ${cert.domains ? cert.domains.join(', ') : cert.name}`);
         
@@ -136,77 +165,106 @@ class RenewalManager {
         const config = this.configManager.getCertConfig(cert.fingerprint);
         const defaults = this.configManager.getGlobalDefaults();
         
+        // Store the original certificate type - add this line
+        const originalCertType = cert.certType || 'standard';
+        
         // Determine validity period
-        const validityDays = config.validityDays || defaults.caValidityPeriod.standard;
+        const validityDays = config?.validityDays || defaults.caValidityPeriod[originalCertType] || defaults.caValidityPeriod.standard;
         
         // Store the old fingerprint to remove later
         const oldFingerprint = cert.fingerprint;
         const oldCertPath = cert.path;
-        const oldKeyPath = cert.keyPath;
+        const oldKeyPath = cert.keyPath || cert.path.replace(/\.(crt|pem|cer|cert)$/, '.key');
+        const oldValidFrom = cert.validFrom || 'unknown_date';
         
         try {
-            // Extract the actual directory and filenames from cert.path
-            let outputDir, keyFilename, certFilename;
-            if (cert.path) {
-                // If cert.path is available, use its directory and extract the filename
-                outputDir = path.dirname(cert.path);
-                certFilename = path.basename(cert.path);
+            // Extract directory and filename parts
+            const certDir = path.dirname(cert.path);
+            const certName = path.basename(cert.path, path.extname(cert.path));
+            const certExtension = path.extname(cert.path);
+            
+            // Always use the original paths for new files
+            const certPath = cert.path;
+            const keyPath = oldKeyPath;
+            
+            // Create backup filenames with old valid-from date
+            // Convert the validFrom date into a compatible filename format
+            const validFromStr = dateUtils.parseAndFormatDateYYYYMMDD(oldValidFrom);
+            const backupCertPath = path.join(certDir, `${certName}.${validFromStr}${certExtension}`);
+            const backupKeyPath = path.join(certDir, `${path.basename(oldKeyPath, path.extname(oldKeyPath))}.${validFromStr}${path.extname(oldKeyPath)}`);
+            
+            // Backup existing files before overwriting
+            if (fs.existsSync(certPath)) {
+                fs.copyFileSync(certPath, backupCertPath);
+                logger.info(`Backed up original certificate to ${backupCertPath}`);
+            }
+            
+            if (fs.existsSync(keyPath)) {
+                fs.copyFileSync(keyPath, backupKeyPath);
+                logger.info(`Backed up original key to ${backupKeyPath}`);
+            }
+            
+            // For intermediate CA renewals, check if we need a passphrase for the root CA
+            let rootCAPassphrase = null;
+            
+            if (originalCertType === 'intermediateCA') {  // Modified to use originalCertType
+                // Find the root CA certificate
+                const rootCAs = await this.findRootCACertificates();
                 
-                // Try to guess the key filename based on common patterns
-                if (cert.keyPath) {
-                    keyFilename = path.basename(cert.keyPath);
-                    logger.debug(`Using existing key filename: ${keyFilename}`);
-                } else if (fs.existsSync(path.join(outputDir, 'private.key'))) {
-                    keyFilename = 'private.key';
-                    logger.debug(`Found default private.key in directory`);
-                } else if (fs.existsSync(path.join(outputDir, certFilename.replace('.crt', '.key')))) {
-                    keyFilename = certFilename.replace('.crt', '.key');
-                    logger.debug(`Found matching key file: ${keyFilename}`);
-                } else {
-                    // Default fallback - use cert name as base for key name
-                    keyFilename = certFilename.replace(/\.(crt|pem|cert)$/, '.key');
-                    logger.debug(`Using derived key filename: ${keyFilename}`);
+                if (rootCAs.length === 0) {
+                    throw new Error('No root CA found to sign the intermediate certificate');
                 }
-            } else {
-                // Otherwise create a sanitized name
-                const sanitizedName = cert.domains && cert.domains[0] 
-                    ? cert.domains[0].replace(/\*/g, 'wildcard').replace(/[^a-zA-Z0-9-_.]/g, '_') 
-                    : cert.name.replace(/[^a-zA-Z0-9-_.]/g, '_');
-                outputDir = path.join(this.certsDir, sanitizedName);
-                certFilename = 'certificate.crt';
-                keyFilename = 'private.key';
-                logger.debug(`Using default filenames in directory: ${outputDir}`);
+                
+                const rootCA = rootCAs[0];
+                
+                // Try to get stored passphrase for the root CA
+                rootCAPassphrase = this.configManager.getCACertPassphrase(rootCA.fingerprint);
+                
+                // If no passphrase is stored, we need to request it via WebSocket
+                if (!rootCAPassphrase && this.io) {
+                    logger.info('No stored passphrase found for root CA, requesting via WebSocket');
+                    
+                    try {
+                        // Send a request for the passphrase
+                        rootCAPassphrase = await this.requestPassphraseViaWebSocket(rootCA);
+                        
+                        if (!rootCAPassphrase) {
+                            throw new Error('No passphrase provided for root CA');
+                        }
+                    } catch (passphraseError) {
+                        logger.error('Failed to get passphrase for root CA:', passphraseError);
+                        throw new Error(`Failed to get passphrase for root CA: ${passphraseError.message}`);
+                    }
+                }
             }
-            
-            // Make sure the directory exists
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir, { recursive: true });
-                logger.debug(`Created output directory: ${outputDir}`);
-            }
-            
-            // Set up paths for key and certificate
-            const keyPath = path.join(outputDir, keyFilename);
-            const certPath = path.join(outputDir, certFilename);
-            
-            logger.info(`Certificate will be renewed at: ${certPath}`);
-            logger.info(`Private key will be saved at: ${keyPath}`);
-
-            // Backup existing certificate and key if they exist
-            await this.backupCertificateIfNeeded(keyPath, certPath);
             
             // Generate the OpenSSL command based on the certificate domains
             let openSslCommand;
             
-            if (cert.certType === 'rootCA') {
-                // Generate a self-signed root CA certificate
-                openSslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096` +
-                    ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${cert.name}"` +
-                    ` -addext "subjectAltName=DNS:${cert.name}"` +
-                    ` -addext "basicConstraints=critical,CA:true"` +
-                    ` -addext "keyUsage=critical,keyCertSign,cRLSign"`;
-            } else if (cert.certType === 'intermediateCA') {
-                // For intermediate CA renewals, we need to sign with the root CA
-                const csrPath = path.join(outputDir, 'intermediate.csr');
+            if (originalCertType === 'rootCA') {  // Modified to use originalCertType
+                // For root CA, include passphrase option if we have a stored passphrase
+                const caPassphrase = this.configManager.getCACertPassphrase(cert.fingerprint);
+                
+                if (caPassphrase) {
+                    // Use passphrase for both new key and for signing
+                    openSslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096` +
+                        ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${cert.name}"` +
+                        ` -addext "subjectAltName=DNS:${cert.name}"` +
+                        ` -addext "basicConstraints=critical,CA:true"` +
+                        ` -addext "keyUsage=critical,keyCertSign,cRLSign"` +
+                        ` -passout pass:${this._escapeShellArg(caPassphrase)}`;
+                } else {
+                    // No passphrase - ensure nodes is included to prevent passphrase prompt
+                    openSslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:4096` +
+                        ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${cert.name}"` +
+                        ` -addext "subjectAltName=DNS:${cert.name}"` +
+                        ` -addext "basicConstraints=critical,CA:true"` +
+                        ` -addext "keyUsage=critical,keyCertSign,cRLSign"`;
+                }
+            } else if (originalCertType === 'intermediateCA') {  // Modified to use originalCertType
+                // For intermediate CA renewals, use the root CA passphrase if available
+                // Use a temporary CSR file in the same directory
+                const csrPath = path.join(certDir, `${certName}.csr`);
                 
                 // Find the root CA
                 const rootCAs = await this.findRootCACertificates();
@@ -216,81 +274,177 @@ class RenewalManager {
                 
                 const rootCA = rootCAs[0];
                 
-                // Create a CSR first
-                openSslCommand = `openssl req -new -sha256 -nodes -newkey rsa:4096` +
-                    ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${cert.name}" &&` +
-                    ` openssl x509 -req -in "${csrPath}" -CA "${rootCA.path}" -CAkey "${rootCA.keyPath}"` +
-                    ` -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256` +
-                    ` -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\\nkeyUsage=critical,keyCertSign,cRLSign\\nsubjectAltName=DNS:${cert.name}")`;
-            } else {
-                // Standard certificate renewal
-                // Create SAN extension with all domains
-                let sanExtension = '';
-                if (cert.domains && cert.domains.length > 0) {
-                    // Use the first domain as common name
-                    const commonName = cert.domains[0];
-                    
-                    // Create SAN extension with all domains
-                    sanExtension = cert.domains.map(domain => `DNS:${domain}`).join(',');
-                    
-                    // Create self-signed certificate with all domains in the SAN
-                    openSslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
-                        ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
-                        ` -subj "/CN=${commonName}" -addext "subjectAltName=${sanExtension}"`;
+                // Create the CSR command
+                const csrCommand = `openssl req -new -sha256 -nodes -newkey rsa:4096` +
+                    ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${cert.name}"`;
+                
+                // Create the signing command, using passphrase if available
+                let signingCommand;
+                if (rootCAPassphrase) {
+                    signingCommand = `openssl x509 -req -in "${csrPath}" -CA "${rootCA.path}" -CAkey "${rootCA.keyPath}"` +
+                        ` -passin pass:${this._escapeShellArg(rootCAPassphrase)} -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256` +
+                        ` -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\\nkeyUsage=critical,keyCertSign,cRLSign\\nsubjectAltName=DNS:${cert.name}")`;
                 } else {
-                    // Fallback to using cert name if no domains are specified
-                    openSslCommand = `openssl req -new -x509 -nodes -sha256 -days ${validityDays}` +
-                        ` -newkey rsa:2048 -keyout "${keyPath}" -out "${certPath}"` +
-                        ` -subj "/CN=${cert.name}" -addext "subjectAltName=DNS:${cert.name}"`;
+                    signingCommand = `openssl x509 -req -in "${csrPath}" -CA "${rootCA.path}" -CAkey "${rootCA.keyPath}"` +
+                        ` -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256` +
+                        ` -extfile <(echo -e "basicConstraints=critical,CA:true,pathlen:0\\nkeyUsage=critical,keyCertSign,cRLSign\\nsubjectAltName=DNS:${cert.name}")`;
+                }
+                
+                openSslCommand = `${csrCommand} && ${signingCommand} && rm -f "${csrPath}"`;
+            } else {
+                // Standard certificate renewal - find if we should use a CA to sign it
+                const domains = cert.domains || [cert.name];
+                const sanEntries = domains.map(d => `DNS:${d}`).join(',');
+                
+                // Check if we have a configured CA for signing standard certificates
+                let useCA = false;
+                let signingCA = null;
+                const globalDefaults = this.configManager.getGlobalDefaults();
+                
+                // First check certificate-specific settings
+                if (config && config.signWithCA) {
+                    useCA = true;
+                    // If a specific CA fingerprint is specified, use that
+                    if (config.caFingerprint) {
+                        // Find the CA by fingerprint
+                        const allCerts = await this.certificateService.getAllCertificates();
+                        signingCA = allCerts.find(c => c.fingerprint === config.caFingerprint && 
+                                                (c.certType === 'rootCA' || c.certType === 'intermediateCA'));
+                        
+                        if (!signingCA) {
+                            logger.warn(`Specified CA with fingerprint ${config.caFingerprint} not found, falling back to default CA`);
+                        }
+                    }
+                } else if (globalDefaults.signStandardCertsWithCA) {
+                    // Check global setting next
+                    useCA = true;
+                }
+                
+                // If no specific CA was found but we should use a CA, find the first suitable one
+                if (useCA && !signingCA) {
+                    try {
+                        // Prefer intermediate CAs if available
+                        const cas = await this.findRootCACertificates();
+                        if (cas.length > 0) {
+                            // Prefer intermediate CAs over root CAs when available
+                            signingCA = cas.find(ca => ca.certType === 'intermediateCA') || cas[0];
+                            logger.info(`Using ${signingCA.certType} certificate ${signingCA.name} for signing`);
+                        } else {
+                            logger.warn('No CA certificates found for signing, falling back to self-signed');
+                            useCA = false;
+                        }
+                    } catch (error) {
+                        logger.error('Error finding CA certificates:', error);
+                        useCA = false;
+                    }
+                }
+                
+                if (useCA && signingCA) {
+                    // Sign the certificate with our CA
+                    logger.info(`Signing certificate with ${signingCA.certType}: ${signingCA.name}`);
+                    
+                    // Create a CSR first
+                    const csrPath = path.join(certDir, `${certName}.csr`);
+                    
+                    // Check if we need a passphrase for the CA
+                    let caPassphrase = null;
+                    if (signingCA.hasPassphrase) {
+                        caPassphrase = this.configManager.getCACertPassphrase(signingCA.fingerprint);
+                        
+                        if (!caPassphrase && this.io) {
+                            try {
+                                caPassphrase = await this.requestPassphraseViaWebSocket(signingCA);
+                            } catch (error) {
+                                logger.error('Failed to get CA passphrase:', error);
+                                throw new Error(`Failed to get passphrase for CA: ${error.message}`);
+                            }
+                        }
+                    }
+                    
+                    // Create CSR with the key
+                    const csrCommand = `openssl req -new -sha256 -nodes -newkey rsa:2048` +
+                        ` -keyout "${keyPath}" -out "${csrPath}" -subj "/CN=${domains[0]}"`;
+                    
+                    // Sign with the CA
+                    let signingCommand;
+                    if (caPassphrase) {
+                        signingCommand = `openssl x509 -req -in "${csrPath}" -CA "${signingCA.path}" -CAkey "${signingCA.keyPath}"` +
+                            ` -passin pass:${this._escapeShellArg(caPassphrase)} -CAcreateserial -out "${certPath}"` +
+                            ` -days ${validityDays} -sha256 -extfile <(echo -e "subjectAltName=${sanEntries}")`;
+                    } else {
+                        signingCommand = `openssl x509 -req -in "${csrPath}" -CA "${signingCA.path}" -CAkey "${signingCA.keyPath}"` +
+                            ` -CAcreateserial -out "${certPath}" -days ${validityDays} -sha256` +
+                            ` -extfile <(echo -e "subjectAltName=${sanEntries}")`;
+                    }
+                    
+                    openSslCommand = `${csrCommand} && ${signingCommand} && rm -f "${csrPath}"`;
+                } else {
+                    // Generate a self-signed certificate (default behavior)
+                    openSslCommand = `openssl req -x509 -new -nodes -sha256 -days ${validityDays} -newkey rsa:2048` +
+                        ` -keyout "${keyPath}" -out "${certPath}" -subj "/CN=${domains[0]}"` +
+                        ` -addext "subjectAltName=${sanEntries}"`;
                 }
             }
             
-            // Split the command into executable and arguments for spawn
-            const parts = openSslCommand.split(' ');
-            const command = parts[0];
-            const args = parts.slice(1);
+            // Execute the OpenSSL command
+            logger.debug(`Executing OpenSSL command: ${openSslCommand}`);
+            execSync(openSslCommand, { shell: '/bin/bash' });
             
-            logger.info(`Executing OpenSSL command for certificate renewal`);
-            logger.debug(`Full command: ${openSslCommand}`);
-            
-            // Execute OpenSSL command
-            const result = await this.executeCommandWithOutput(command, args);
-            
-            logger.info(`Certificate renewal completed successfully`);
-            
-            // Make sure the key file actually exists after renewal
-            if (!fs.existsSync(keyPath)) {
-                logger.error(`Key file not found after renewal at expected path: ${keyPath}`);
-            } else {
-                logger.info(`Key file confirmed at path: ${keyPath}`);
+            // Verify the new certificate was created
+            if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+                throw new Error('Failed to create certificate files');
             }
-        
-            // Set appropriate file permissions for key file
-            try {
-                fs.chmodSync(keyPath, 0o600); // Set read/write for owner only
-                logger.debug(`Set secure permissions on key file: ${keyPath}`);
-            } catch (permError) {
-                logger.warn(`Failed to set secure permissions on key file: ${permError.message}`);
-            }
-
-            // Process the new certificate to get its details
+            
+            // Process the new certificate to extract details
             const newCertDetails = await this.processCertificate(certPath);
             
             // Update certificate paths
             newCertDetails.path = certPath;
             newCertDetails.keyPath = keyPath;
-            // Remove the old certificate from config but preserve its settings
+            
+            // Explicitly preserve the original certificate type
+            newCertDetails.certType = cert.certType || newCertDetails.certType || 'standard';
+
+            // If original name and display name exist, preserve them
+            if (cert.name) {
+                newCertDetails.name = cert.name;
+            }
+            
+            if (cert.displayName) {
+                newCertDetails.displayName = cert.displayName;
+            }
+            
+            // Remove the old certificate from config but preserve its settings and store it as previous version
             if (oldFingerprint && oldFingerprint !== newCertDetails.fingerprint) {
                 const oldConfig = this.configManager.getCertConfig(oldFingerprint);
                 
                 // Create entry for new certificate with old settings
                 if (oldConfig) {
+                    // Create previous version entry
+                    const previousVersion = {
+                        fingerprint: oldFingerprint,
+                        validFrom: cert.validFrom,
+                        validTo: cert.validTo,
+                        backupCertPath: backupCertPath,
+                        backupKeyPath: backupKeyPath,
+                        renewedAt: new Date().toISOString()
+                    };
+                    
+                    // Initialize previousVersions array or add to it
+                    const previousVersions = oldConfig.previousVersions || [];
+                    previousVersions.push(previousVersion);
+                    
+                    // Create the new configuration
                     this.configManager.setCertConfig(newCertDetails.fingerprint, {
                         autoRenew: oldConfig.autoRenew,
                         renewDaysBeforeExpiry: oldConfig.renewDaysBeforeExpiry,
                         deployActions: oldConfig.deployActions || [],
                         domains: newCertDetails.domains || oldConfig.domains,
-                        metadata: newCertDetails
+                        metadata: {
+                            ...newCertDetails,
+                            certType: cert.certType || newCertDetails.certType || 'standard' // Ensure certType is preserved
+                        },
+                        previousVersions: previousVersions
                     });
                     
                     // Remove old certificate entry
@@ -299,52 +453,109 @@ class RenewalManager {
                 }
             }
             
-            // After successful renewal and before returning the result
-            if (oldFingerprint && oldFingerprint !== newCertDetails.fingerprint) {
-                // Add cleanup step for old certificate
-                await this.cleanupOldCertificate(oldFingerprint, newCertDetails.fingerprint, newCertDetails);
-                
-                // If using metadata tracking
-                if (oldConfig) {
-                    // Copy any important metadata/settings from old to new certificate
-                    const newConfig = this.configManager.getCertConfig(newCertDetails.fingerprint) || {};
-                    newConfig.autoRenew = oldConfig.autoRenew || false;
-                    newConfig.renewDaysBeforeExpiry = oldConfig.renewDaysBeforeExpiry || 30;
-                    newConfig.deployActions = oldConfig.deployActions || [];
-                    
-                    // Save the updated config
-                    this.configManager.setCertConfig(newCertDetails.fingerprint, newConfig);
-                }
-            }
-            
-            // Return success
-            const renewalResult = {
+            // Return success result
+            return {
                 success: true,
-                message: `Certificate for ${cert.domains ? cert.domains[0] : cert.name} renewed successfully`,
+                fingerprint: newCertDetails.fingerprint,
                 oldFingerprint: oldFingerprint,
-                newFingerprint: newCertDetails.fingerprint,
                 certPath: certPath,
                 keyPath: keyPath,
-                oldRemoved: true // Add flag to indicate old certificate was removed
+                backupCertPath: backupCertPath,
+                backupKeyPath: backupKeyPath,
+                certificate: newCertDetails
             };
-            
-            // Emit a certificate-renewed event if WebSocket service is available
-            if (this.io) {
-                this.io.emit('certificate-renewed', {
-                    oldFingerprint: oldFingerprint,
-                    newFingerprint: newCertDetails ? newCertDetails.fingerprint : null,
-                    name: newCertDetails.name || 'Unnamed Certificate',
-                    domains: newCertDetails.domains || []
-                });
-            }
-
-            return renewalResult;
         } catch (error) {
             logger.error(`Renewal failed:`, error);
-            throw new Error(`Failed to renew certificate: ${error.message}`);
+            return {
+                success: false,
+                error: `Failed to renew certificate: ${error.message}`
+            };
         }
     }
     
+    /**
+     * Escape a string for use in a shell command
+     * @private
+     * @param {string} arg - Argument to escape
+     * @returns {string} Escaped argument
+     */
+    _escapeShellArg(arg) {
+        if (!arg) return '';
+        // Replace single quotes with '\'' (close quote, escaped quote, open quote)
+        return `'${arg.replace(/'/g, "'\\''")}'`;
+    }
+
+    /**
+     * Request a CA passphrase from the user via WebSocket
+     * @private
+     * @param {Object} caCert - The CA certificate object
+     * @returns {Promise<string>} The provided passphrase
+     */
+    async requestPassphraseViaWebSocket(caCert) {
+        return new Promise((resolve, reject) => {
+            if (!this.io) {
+                return reject(new Error('WebSocket service not available'));
+            }
+            
+            const requestId = `passphrase-request-${Date.now()}`;
+            
+            // Setup timeout
+            const timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('Passphrase request timed out after 2 minutes'));
+            }, 2 * 60 * 1000); // 2 minutes
+            
+            // Store callback for later
+            if (!this._passphraseCallbacks) {
+                this._passphraseCallbacks = new Map();
+            }
+            
+            // Store the callbacks for cleanup
+            const cleanup = () => {
+                clearTimeout(timeout);
+                if (this._passphraseCallbacks) {
+                    this._passphraseCallbacks.delete(requestId);
+                }
+            };
+            
+            // Register the callback
+            this._passphraseCallbacks.set(requestId, {
+                resolve: (passphrase, storePassphrase = false) => {
+                    cleanup();
+                    
+                    // Store passphrase if requested
+                    if (storePassphrase && passphrase && caCert.fingerprint) {
+                        try {
+                            this.configManager.setCACertPassphrase(
+                                caCert.fingerprint, 
+                                passphrase, 
+                                storePassphrase
+                            );
+                        } catch (error) {
+                            logger.warn(`Failed to store passphrase: ${error.message}`);
+                        }
+                    }
+                    
+                    resolve(passphrase);
+                },
+                reject: (error) => {
+                    cleanup();
+                    reject(error);
+                }
+            });
+            
+            // Send request to client
+            this.io.emit('ca-passphrase-required', {
+                requestId,
+                caName: caCert.name,
+                caFingerprint: caCert.fingerprint,
+                message: `Passphrase required for CA certificate "${caCert.name}"`,
+            });
+            
+            logger.info(`Passphrase request sent for CA: ${caCert.name} (${requestId})`);
+        });
+    }
+
     /**
      * Clean up old certificate after renewal
      * @param {string} oldFingerprint - The fingerprint of the old certificate
@@ -405,6 +616,25 @@ class RenewalManager {
             const certOutput = execSync(`openssl x509 -in "${certPath}" -text -noout`).toString();
             const fingerprint = execSync(`openssl x509 -in "${certPath}" -fingerprint -sha256 -noout`).toString().trim();
             
+            // Check if the key is encrypted (has a passphrase)
+            let hasPassphrase = false;
+            const keyPath = certPath.replace(/\.(crt|pem|cer|cert)$/, '.key');
+            
+            if (fs.existsSync(keyPath)) {
+                try {
+                    const keyOutput = execSync(`openssl rsa -in "${keyPath}" -check -noout 2>&1`).toString();
+                    // If it throws an error about a passphrase, we'll catch that below
+                    hasPassphrase = false;
+                } catch (error) {
+                    // If OpenSSL asks for a passphrase, the key is encrypted
+                    if (error.message.includes('pass phrase') || 
+                        error.message.includes('password') ||
+                        error.message.includes('encrypted')) {
+                        hasPassphrase = true;
+                        logger.info(`Certificate key at ${keyPath} is encrypted with a passphrase`);
+                    }
+                }
+            }
             // Parse the certificate details
             const subject = certOutput.match(/Subject:.*?CN\s*=\s*([^,\n]+)/);
             const issuer = certOutput.match(/Issuer:.*?CN\s*=\s*([^,\n]+)/);
@@ -449,7 +679,8 @@ class RenewalManager {
                 certType: certType,
                 fingerprint: fingerprint,
                 subjectKeyId: subjectKeyIdMatch ? subjectKeyIdMatch[1].replace(/:/g, '').trim() : null,
-                authorityKeyId: authorityKeyIdMatch ? authorityKeyIdMatch[1].replace(/:/g, '').trim() : null
+                authorityKeyId: authorityKeyIdMatch ? authorityKeyIdMatch[1].replace(/:/g, '').trim() : null,
+                hasPassphrase: hasPassphrase
             };
         } catch (error) {
             logger.error(`Error processing certificate ${certPath}: ${error.message}`);
@@ -503,7 +734,7 @@ class RenewalManager {
             
             // Filter for root CAs
             return certificates.filter(cert => cert.certType === 'rootCA');
-        } catch (error) {
+} catch (error) {
             logger.error('Error finding root CA certificates:', error);
             return [];
         }

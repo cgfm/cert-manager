@@ -364,3 +364,108 @@
     border-radius: 4px;
     margin-top: 0.5rem;
 }
+
+/* CA Passphrase Modal Styles */
+.ca-passphrase-modal .modal-content {
+    max-width: 450px;
+}
+
+.ca-passphrase-modal h2 {
+    color: #333;
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.ca-passphrase-modal h2 i {
+    color: #0078d7;
+    margin-right: 10px;
+}
+
+.ca-passphrase-modal .form-group {
+    margin-bottom: 15px;
+}
+
+.ca-passphrase-modal input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.ca-passphrase-modal .button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Backup tab styles */
+.backups-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.backups-table th,
+.backups-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.backups-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+.backups-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.no-backups {
+    color: #666;
+    font-style: italic;
+    padding: 20px 0;
+    text-align: center;
+}
+
+.loading-backups {
+    text-align: center;
+    padding: 20px 0;
+    color: #666;
+}
+
+.small-btn {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    margin-left: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.small-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.view-backup-btn {
+    background-color: #0078d7;
+    color: white;
+}
+
+.view-backup-btn:hover {
+    background-color: #0367b8;
+}
+
+.restore-backup-btn {
+    background-color: #28a745;
+    color: white;
+}
+
+.restore-backup-btn:hover {
+    background-color: #23913d;
+}

@@ -52,7 +52,7 @@ const schedulerService = new SchedulerService(configManager, renewalManager);
 schedulerService.initialize();
 
 // Set up the socket.io instance and pass it to the scheduler service
-schedulerService.setIo(io);
+schedulerService.setSocketIo(io);
 
 // Make services available to routes
 const services = {
@@ -145,6 +145,44 @@ io.on('connection', (socket) => {
     // Update WebSocket status in UI for all clients
     io.emit('server-status', { status: 'online', clients: io.engine.clientsCount });
     
+    // Handle CA passphrase submission
+    socket.on('ca-passphrase-submit', (data) => {
+        // Get the passphrase and request ID from the submission
+        const { requestId, passphrase, storePassphrase } = data;
+        
+        logger.debug(`Received passphrase for request ${requestId}`);
+        
+        // Find the corresponding callback
+        if (renewalManager._passphraseCallbacks && 
+            renewalManager._passphraseCallbacks.has(requestId)) {
+            
+            const { resolve } = renewalManager._passphraseCallbacks.get(requestId);
+            resolve(passphrase, storePassphrase);
+            logger.info(`Passphrase processed for request ${requestId}`);
+        } else {
+            logger.warn(`No pending request found for passphrase: ${requestId}`);
+            socket.emit('ca-passphrase-error', {
+                requestId,
+                message: 'No pending request found for this passphrase'
+            });
+        }
+    });
+    
+    // Handle CA passphrase cancellation
+    socket.on('ca-passphrase-cancel', (data) => {
+        const { requestId } = data;
+        
+        logger.debug(`Passphrase request cancelled: ${requestId}`);
+        
+        // Find and reject the corresponding promise
+        if (renewalManager._passphraseCallbacks && 
+            renewalManager._passphraseCallbacks.has(requestId)) {
+            
+            const { reject } = renewalManager._passphraseCallbacks.get(requestId);
+            reject(new Error('Passphrase request cancelled by user'));
+        }
+    });
+
     socket.on('disconnect', () => {
         logger.info('Client disconnected:', socket.id);
         // Update client count for remaining clients
@@ -173,8 +211,7 @@ app.listen(PORT, () => {
 logger.info('Configuration paths:');
 logger.info(`  Config directory: ${CONFIG_DIR}`);
 logger.info(`  Settings path: ${configManager.settingsPath}`);
-logger.info(`  Certificate config path: ${configManager.configPath}`);
-logger.info(`  Certificate info path: ${configManager.certInfoPath}`);
+logger.info(`  Certificate config path: ${configManager.certConfigPath}`);
 logger.info(`  Certificates directory: ${CERTS_DIR}`);
 
 // Function to set up automatic renewal checks

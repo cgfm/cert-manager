@@ -177,7 +177,7 @@ class SchedulerService {
      * Set Socket.IO instance for emitting events
      * @param {Object} socketIo - Socket.IO instance
      */
-    setIo(socketIo) {
+    setSocketIo(socketIo) {
         this.io = socketIo;
     }
 }

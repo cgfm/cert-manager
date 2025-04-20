@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const logger = require('./logger');
 
 class ConfigManager {
@@ -11,6 +12,9 @@ class ConfigManager {
         if (!fs.existsSync(configDir)) {
             fs.mkdirSync(configDir, { recursive: true });
         }
+        
+        // Initialize the caPassphrases object
+        this.caPassphrases = {};
         
         // Load configuration
         this.loadConfig();
@@ -133,6 +137,10 @@ class ConfigManager {
      * @param {Object} config - Certificate configuration
      */
     setCertConfig(fingerprint, config) {
+        if (!fingerprint) {
+            throw new Error('Fingerprint is required');
+        }
+        
         // Create default config if none exists
         this.certConfig.certificates[fingerprint] = {
             ...config,
@@ -264,6 +272,191 @@ class ConfigManager {
                 lastRenewalCheck: null
             }
         };
+    }
+
+    /**
+     * Check if a stored passphrase exists for a CA certificate
+     * @param {string} fingerprint - The CA certificate fingerprint
+     * @returns {boolean} True if a passphrase is stored
+     */
+    hasCACertPassphrase(fingerprint) {
+        if (!fingerprint) return false;
+    
+        // First check in-memory cache
+        if (this.caPassphrases && this.caPassphrases[fingerprint]) {
+        return true;
+        }
+        
+        // Then check persistent storage
+        const certConfig = this.getCertConfig(fingerprint) || {};
+        return certConfig.hasStoredPassphrase === true;
+    }
+
+    /**
+     * Store a CA passphrase securely
+     * @param {string} fingerprint - The CA certificate fingerprint
+     * @param {string} passphrase - The passphrase to store
+     * @param {boolean} persistent - Whether to store persistently (default: false)
+     */
+    setCACertPassphrase(fingerprint, passphrase, persistent = false) {
+        if (!fingerprint) {
+            throw new Error('Fingerprint is required to store a passphrase');
+        }
+
+        // Get current certificate config
+        const certConfig = this.getCertConfig(fingerprint) || {};
+        
+        // In-memory storage (always)
+        if (!this.caPassphrases) {
+            this.caPassphrases = {};
+        }
+        this.caPassphrases[fingerprint] = passphrase;
+        
+        // Persistent storage (optional)
+        if (persistent) {
+            try {
+                // Store an indicator that we have a passphrase
+                certConfig.hasStoredPassphrase = true;
+                
+                // Encrypt the passphrase before storing
+                const crypto = require('crypto');
+                const key = this.getEncryptionKey();
+                const iv = crypto.randomBytes(16);
+                const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+                
+                let encrypted = cipher.update(passphrase, 'utf8', 'hex');
+                encrypted += cipher.final('hex');
+                
+                // Store the encrypted passphrase and IV
+                certConfig.encryptedPassphrase = encrypted;
+                certConfig.passphraseIV = iv.toString('hex');
+                
+                // Save updated config
+                this.setCertConfig(fingerprint, certConfig);
+                logger.info(`Passphrase stored securely for CA certificate: ${fingerprint}`);
+            } catch (error) {
+                logger.error(`Failed to store CA passphrase: ${error.message}`);
+                throw new Error(`Failed to store CA passphrase: ${error.message}`);
+            }
+        }
+    }
+
+    /**
+     * Retrieve a CA passphrase
+     * @param {string} fingerprint - The CA certificate fingerprint
+     * @returns {string|null} The passphrase or null if not found
+     */
+    getCACertPassphrase(fingerprint) {
+        if (!fingerprint) {
+            return null;
+        }
+        
+        // First check in-memory cache
+        if (this.caPassphrases && this.caPassphrases[fingerprint]) {
+            return this.caPassphrases[fingerprint];
+        }
+        
+        // Then check persistent storage
+        const certConfig = this.getCertConfig(fingerprint) || {};
+        if (certConfig.hasStoredPassphrase && certConfig.encryptedPassphrase && certConfig.passphraseIV) {
+            try {
+                // Decrypt the passphrase
+                const crypto = require('crypto');
+                const key = this.getEncryptionKey();
+                const iv = Buffer.from(certConfig.passphraseIV, 'hex');
+                
+                const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+                let decrypted = decipher.update(certConfig.encryptedPassphrase, 'hex', 'utf8');
+                decrypted += decipher.final('utf8');
+                
+                // Cache it in memory for future use
+                if (!this.caPassphrases) {
+                    this.caPassphrases = {};
+                }
+                this.caPassphrases[fingerprint] = decrypted;
+                
+                return decrypted;
+            } catch (error) {
+                logger.error(`Failed to retrieve CA passphrase: ${error.message}`);
+                return null;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Delete a stored passphrase
+     * @param {string} fingerprint - The CA certificate fingerprint
+     */
+    deleteCACertPassphrase(fingerprint) {
+        // Remove from memory cache
+        if (this.caPassphrases && this.caPassphrases[fingerprint]) {
+        delete this.caPassphrases[fingerprint];
+        }
+        
+        // Remove from persistent storage
+        const certConfig = this.getCertConfig(fingerprint);
+        if (certConfig) {
+        delete certConfig.hasStoredPassphrase;
+        delete certConfig.encryptedPassphrase;
+        delete certConfig.passphraseIV;
+        this.setCertConfig(fingerprint, certConfig);
+        }
+    }
+
+    /**
+     * Delete a stored passphrase
+     * @param {string} fingerprint - The CA certificate fingerprint
+     */
+    deleteCACertPassphrase(fingerprint) {
+        // Remove from memory cache
+        if (this.caPassphrases && this.caPassphrases[fingerprint]) {
+            delete this.caPassphrases[fingerprint];
+        }
+        
+        // Remove from persistent storage
+        const certConfig = this.getCertConfig(fingerprint);
+        if (certConfig) {
+            delete certConfig.hasStoredPassphrase;
+            delete certConfig.encryptedPassphrase;
+            delete certConfig.passphraseIV;
+            this.setCertConfig(fingerprint, certConfig);
+        }
+    }
+
+    /**
+     * Get encryption key for passphrase storage
+     * @private
+     * @returns {Buffer} 32-byte encryption key
+     */
+    getEncryptionKey() {
+        // Check if we already have a key in memory
+        if (this.encryptionKey) {
+            return this.encryptionKey;
+        }
+
+        const crypto = require('crypto');
+        const fs = require('fs');
+        const path = require('path');
+        
+        // Get the key file path
+        const keyFilePath = path.join(this.configDir, '.encryption-key');
+        
+        // Check if the key file exists
+        if (fs.existsSync(keyFilePath)) {
+            // Read the existing key
+            this.encryptionKey = fs.readFileSync(keyFilePath);
+            return this.encryptionKey;
+        }
+        
+        // Generate a new encryption key
+        this.encryptionKey = crypto.randomBytes(32);
+        
+        // Save the key to file
+        fs.writeFileSync(keyFilePath, this.encryptionKey, { mode: 0o600 });
+        
+        return this.encryptionKey;
     }
 }
 

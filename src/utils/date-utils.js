@@ -167,13 +167,42 @@ function buildCertificateHierarchy(certificates, caMap) {
     }
 }
 
+/**
+ * Parse a date string and format as yyyy-mm-dd
+ * @param {string} dateStr - Date string to parse
+ * @returns {string} - Formatted date string in yyyy-mm-dd format, or 'unknown_date' if invalid
+ */
+function parseAndFormatDateYYYYMMDD(dateStr) {
+    if (!dateStr) return 'unknown_date';
+    
+    try {
+        // First parse the date
+        const parsedDate = parseDate(dateStr);
+        
+        if (!parsedDate || isNaN(parsedDate.getTime())) {
+            return 'unknown_date';
+        }
+        
+        // Format as yyyy-mm-dd
+        const year = parsedDate.getFullYear();
+        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(parsedDate.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    } catch (error) {
+        console.error('Error parsing and formatting date:', error);
+        return 'unknown_date';
+    }
+}
+
 // Export as both module.exports (for Node) and window.dateUtils (for browser)
 if (typeof window !== 'undefined') {
     window.dateUtils = {
         parseDate,
         formatDate,
         getDaysRemaining,
-        buildCertificateHierarchy
+        buildCertificateHierarchy,
+        parseAndFormatDateYYYYMMDD // Add new function
     };
 }
 
@@ -181,5 +210,6 @@ module.exports = {
     parseDate,
     formatDate,
     getDaysRemaining,
-    buildCertificateHierarchy
+    buildCertificateHierarchy,
+    parseAndFormatDateYYYYMMDD // Add new function
 };

@@ -159,7 +159,39 @@ class CertificateService {
             logger.error(`Error scanning certificates directory: ${error.message}`);
         }
     }
-   
+   /**
+     * Get a list of backup certificate paths from the configuration
+     * @private
+     * @returns {Array<string>} List of backup certificate paths
+     */
+    _getBackupCertificatePaths() {
+        const backupPaths = [];
+        
+        try {
+            // Get all certificates from the config
+            const certConfigs = this.configManager.getAllCertConfigs().certificates || {};
+            
+            // Extract backup paths from each certificate's previous versions
+            Object.values(certConfigs).forEach(config => {
+                if (config.previousVersions && Array.isArray(config.previousVersions)) {
+                    config.previousVersions.forEach(version => {
+                        if (version.backupCertPath) {
+                            backupPaths.push(version.backupCertPath);
+                        }
+                        if (version.backupKeyPath) {
+                            backupPaths.push(version.backupKeyPath);
+                        }
+                    });
+                }
+            });
+            
+            logger.debug(`Found ${backupPaths.length} backup paths to exclude from scanning`);
+        } catch (error) {
+            logger.error('Error getting backup paths from config:', error);
+        }
+        
+        return backupPaths;
+    }
     /**
      * Scan a specific directory for certificates
      * @param {string} dirPath - Directory path to scan
@@ -167,6 +199,9 @@ class CertificateService {
     async scanDirectoryForCertificates(dirPath) {
         try {
             const files = await readDirAsync(dirPath);
+            
+            // Get list of backup certificate paths to ignore
+            const backupPaths = this._getBackupCertificatePaths();
             
             // Look for certificate files
             const certFiles = files.filter(file => {
@@ -177,6 +212,12 @@ class CertificateService {
             // Process each certificate file
             for (const certFile of certFiles) {
                 const certPath = path.join(dirPath, certFile);
+                
+                // Skip this file if it's in our backup paths list
+                if (backupPaths.includes(certPath)) {
+                    logger.debug(`Skipping backup certificate: ${certPath}`);
+                    continue;
+                }
                 
                 try {
                     // Check if the file has been modified since last refresh
@@ -537,11 +578,23 @@ class CertificateService {
      */
     async cleanupOldBackups() {
         try {
-            const defaults = this.configManager.getGlobalDefaults();
-            const retentionDays = defaults.backupRetention || 30;
+            // Get settings
+            const settings = this.configManager.getGlobalDefaults();
             
+            // If keepBackupsForever is true, skip the cleanup process
+            if (settings.keepBackupsForever === true) {
+                logger.info('Certificate backup cleanup skipped: keeping backups forever is enabled');
+                return {
+                success: true,
+                message: 'Backup cleanup skipped (keeping backups forever)',
+                deletedCount: 0
+                };
+            }
+            
+            // Get retention days, default to 30 if not specified
+            const retentionDays = settings.backupRetention || 30;
+
             const backupDir = path.join(this.certsDir, 'backups');
-            
             // Check if backup directory exists
             if (!fs.existsSync(backupDir)) {
                 return;

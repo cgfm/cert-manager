@@ -23,7 +23,7 @@
 
 // Add utility verification and fallbacks at the beginning
 (function ensureUtilities() {
-    logger.info('Checking utilities...');
+    logger.debug('Checking utilities...');
 
     // Simple fallback modal function
     function fallbackCreateModal(options) {
@@ -184,7 +184,7 @@
     }
 
     // Verify utilities are available
-    logger.info('Utilities available:', {
+    logger.debug('Utilities available:', {
         modalUtils: {
             available: !!window.modalUtils,
             createModal: typeof window.modalUtils.createModal === 'function',
@@ -1104,12 +1104,32 @@ async function showConfigModal(fingerprint) {
             </div>
         `;
 
+        // Add this to the "Advanced" tab content (before the danger zone)
+        const passPhraseSection = cert.certType === 'rootCA' || cert.certType === 'intermediateCA' ? `
+        <div class="passphrase-management">
+        <h4>Certificate Passphrase Management</h4>
+        <p>Manage the passphrase for this CA certificate.</p>
+        <div id="passphrase-status" class="form-group">
+            <span class="loading"><i class="fas fa-circle-notch fa-spin"></i> Checking passphrase status...</span>
+        </div>
+        <div class="button-group">
+            <button id="setPassphraseBtn" class="secondary-btn">
+            <i class="fas fa-key"></i> Set Passphrase
+            </button>
+            <button id="removePassphraseBtn" class="danger-btn" style="display:none">
+            <i class="fas fa-trash-alt"></i> Remove Stored Passphrase
+            </button>
+        </div>
+        </div>
+        ` : '';
+
         // Create tabs content
         const modalContent = `
             <div class="tabs">
                 <button class="tab-btn active" data-tab="details">Details</button>
                 <button class="tab-btn" data-tab="domains">Domains</button>
                 <button class="tab-btn" data-tab="deploy">Deployment</button>
+                <button class="tab-btn" data-tab="backups">Backups</button>
                 <button class="tab-btn" data-tab="advanced">Advanced</button>
             </div>
             
@@ -1117,11 +1137,13 @@ async function showConfigModal(fingerprint) {
                 <!-- Details tab content here -->
                 <div id="details-tab" class="tab-content active">
                     <div class="form-group">
-                        <label for="autoRenew">
+                        <label class="toggle-switch">
                             <input type="checkbox" id="autoRenew" ${cert.autoRenew ? 'checked' : ''}>
-                            Auto-renew this certificate
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Auto-renew this certificate</span>
                         </label>
                     </div>
+
                     
                     <div class="form-group">
                         <label for="renewDays">Days before expiry to renew:</label>
@@ -1230,7 +1252,15 @@ async function showConfigModal(fingerprint) {
                         <button id="addActionBtn" class="add-btn"><i class="fas fa-plus"></i> Add Action</button>
                     </div>
                 </div>
-                
+                        
+                <!-- Backups tab content -->
+                <div id="backups-tab" class="tab-content">
+                    <h3>Certificate Backups</h3>
+                    <div class="backup-list-container" id="backup-list-container">
+                        <p class="loading-backups"><i class="fas fa-spinner fa-spin"></i> Loading backups...</p>
+                    </div>
+                </div>
+
                 <!-- Advanced tab content here -->
                 <div id="advanced-tab" class="tab-content">
                     <h3>Advanced Settings</h3>
@@ -1244,6 +1274,28 @@ async function showConfigModal(fingerprint) {
                         <div class="info-row">
                             <span class="info-label">Serial Number:</span>
                             <span class="info-value">${cert.serialNumber || 'N/A'}</span>
+                        </div>
+                    </div>
+
+                    ${passPhraseSection}
+
+                    <div class="signing-options">
+                        <h4>Signing Configuration</h4>
+                        <div class="form-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="signWithCA" ${cert.signWithCA ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label-text">Sign with CA certificate</span>
+                            </label>
+                            <p class="form-help-text">When enabled, this certificate will be signed by a CA certificate instead of being self-signed.</p>
+                        </div>
+                        
+                        <div id="caSelectionContainer" class="form-group" ${cert.signWithCA ? '' : 'style="display: none"'}>
+                            <label for="caFingerprint">Signing CA Certificate:</label>
+                            <select id="caFingerprint" class="ca-selector">
+                                <option value="">Loading CA certificates...</option>
+                            </select>
+                            <p class="form-help-text">Select which CA certificate should sign this certificate when it's renewed.</p>
                         </div>
                     </div>
                     
@@ -1289,6 +1341,265 @@ async function showConfigModal(fingerprint) {
 }
 
 /**
+ * Fetch and render certificate backups
+ * @param {string} fingerprint - Certificate fingerprint
+ * @param {HTMLElement} container - Container element to render backups
+ */
+function fetchAndRenderBackups(fingerprint, container) {
+    // Make sure container exists
+    if (!container) return;
+    
+    // Clean the fingerprint for URL safety
+    const cleanFingerprint = fingerprint.replace(/:/g, '');
+    
+    // Show loading indicator
+    container.innerHTML = '<p class="loading-backups"><i class="fas fa-spinner fa-spin"></i> Loading backups...</p>';
+    
+    // Fetch backups from API
+    fetch(`/api/certificate/${cleanFingerprint}/backups`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch backups: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Check if there are any backups
+            if (!data.backups || data.backups.length === 0) {
+                container.innerHTML = '<p class="no-backups">No backups found for this certificate.</p>';
+                return;
+            }
+            
+            // Render the backups
+            const backupsHTML = `
+                <table class="backups-table">
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Valid From</th>
+                            <th>Valid To</th>
+                            <th>Renewed On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.backups.map((backup, index) => `
+                            <tr>
+                                <td>Version ${data.backups.length - index}</td>
+                                <td>${window.dateUtils.formatDate(backup.validFrom)}</td>
+                                <td>${window.dateUtils.formatDate(backup.validTo)}</td>
+                                <td>${window.dateUtils.formatDate(backup.renewedAt)}</td>
+                                <td>
+                                    <button class="view-backup-btn small-btn" 
+                                            data-fingerprint="${backup.fingerprint}" 
+                                            data-cert-path="${backup.backupCertPath}" 
+                                            data-key-path="${backup.backupKeyPath}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <button class="restore-backup-btn small-btn" 
+                                            data-fingerprint="${backup.fingerprint}" 
+                                            data-cert-path="${backup.backupCertPath}" 
+                                            data-key-path="${backup.backupKeyPath}">
+                                        <i class="fas fa-undo"></i> Restore
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = backupsHTML;
+            
+            // Set up action buttons
+            container.querySelectorAll('.view-backup-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const certPath = this.dataset.certPath;
+                    showBackupCertificateDetails(certPath);
+                });
+            });
+            
+            container.querySelectorAll('.restore-backup-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const certPath = this.dataset.certPath;
+                    const keyPath = this.dataset.keyPath;
+                    const backupFingerprint = this.dataset.fingerprint;
+                    
+                    restoreCertificateBackup(fingerprint, backupFingerprint, certPath, keyPath);
+                });
+            });
+        })
+        .catch(error => {
+            logger.error('Error fetching certificate backups:', error);
+            container.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>Error loading backups: ${error.message}</p>
+                </div>
+            `;
+        });
+}
+
+/**
+ * Show backup certificate details
+ * @param {string} certPath - Path to the certificate file
+ */
+function showBackupCertificateDetails(certPath) {
+    // Show loading overlay
+    const loadingOverlay = window.modalUtils.createLoadingOverlay('Loading certificate details...');
+    document.body.appendChild(loadingOverlay);
+    
+    // Fetch certificate details
+    fetch('/api/certificate/details', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ certPath })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to get certificate details: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.body.removeChild(loadingOverlay);
+            
+            // Format dates
+            const validFrom = window.dateUtils.formatDate(data.validFrom);
+            const validTo = window.dateUtils.formatDate(data.validTo);
+            
+            // Create modal content
+            const modalContent = `
+                <div class="cert-details">
+                    <h3>Certificate Details</h3>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Subject:</span>
+                        <span class="info-value">${data.subject || 'N/A'}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Issuer:</span>
+                        <span class="info-value">${data.issuer || 'N/A'}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Valid From:</span>
+                        <span class="info-value">${validFrom}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Valid Until:</span>
+                        <span class="info-value">${validTo}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Fingerprint:</span>
+                        <span class="info-value">${data.fingerprint || 'N/A'}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Serial Number:</span>
+                        <span class="info-value">${data.serialNumber || 'N/A'}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">Certificate Path:</span>
+                        <span class="info-value">${certPath}</span>
+                    </div>
+                    
+                    ${data.domains && data.domains.length > 0 ? `
+                    <div class="domains-section">
+                        <h4>Domains</h4>
+                        <ul class="domain-list">
+                            ${data.domains.map(domain => `<li>${domain}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            // Create modal
+            window.modalUtils.createModal({
+                title: 'Backup Certificate Details',
+                content: modalContent,
+                width: '600px'
+            });
+        })
+        .catch(error => {
+            document.body.removeChild(loadingOverlay);
+            logger.error('Error getting certificate details:', error);
+            window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
+        });
+}
+
+/**
+ * Restore a certificate from backup
+ * @param {string} currentFingerprint - Current certificate fingerprint
+ * @param {string} backupFingerprint - Backup certificate fingerprint
+ * @param {string} certPath - Path to backup certificate file
+ * @param {string} keyPath - Path to backup key file
+ */
+function restoreCertificateBackup(currentFingerprint, backupFingerprint, certPath, keyPath) {
+    // Clean fingerprints for URL safety
+    const cleanFingerprint = currentFingerprint.replace(/:/g, '');
+    
+    // Show confirmation dialog
+    window.modalUtils.showCustomConfirm(
+        'Are you sure you want to restore this backup? This will replace the current certificate.',
+        () => {
+            // Show loading overlay
+            const loadingOverlay = window.modalUtils.createLoadingOverlay('Restoring backup...');
+            document.body.appendChild(loadingOverlay);
+            
+            // Call API to restore backup
+            fetch(`/api/certificate/${cleanFingerprint}/restore`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    backupFingerprint,
+                    backupCertPath: certPath, 
+                    backupKeyPath: keyPath
+                })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to restore backup: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.body.removeChild(loadingOverlay);
+                    
+                    if (data.success) {
+                        // Close any open modals
+                        document.querySelectorAll('.modal').forEach(modal => {
+                            document.body.removeChild(modal);
+                        });
+                        
+                        window.modalUtils.showNotification('Certificate restored successfully', 'success');
+                        
+                        // Refresh certificates list
+                        fetchCertificates(true);
+                    } else {
+                        const errorMsg = data.error || 'Unknown error occurred';
+                        window.modalUtils.showNotification(`Error: ${errorMsg}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    document.body.removeChild(loadingOverlay);
+                    logger.error('Error restoring certificate backup:', error);
+                    window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
+                });
+        }
+    );
+}
+
+/**
  * Show the create certificate modal
  */
 function showCreateCertModal() {
@@ -1329,9 +1640,10 @@ function showCreateCertModal() {
                 </div>
                 
                 <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="autoRenew" checked>
-                        Auto-renew this certificate
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoRenew">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label-text">Auto-renew this certificate</span>
                     </label>
                 </div>
                 
@@ -1874,9 +2186,24 @@ function setupSettingsButton() {
         const settingsBtn = document.createElement('button');
         settingsBtn.id = 'settings-btn';
         settingsBtn.className = 'action-btn settings-btn';
-        settingsBtn.innerHTML = '<i class="fas fa-cog"></i> Settings';
+        settingsBtn.title = 'Settings';
+        settingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
         settingsBtn.addEventListener('click', showSettingsModal);
         buttonContainer.appendChild(settingsBtn);
+    }
+
+    // Check if settings button exists
+    if (!buttonContainer.querySelector('#refresh-btn')) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.id = 'refresh-btn';
+        refreshBtn.className = 'action-btn refresh-btn';
+        refreshBtn.title = 'Refresh Certificates';
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        refreshBtn.addEventListener('click', () => {
+            logger.info('Refresh button clicked');
+            fetchCertificates(true);
+        });
+        buttonContainer.appendChild(refreshBtn);
     }
 }
 
@@ -2422,6 +2749,117 @@ function showSettingsModal() {
 }
 
 /**
+ * Show a modal to set a CA certificate passphrase
+ * @param {string} fingerprint - Certificate fingerprint
+ * @param {string} certificateName - Certificate name for display
+ * @param {Function} callback - Callback to run after passphrase is set
+ */
+function showPassphraseModal(fingerprint, certificateName, callback) {
+    // Create modal
+    const modal = window.modalUtils.createModal({
+      title: `Set Passphrase for ${certificateName}`,
+      content: `
+        <div class="passphrase-form">
+          <p>Enter the passphrase for this CA certificate.</p>
+          
+          <div class="form-group">
+            <label for="passphrase">Passphrase:</label>
+            <input type="password" id="passphrase" class="form-control" placeholder="Enter passphrase">
+          </div>
+          
+          <div class="form-group">
+            <label for="confirm-passphrase">Confirm Passphrase:</label>
+            <input type="password" id="confirm-passphrase" class="form-control" placeholder="Confirm passphrase">
+          </div>
+          
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="persist-passphrase" checked>
+              Store passphrase persistently (encrypted)
+            </label>
+            <p class="help-text">If not checked, the passphrase will only be stored in memory until the server restarts.</p>
+          </div>
+        </div>
+        
+        <div class="button-group">
+          <button id="savePassphraseBtn" class="primary-btn">Save Passphrase</button>
+          <button id="cancelPassphraseBtn" class="secondary-btn">Cancel</button>
+        </div>
+      `,
+      width: '500px'
+    });
+    
+    // Set up save button
+    const saveBtn = modal.querySelector('#savePassphraseBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const passphrase = modal.querySelector('#passphrase').value;
+            const confirmPassphrase = modal.querySelector('#confirm-passphrase').value;
+            const persistPassphrase = modal.querySelector('#persist-passphrase').checked;
+            
+            // Validate passphrases match
+            if (passphrase !== confirmPassphrase) {
+                window.modalUtils.showNotification('Passphrases do not match', 'error');
+                return;
+            }
+            
+            // Validate passphrase not empty
+            if (!passphrase) {
+                window.modalUtils.showNotification('Please enter a passphrase', 'error');
+                return;
+            }
+            
+            // Save passphrase - show loading overlay
+            const loadingOverlay = window.modalUtils.createLoadingOverlay('Saving passphrase...');
+            document.body.appendChild(loadingOverlay);
+            
+            fetch(`/api/certificate/${fingerprint}/passphrase`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    passphrase,
+                    persistStorage: persistPassphrase
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.body.removeChild(loadingOverlay);
+                
+                if (data.success) {
+                // Close modal
+                document.body.removeChild(modal);
+                
+                // Show success notification
+                window.modalUtils.showNotification('Passphrase saved successfully', 'success');
+                
+                // Run callback if provided
+                if (typeof callback === 'function') {
+                    callback(true);
+                }
+                } else {
+                    window.modalUtils.showNotification(`Error: ${data.error || 'Unknown error'}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.body.removeChild(loadingOverlay);
+                logger.error('Error saving passphrase:', error);
+                window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
+            });
+        });
+    }
+    
+    // Set up cancel button
+    const cancelBtn = modal.querySelector('#cancelPassphraseBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+    }
+}
+
+/**
  * Update the certificate count in the UI
  * @param {number} count - Number of certificates
  */
@@ -2797,6 +3235,140 @@ function setupModalEventHandlers(modal, cert, fingerprint) {
             }
         });
     }
+
+    // Set up backups tab event
+    const backupsTabButton = modal.querySelector('.tab-btn[data-tab="backups"]');
+    if (backupsTabButton) {
+        backupsTabButton.addEventListener('click', () => {
+            // Get the container element
+            const backupListContainer = modal.querySelector('#backup-list-container');
+            
+            // Only fetch backups if we haven't done so yet
+            if (backupListContainer && 
+                (!backupListContainer.dataset.loaded || backupListContainer.dataset.loaded !== 'true')) {
+                // Fetch and render backups
+                fetchAndRenderBackups(fingerprint, backupListContainer);
+                
+                // Mark as loaded
+                backupListContainer.dataset.loaded = 'true';
+            }
+        });
+    }
+
+    // Set up passphrase management if this is a CA certificate
+    if (cert.certType === 'rootCA' || cert.certType === 'intermediateCA') {
+        const passPhraseStatus = modal.querySelector('#passphrase-status');
+        const setPassphraseBtn = modal.querySelector('#setPassphraseBtn');
+        const removePassphraseBtn = modal.querySelector('#removePassphraseBtn');
+    
+        // Clean the fingerprint for URL safety - this was missing
+        const cleanFingerprint = fingerprint.replace(/:/g, '');
+    
+        // Check if certificate has a stored passphrase
+        fetch(`/api/certificate/${cleanFingerprint}/passphrase/check`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+            if (data.hasPassphrase) {
+                passPhraseStatus.innerHTML = '<span class="status-positive"><i class="fas fa-check-circle"></i> Passphrase is stored for this certificate</span>';
+                removePassphraseBtn.style.display = 'inline-block';
+            } else {
+                passPhraseStatus.innerHTML = '<span class="status-neutral"><i class="fas fa-info-circle"></i> No passphrase stored for this certificate</span>';
+            }
+            } else {
+            passPhraseStatus.innerHTML = '<span class="status-negative"><i class="fas fa-exclamation-circle"></i> Error checking passphrase status</span>';
+            }
+        })
+        .catch(error => {
+            logger.error('Error checking passphrase status:', error);
+            passPhraseStatus.innerHTML = '<span class="status-negative"><i class="fas fa-exclamation-circle"></i> Error checking passphrase status</span>';
+        });
+    
+        // Set up set passphrase button
+        if (setPassphraseBtn) {
+        setPassphraseBtn.addEventListener('click', () => {
+            showPassphraseModal(cleanFingerprint, cert.name || 'CA Certificate', (updatedStatus) => {
+            // Update status after setting passphrase
+            if (updatedStatus) {
+                passPhraseStatus.innerHTML = '<span class="status-positive"><i class="fas fa-check-circle"></i> Passphrase is stored for this certificate</span>';
+                removePassphraseBtn.style.display = 'inline-block';
+            }
+            });
+        });
+        }
+    
+        // Set up remove passphrase button
+        if (removePassphraseBtn) {
+        removePassphraseBtn.addEventListener('click', () => {
+            // Confirm before removing
+            window.modalUtils.showCustomConfirm(
+            'Are you sure you want to remove the stored passphrase for this certificate?',
+            () => {
+                // Call API to remove passphrase
+                fetch(`/api/certificate/${cleanFingerprint}/passphrase`, {
+                method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                    passPhraseStatus.innerHTML = '<span class="status-neutral"><i class="fas fa-info-circle"></i> Passphrase removed</span>';
+                    removePassphraseBtn.style.display = 'none';
+                    } else {
+                    window.modalUtils.showNotification(`Error: ${data.error || 'Unknown error'}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    logger.error('Error removing passphrase:', error);
+                    window.modalUtils.showNotification(`Error: ${error.message}`, 'error');
+                });
+            }
+            );
+        });
+        }
+    }
+
+    // Handle CA signing options
+    const signWithCACheckbox = modal.querySelector('#signWithCA');
+    const caSelectionSection = modal.querySelector('#caSelectionSection');
+    const caFingerprintSelect = modal.querySelector('#caFingerprint');
+
+    if (signWithCACheckbox && caSelectionSection) {
+        // Toggle CA selection visibility
+        signWithCACheckbox.addEventListener('change', function() {
+            caSelectionSection.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Populate CA certificates dropdown
+        fetch('/api/certificate?type=ca')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.certificates && data.certificates.length > 0) {
+                    let options = '<option value="">Select a Certificate Authority</option>';
+                    
+                    // Sort CAs to put intermediates first (recommended)
+                    const sortedCAs = [...data.certificates].sort((a, b) => {
+                        // Intermediate CAs first, then root CAs
+                        if (a.certType === 'intermediateCA' && b.certType !== 'intermediateCA') return -1;
+                        if (b.certType === 'intermediateCA' && a.certType !== 'intermediateCA') return 1;
+                        // Alphabetical otherwise
+                        return a.name.localeCompare(b.name);
+                    });
+                    
+                    sortedCAs.forEach(ca => {
+                        const isSelected = config && config.caFingerprint === ca.fingerprint ? 'selected' : '';
+                        options += `<option value="${ca.fingerprint}" ${isSelected}>${ca.name} (${ca.certType})</option>`;
+                    });
+                    
+                    caFingerprintSelect.innerHTML = options;
+                } else {
+                    caFingerprintSelect.innerHTML = '<option value="">No CA certificates available</option>';
+                }
+            })
+            .catch(error => {
+                logger.error('Error fetching CA certificates:', error);
+                caFingerprintSelect.innerHTML = '<option value="">Error loading CAs</option>';
+            });
+    }
 }
 
 /**
@@ -2951,11 +3523,15 @@ function saveCertificateConfiguration(cert, fingerprint, modal) {
     // Show loading overlay
     const loadingOverlay = window.modalUtils.createLoadingOverlay('Saving configuration...');
     document.body.appendChild(loadingOverlay);
-
-    // Get updated values
+    
+    // Get values from form elements
     const autoRenew = modal.querySelector('#autoRenew').checked;
     const renewDaysBeforeExpiry = parseInt(modal.querySelector('#renewDays').value, 10);
 
+    // Get CA signing options
+    const signWithCA = modal.querySelector('#signWithCA')?.checked || false;
+    const caFingerprint = signWithCA ? modal.querySelector('#caFingerprint')?.value || null : null;
+    
     // Collect deployment actions
     const deployActions = [];
     modal.querySelectorAll('.action-item').forEach(item => {
@@ -2990,7 +3566,9 @@ function saveCertificateConfiguration(cert, fingerprint, modal) {
     const config = {
         autoRenew,
         renewDaysBeforeExpiry,
-        deployActions
+        deployActions,
+        signWithCA: signWithCA,
+        caFingerprint: caFingerprint
     };
 
     // Send request to update configuration
@@ -3924,6 +4502,14 @@ function initSocketIO() {
             showNotification(`Certificate renewed: ${data.name || 'Unnamed certificate'}`, 'success');
             // Refresh certificates list
             fetchCertificates(true);
+        });
+        
+        // Listen for CA passphrase requests
+        socket.on('ca-passphrase-required', (data) => {
+            logger.info('CA passphrase required:', data);
+            
+            // Show the passphrase modal
+            window.modalUtils.showCAPassphraseModal(data);
         });
         
         // Store socket reference globally

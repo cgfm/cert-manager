@@ -144,10 +144,34 @@ function extractCertDetails(certPath) {
         
         // 4. Check if certificate is a CA
         try {
+            // Get basic constraints
             const basicConstraints = execSync(`openssl x509 -in "${certPath}" -noout -text | grep "CA:" || echo "CA:FALSE"`, {encoding: 'utf8'}).trim();
+            
+            // Check if it's a CA cert at all
             details.isCA = basicConstraints.includes('CA:TRUE');
+            
+            // Do a more thorough check for CA types
+            if (details.isCA) {
+                // Check if it's a root CA by verifying self-signed status (subject = issuer)
+                // and path length constraints
+                const pathLenConstraint = basicConstraints.includes('pathlen:');
+                
+                if (details.subject === details.issuer && !pathLenConstraint) {
+                    // Self-signed with no path length constraint = likely a root CA
+                    details.certType = 'rootCA';
+                } else if (pathLenConstraint || (details.subject !== details.issuer && details.isCA)) {
+                    // Has path length constraint or different subject/issuer but is CA = intermediate CA
+                    details.certType = 'intermediateCA';
+                } else {
+                    details.certType = 'standard';
+                }
+            } else {
+                details.certType = 'standard';
+            }
         } catch (e) {
             logger.error(`Error checking CA status for ${certPath}: ${e.message}`);
+            details.isCA = false;
+            details.certType = 'standard';
         }
         
         // 5. Get fingerprint
@@ -276,13 +300,15 @@ function processCertificate(certPath, certsDirectory) {
         // Extract all certificate details using OpenSSL instead of parsing PEM directly
         const details = extractCertDetails(certPath);
         
-        // Determine certificate type
-        let certType = 'standard';
-        if (details.isCA) {
-            if (details.subject === details.issuer) {
-                certType = 'rootCA';
-            } else {
-                certType = 'intermediateCA';
+        // Determine certificate type - use the one from details if available
+        let certType = details.certType || 'standard';
+        if (!details.certType) {
+            if (details.isCA) {
+                if (details.subject === details.issuer) {
+                    certType = 'rootCA';
+                } else {
+                    certType = 'intermediateCA';
+                }
             }
         }
         
@@ -607,38 +633,31 @@ function initRouter(services) {
             const includeConfig = req.query.config === 'true';
             
             // Use certificate service to get certificates
-            const certificates = await certificateService.getAllCertificates(includeConfig, forceRefresh);
-            res.json(certificates);
+            let certificates = await certificateService.getAllCertificates(includeConfig, forceRefresh);
+            //res.json(certificates);
+            
+            // Filter by type if specified
+            if (req.query.type) {
+                const requestedType = req.query.type.toLowerCase();
+                
+                if (requestedType === 'ca') {
+                    // Get both rootCA and intermediateCA
+                    certificates = certificates.filter(cert => 
+                        cert.certType === 'rootCA' || cert.certType === 'intermediateCA'
+                    );
+                } else {
+                    // Filter by specific cert type
+                    certificates = certificates.filter(cert => cert.certType === requestedType);
+                }
+            }
+            
+            return res.json({
+                success: true,
+                certificates: certificates
+            });
         } catch (error) {
             logger.error('Error in GET /certificate:', error);
             res.status(500).json({ error: error.message });
-        }
-    });
-
-    // GET /api/certificate/:fingerprint - Get certificate by fingerprint
-    router.get('/:fingerprint', async (req, res) => {
-        try {
-            const { fingerprint } = req.params;
-        
-            // Normalize the fingerprint
-            const normalizedFingerprint = normalizeFingerprint(fingerprint);
-            
-            // Get all certificates
-            const certs = await getAllCertificates();
-            
-            // Find the matching certificate using normalized fingerprints
-            const cert = certs.find(c => normalizeFingerprint(c.fingerprint) === normalizedFingerprint);
-            
-            if (!cert) {
-                return res.status(404).json({ error: 'Certificate not found' });
-            }
-            
-            // Return the certificate with any extended properties from cert-info.json
-            res.json(cert);
-            
-        } catch (error) {
-            logger.error(`Error retrieving certificate ${req.params.fingerprint}: ${error.message}`);
-            res.status(500).json({ error: 'Failed to retrieve certificate', message: error.message });
         }
     });
 
@@ -680,6 +699,85 @@ function initRouter(services) {
         } catch (error) {
             logger.error('Error uploading certificate:', error);
             res.status(500).json({ error: 'Failed to upload certificate', message: error.message });
+        }
+    });
+
+    // In the create certificate endpoint:
+    router.post('/create', async (req, res) => {
+        try {
+            const { domains, certType } = req.body;
+            
+            if (!domains || !Array.isArray(domains) || domains.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Domains array is required'
+                });
+            }
+            
+            // Get global defaults
+            const globalDefaults = configManager.getGlobalDefaults();
+            
+            // If it's a standard certificate and signStandardCertsWithCA is enabled, include it
+            const options = { 
+                domains, 
+                certType: certType || 'standard' 
+            };
+            
+            if (options.certType === 'standard' && globalDefaults.signStandardCertsWithCA) {
+                options.signWithCA = true;
+                
+                // Find the first available CA to use for signing (prefer intermediate CAs)
+                const certificates = await getAllCertificates();
+                const cas = certificates.filter(cert => 
+                    cert.certType === 'rootCA' || cert.certType === 'intermediateCA'
+                );
+                
+                // Prefer intermediate CAs
+                const preferredCA = cas.find(ca => ca.certType === 'intermediateCA') || cas[0];
+                
+                if (preferredCA) {
+                    options.caFingerprint = preferredCA.fingerprint;
+                    logger.info(`Using CA ${preferredCA.name} (${preferredCA.fingerprint}) for signing new certificate`);
+                }
+            }
+            
+            // Call the certificate creation method
+            const result = await renewalManager.createCertificate(options);
+            
+            // Process the result...
+        } catch (error) {
+            logger.error('Error creating certificate:', error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    // GET /api/certificate/:fingerprint - Get certificate by fingerprint
+    router.get('/:fingerprint', async (req, res) => {
+        try {
+            const { fingerprint } = req.params;
+        
+            // Normalize the fingerprint
+            const normalizedFingerprint = normalizeFingerprint(fingerprint);
+            
+            // Get all certificates
+            const certs = await getAllCertificates();
+            
+            // Find the matching certificate using normalized fingerprints
+            const cert = certs.find(c => normalizeFingerprint(c.fingerprint) === normalizedFingerprint);
+            
+            if (!cert) {
+                return res.status(404).json({ error: 'Certificate not found' });
+            }
+            
+            // Return the certificate with any extended properties from cert-info.json
+            res.json(cert);
+            
+        } catch (error) {
+            logger.error(`Error retrieving certificate ${req.params.fingerprint}: ${error.message}`);
+            res.status(500).json({ error: 'Failed to retrieve certificate', message: error.message });
         }
     });
 
@@ -1058,82 +1156,150 @@ function initRouter(services) {
         }
     });
 
-    // POST /api/certificate/:fingerprint/renew - Renew a certificate
+    /**
+     * Renew a certificate
+     */
     router.post('/:fingerprint/renew', async (req, res) => {
         try {
             const { fingerprint } = req.params;
             
-            logger.info(`POST /api/certificate/${fingerprint}/renew - Renewing certificate`);
-            
-            // Clean up the fingerprint with more robust normalization
-            const cleanFingerprint = normalizeFingerprint(fingerprint);
-            
-            // Find the certificate in the directory
-            const certificates = await getAllCertificates();
-            let cert = null;
-        
-            // Try different fingerprint formats and normalizations
-            for (const certificate of certificates) {
-                // Normalize the certificate fingerprint the same way
-                const normalizedCertFingerprint = normalizeFingerprint(certificate.fingerprint);
-                
-                // Check if the normalized fingerprints match
-                if (normalizedCertFingerprint === cleanFingerprint) {
-                    cert = certificate;
-                    logger.info(`Found certificate match: ${certificate.name || 'Unnamed'}`);
-                    break;
-                }
-            }
+            // Find the certificate by fingerprint
+            const certificates = await services.certificateService.getAllCertificates();
+            const cert = certificates.find(c => {
+                const normalizedInput = configManager.normalizeFingerprint(fingerprint);
+                const normalizedCert = configManager.normalizeFingerprint(c.fingerprint);
+                return normalizedInput === normalizedCert;
+            });
             
             if (!cert) {
-                // Debug: Log all available fingerprints
-                logger.warn(`Certificate not found with fingerprint: ${cleanFingerprint}`);
-                logger.warn(`Available fingerprints: ${certificates.map(c => normalizeFingerprint(c.fingerprint)).join(', ')}`);
-                
                 return res.status(404).json({
                     success: false,
-                    error: 'Certificate not found'
+                    error: `Certificate with fingerprint ${fingerprint} not found`
                 });
             }
             
-            // Ensure renewal manager is available
-            if (!services.renewalManager) {
-                logger.error('Renewal manager is not available');
-                return res.status(500).json({
+            logger.info(`Found certificate match: ${cert.name || cert.domains?.join(', ') || fingerprint}`);
+            
+            // Perform renewal
+            const renewalResult = await services.renewalManager.renewCertificate(cert);
+        
+            // Check renewal result
+            if (!renewalResult || renewalResult.success === false) {
+                // If renewal failed with an error
+                return res.status(400).json({
                     success: false,
-                    error: 'Certificate renewal service is not available'
+                    error: renewalResult?.error || 'Certificate renewal failed'
                 });
             }
             
-            // After renewal is complete and before sending response
-            if (result.success && result.oldFingerprint && result.newFingerprint) {
-                logger.info(`Certificate renewal completed successfully. Old: ${result.oldFingerprint}, New: ${result.newFingerprint}`);
-                
-                // Force a re-scan of certificates to ensure our cache is updated
-                // This ensures the UI will show the correct list without the old certificate
-                await services.certificateService.refreshCertificateCache();
-            }
-            
-            try {
-                // Get renewal results
-                const result = await services.renewalManager.renewCertificate(cert);
-                return res.json(result);
-            } catch (renewalError) {
-                logger.error(`Error in renewal manager:`, renewalError);
-                return res.status(500).json({
-                    success: false,
-                    error: `Renewal error: ${renewalError.message}`
+            // If we got here, the renewal was successful
+            // Emit a socket.io event to notify clients
+            if (services.io) {
+                services.io.emit('certificate-renewed', {
+                    name: cert.name || cert.domains?.[0] || 'Certificate',
+                    fingerprint: renewalResult.fingerprint || fingerprint
                 });
             }
+            
+            // Return success response
+            return res.json({
+                success: true,
+                message: 'Certificate renewed successfully',
+                data: renewalResult
+            });
         } catch (error) {
-            logger.error(`Error in certificate renewal endpoint:`, error);
+            logger.error('Error in certificate renewal endpoint:', error);
             return res.status(500).json({
                 success: false,
-                error: error.message,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                error: error.message
             });
         }
     });
+
+    /**
+     * Store a CA passphrase for a certificate
+     */
+    router.post('/:fingerprint/passphrase', async (req, res) => {
+        try {
+        const { fingerprint } = req.params;
+        const { passphrase, persistStorage } = req.body;
+        
+        if (!passphrase) {
+            return res.status(400).json({
+            success: false,
+            error: 'Passphrase is required'
+            });
+        }
+    
+        // Sanitize fingerprint by removing the prefix if present
+        let cleanFingerprint = fingerprint;
+        if (cleanFingerprint.startsWith('sha256 Fingerprint=')) {
+            cleanFingerprint = cleanFingerprint.replace('sha256 Fingerprint=', '');
+        }
+        
+        // Log that we're about to store the passphrase
+        logger.info(`Storing passphrase for certificate: ${cleanFingerprint}, persistent: ${persistStorage}`);
+    
+        // Store the passphrase in the config manager
+        await configManager.setCACertPassphrase(cleanFingerprint, passphrase, persistStorage);
+        
+        return res.json({
+            success: true,
+            message: 'Passphrase stored successfully'
+        });
+        } catch (error) {
+        logger.error('Error storing passphrase:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+        }
+    });
+
+    /**
+     * Delete a stored CA passphrase
+     */
+    router.delete('/:fingerprint/passphrase', async (req, res) => {
+        try {
+        const { fingerprint } = req.params;
+        
+        await configManager.deleteCACertPassphrase(fingerprint);
+        
+        return res.json({
+            success: true,
+            message: 'Passphrase deleted successfully'
+        });
+        } catch (error) {
+        logger.error('Error deleting passphrase:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+        }
+    });
+   
+   /**
+    * Check if a CA has a stored passphrase
+    */
+   router.get('/:fingerprint/passphrase/check', async (req, res) => {
+     try {
+       const { fingerprint } = req.params;
+       
+       // Check if there is a stored passphrase
+       const hasPassphrase = await configManager.hasCACertPassphrase(fingerprint);
+       
+       return res.json({
+         success: true,
+         hasPassphrase
+       });
+     } catch (error) {
+       logger.error('Error checking passphrase:', error);
+       return res.status(500).json({
+         success: false,
+         error: error.message
+       });
+     }
+   });
     
     // Debug endpoint to view cert-info.json
     router.get('/debug/cert-info', async (req, res) => {
@@ -1263,6 +1429,110 @@ function initRouter(services) {
         }
     });
 
+    /**
+     * Get certificate backups
+     */
+    router.get('/:fingerprint/backups', async (req, res) => {
+        try {
+            const { fingerprint } = req.params;
+            
+            // Get the certificate config to find previous versions
+            const certConfig = configManager.getCertConfig(fingerprint);
+            
+            if (!certConfig) {
+                return res.status(404).json({
+                    success: false,
+                    error: `Certificate with fingerprint ${fingerprint} not found`
+                });
+            }
+            
+            // Get previous versions from config
+            const backups = certConfig.previousVersions || [];
+            
+            return res.json({
+                success: true,
+                backups
+            });
+        } catch (error) {
+            logger.error('Error getting certificate backups:', error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    /**
+     * Get certificate details from file
+     */
+    router.post('/details', async (req, res) => {
+        try {
+            const { certPath } = req.body;
+            
+            if (!certPath) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Certificate path is required'
+                });
+            }
+            
+            // Process the certificate
+            const certDetails = await certificateService.processCertificate(certPath);
+            
+            return res.json(certDetails);
+        } catch (error) {
+            logger.error('Error getting certificate details:', error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    /**
+     * Restore a certificate from backup
+     */
+    router.post('/:fingerprint/restore', async (req, res) => {
+        try {
+            const { fingerprint } = req.params;
+            const { backupFingerprint, backupCertPath, backupKeyPath } = req.body;
+            
+            if (!backupCertPath) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Backup certificate path is required'
+                });
+            }
+            
+            // Get current certificate
+            const certificates = await certificateService.getAllCertificates();
+            const cert = certificates.find(c => c.fingerprint === fingerprint);
+            
+            if (!cert) {
+                return res.status(404).json({
+                    success: false,
+                    error: `Certificate with fingerprint ${fingerprint} not found`
+                });
+            }
+            
+            // Restore from backup
+            const result = await certificateService.restoreCertificateFromBackup(
+                cert, 
+                backupFingerprint,
+                backupCertPath, 
+                backupKeyPath
+            );
+            
+            return res.json(result);
+        } catch (error) {
+            logger.error('Error restoring certificate backup:', error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
     return router;
 }
 
@@ -1294,6 +1564,22 @@ async function getAllCertificates() {
     try {
         // Use configManager to get all certificates with metadata
         const certificates = configManager.getAllCertificatesWithMetadata();
+        
+        // Ensure all certificates have the correct type
+        certificates.forEach(cert => {
+            if (!cert.certType) {
+                // If no type is set, determine based on isCA and subject/issuer
+                if (cert.isCA) {
+                    if (cert.subject === cert.issuer) {
+                        cert.certType = 'rootCA';
+                    } else {
+                        cert.certType = 'intermediateCA';
+                    }
+                } else {
+                    cert.certType = 'standard';
+                }
+            }
+        });
         
         if (certificates.length === 0) {
             logger.warn('No certificates found in config, scanning certificate files');
@@ -1373,4 +1659,4 @@ module.exports = {
     extractCertDetails: extractCertDetails,
     fallbackCertificateParser: fallbackCertificateParser,
     buildCertificateHierarchy: buildCertificateHierarchy
-};;
+};

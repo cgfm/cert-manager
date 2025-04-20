@@ -4,22 +4,30 @@ const logger = require('../services/logger');
 const fs = require('fs');
 const path = require('path');
 
-// UPDATED: Path to settings file in /config directory
 const settingsPath = process.env.SETTINGS_PATH || path.join(process.env.CONFIG_DIR || '/config', 'settings.json');
 
 // Default settings
 const defaultSettings = {
-    certPath: '/certs',
-    renewalDays: 30,
-    autoRenewDefault: true,
-    acmeServer: 'letsencrypt',
-    customAcmeUrl: '',
-    defaultEmail: '',
-    keySize: 2048,
-    enableAuth: false,
-    username: '',
+    enableHttps: false,
     httpsPort: 4443,
-    enableDebugLogs: false
+    httpsCertPath: null,
+    httpsKeyPath: null,
+    openSSLPath: 'openssl',
+    caValidityPeriod: {
+        rootCA: 3650, // 10 years
+        intermediateCA: 1825, // 5 years
+        standard: 90   // 3 months
+    },
+    autoRenewByDefault: true,
+    renewDaysBeforeExpiry: 30,
+    logLevel: 'info',
+    jsonOutput: false,
+    enableCertificateBackups: true,
+    keepBackupsForever: true,  // Changed default to true
+    backupRetention: 90,
+    signStandardCertsWithCA: false,  // Default to false for backward compatibility
+    enableAutoRenewalJob: true,
+    renewalSchedule: '0 0 * * *'  // Daily at midnight
 };
 
 let configManager = null;
