@@ -1,30 +1,14 @@
-# Certificate Manager
+# Certificate Manager for ESP32
 
-A comprehensive web-based tool for managing SSL certificates:
+:warning: **WARNING**: This library is currently under development and is not yet stable. Use at your own risk.
 
-- View certificate details and expiry dates
-- Create self-signed certificates and Certificate Authorities
-- Renew certificates (self-signed or CA-signed)
-- Manage certificate configuration and deployment actions
-- Automatic certificate renewal with configurable settings
-- Certificate backup functionality
+## Overview
 
-## Installation
-
-```shell
-# Clone the repository
-git clone https://github.com/yourusername/cert-manager.git
-cd cert-manager
-
-# Run with Docker Compose
-docker-compose up -d
-```
-Visit http://localhost:3000 to access the certificate management interface.
+This library provides certificate management capabilities for ESP32 devices, allowing easy handling of SSL/TLS certificates for secure communications.
 
 ## Features
-- Certificate viewing with detailed information
-- Certificate creation (self-signed, CA-signed)
-- Certificate renewal management
-- Automatic renewal based on configurable thresholds
-- Certificate backup functionality
-- Deployment action configuration
+
+- Store and manage X.509 certificates
+- Support for certificate chains
+- Easy integration with ESP32's networking libraries
+- Certificate validation and expiration checking
