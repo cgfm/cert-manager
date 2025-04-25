@@ -45,24 +45,6 @@ function initCertificatesRouter(deps) {
     }
   });
   
-  // Get certificate by fingerprint
-  router.get('/:fingerprint', async (req, res) => {
-    try {
-      const { fingerprint } = req.params;
-      await certificateManager.loadCertificates();
-      
-      const cert = certificateManager.getCertificate(fingerprint);
-      if (!cert) {
-        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
-      }
-      
-      res.json(cert.toApiResponse(certificateManager.passphraseManager));
-    } catch (error) {
-      logger.error(`Error getting certificate ${req.params.fingerprint}`, error);
-      res.status(500).json({ message: 'Failed to retrieve certificate', statusCode: 500 });
-    }
-  });
-  
   // Create a new certificate
   router.post('/', async (req, res) => {
     try {
@@ -133,6 +115,24 @@ function initCertificatesRouter(deps) {
     }
   });
   
+  // Get certificate by fingerprint
+  router.get('/:fingerprint', async (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      await certificateManager.loadCertificates();
+      
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
+      }
+      
+      res.json(cert.toApiResponse(certificateManager.passphraseManager));
+    } catch (error) {
+      logger.error(`Error getting certificate ${req.params.fingerprint}`, error);
+      res.status(500).json({ message: 'Failed to retrieve certificate', statusCode: 500 });
+    }
+  });
+  
   // Update certificate
   router.put('/:fingerprint', async (req, res) => {
     try {
@@ -183,120 +183,177 @@ function initCertificatesRouter(deps) {
     }
   });
   
-  // Renew certificate
-  router.post('/:fingerprint/renew', async (req, res) => {
+  // Get all backups for a certificate
+  router.get('/:fingerprint/backups', async (req, res) => {
     try {
       const { fingerprint } = req.params;
-      const { passphrase } = req.body || {};
       
-      // Get the certificate
-      const cert = certificateManager.getCertificate(fingerprint);
-      if (!cert) {
-        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
       }
       
-      // Find signing CA if needed
-      let signingCA = null;
-      if (cert.signWithCA && cert.caFingerprint) {
-        signingCA = certificateManager.getCertificate(cert.caFingerprint);
-      }
+      // Get backups
+      const backups = await deps.certificateManager.getCertificateBackups(fingerprint);
       
-      // Get stored passphrase if not provided
-      let certPassphrase = passphrase;
-      if (!certPassphrase && cert.hasStoredPassphrase(certificateManager.passphraseManager)) {
-        certPassphrase = cert.getPassphrase(certificateManager.passphraseManager);
-      }
+      // Format response
+      const formattedBackups = backups.map(backup => ({
+        id: backup.id,
+        date: backup.date,
+        size: backup.size,
+        filename: backup.filename
+      }));
       
-      // Renew the certificate
-      const result = await cert.createOrRenew(openSSL, {
-        certsDir: certificateManager.certsDir,
-        signingCA,
-        passphrase: certPassphrase
+      res.json(formattedBackups);
+    } catch (error) {
+      logger.error(`Error getting backups for certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to get backups: ${error.message}`,
+        statusCode: 500
       });
-      
-      // Update certificate manager and save config
-      certificateManager.certificates.set(cert.fingerprint, cert);
-      await certificateManager.saveCertificateConfigs();
-      
-      res.json(cert.toApiResponse(certificateManager.passphraseManager));
-    } catch (error) {
-      logger.error(`Error renewing certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({ message: `Failed to renew certificate: ${error.message}`, statusCode: 500 });
     }
   });
-  
-  // Verify key match
-  router.get('/:fingerprint/verify-key-match', async (req, res) => {
+
+  // Create a backup of a certificate
+  router.post('/:fingerprint/backups', async (req, res) => {
     try {
       const { fingerprint } = req.params;
       
-      // Get the certificate
-      const cert = certificateManager.getCertificate(fingerprint);
-      if (!cert) {
-        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
       }
       
-      const matches = await cert.verifyKeyMatch(openSSL);
+      // Create backup
+      const backup = await deps.certificateManager.createCertificateBackup(fingerprint);
       
-      res.json({ matches });
+      res.status(201).json({
+        message: 'Backup created successfully',
+        backup: {
+          id: backup.id,
+          date: backup.date,
+          size: backup.size,
+          filename: backup.filename
+        }
+      });
     } catch (error) {
-      logger.error(`Error verifying key match for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ message: 'Failed to verify key match', statusCode: 500 });
+      logger.error(`Error creating backup for certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to create backup: ${error.message}`,
+        statusCode: 500
+      });
     }
   });
-  
-  // Check if certificate has passphrase
-  router.get('/:fingerprint/passphrase', (req, res) => {
+
+  // Delete a backup
+  router.delete('/:fingerprint/backups/:backupId', async (req, res) => {
     try {
-      const { fingerprint } = req.params;
+      const { fingerprint, backupId } = req.params;
       
-      const hasPassphrase = certificateManager.hasPassphrase(fingerprint);
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
+      }
       
-      res.json({ hasPassphrase });
+      // Delete backup
+      await deps.certificateManager.deleteCertificateBackup(fingerprint, backupId);
+      
+      res.json({
+        message: 'Backup deleted successfully'
+      });
     } catch (error) {
-      logger.error(`Error checking passphrase for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ message: 'Failed to check passphrase', statusCode: 500 });
+      logger.error(`Error deleting backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to delete backup: ${error.message}`,
+        statusCode: 500
+      });
     }
   });
-  
-  // Store certificate passphrase
-  router.post('/:fingerprint/passphrase', (req, res) => {
+
+  // Download a backup
+  router.get('/:fingerprint/backups/:backupId/download', async (req, res) => {
     try {
-      const { fingerprint } = req.params;
-      const { passphrase } = req.body;
+      const { fingerprint, backupId } = req.params;
       
-      if (!passphrase) {
-        return res.status(400).json({ message: 'Passphrase is required', statusCode: 400 });
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
       }
       
-      const success = certificateManager.storePassphrase(fingerprint, passphrase);
-      
-      if (!success) {
-        return res.status(500).json({ message: 'Failed to store passphrase', statusCode: 500 });
+      // Get backup
+      const backup = await deps.certificateManager.getCertificateBackup(fingerprint, backupId);
+      if (!backup || !backup.filePath) {
+        return res.status(404).json({
+          message: `Backup ${backupId} not found`,
+          statusCode: 404
+        });
       }
       
-      res.status(201).json({ success: true });
+      // Check if file exists
+      if (!fs.existsSync(backup.filePath)) {
+        return res.status(404).json({
+          message: `Backup file not found on disk`,
+          statusCode: 404
+        });
+      }
+      
+      // Set headers
+      res.setHeader('Content-Disposition', `attachment; filename="${backup.filename || 'certificate-backup.zip'}"`);
+      res.setHeader('Content-Type', 'application/zip');
+      
+      // Stream the file
+      fs.createReadStream(backup.filePath).pipe(res);
     } catch (error) {
-      logger.error(`Error storing passphrase for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ message: 'Failed to store passphrase', statusCode: 500 });
+      logger.error(`Error downloading backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to download backup: ${error.message}`,
+        statusCode: 500
+      });
     }
   });
-  
-  // Delete certificate passphrase
-  router.delete('/:fingerprint/passphrase', (req, res) => {
+
+  // Restore a backup
+  router.post('/:fingerprint/backups/:backupId/restore', async (req, res) => {
     try {
-      const { fingerprint } = req.params;
+      const { fingerprint, backupId } = req.params;
       
-      const success = certificateManager.deletePassphrase(fingerprint);
-      
-      if (!success) {
-        return res.status(404).json({ message: 'No passphrase found for this certificate', statusCode: 404 });
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
       }
       
-      res.json({ success: true });
+      // Restore backup
+      await deps.certificateManager.restoreCertificateBackup(fingerprint, backupId);
+      
+      res.json({
+        message: 'Backup restored successfully'
+      });
     } catch (error) {
-      logger.error(`Error deleting passphrase for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ message: 'Failed to delete passphrase', statusCode: 500 });
+      logger.error(`Error restoring backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to restore backup: ${error.message}`,
+        statusCode: 500
+      });
     }
   });
 
@@ -431,7 +488,7 @@ function initCertificatesRouter(deps) {
       });
     }
   });
-  
+
   // Download specific certificate file
   router.get('/:fingerprint/download/:fileType', async (req, res) => {
     try {
@@ -610,180 +667,6 @@ function initCertificatesRouter(deps) {
     }
   });
 
-  // Get all backups for a certificate
-  router.get('/:fingerprint/backups', async (req, res) => {
-    try {
-      const { fingerprint } = req.params;
-      
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Get backups
-      const backups = await deps.certificateManager.getCertificateBackups(fingerprint);
-      
-      // Format response
-      const formattedBackups = backups.map(backup => ({
-        id: backup.id,
-        date: backup.date,
-        size: backup.size,
-        filename: backup.filename
-      }));
-      
-      res.json(formattedBackups);
-    } catch (error) {
-      logger.error(`Error getting backups for certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({
-        message: `Failed to get backups: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Create a backup of a certificate
-  router.post('/:fingerprint/backups', async (req, res) => {
-    try {
-      const { fingerprint } = req.params;
-      
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Create backup
-      const backup = await deps.certificateManager.createCertificateBackup(fingerprint);
-      
-      res.status(201).json({
-        message: 'Backup created successfully',
-        backup: {
-          id: backup.id,
-          date: backup.date,
-          size: backup.size,
-          filename: backup.filename
-        }
-      });
-    } catch (error) {
-      logger.error(`Error creating backup for certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({
-        message: `Failed to create backup: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Delete a backup
-  router.delete('/:fingerprint/backups/:backupId', async (req, res) => {
-    try {
-      const { fingerprint, backupId } = req.params;
-      
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Delete backup
-      await deps.certificateManager.deleteCertificateBackup(fingerprint, backupId);
-      
-      res.json({
-        message: 'Backup deleted successfully'
-      });
-    } catch (error) {
-      logger.error(`Error deleting backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({
-        message: `Failed to delete backup: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Download a backup
-  router.get('/:fingerprint/backups/:backupId/download', async (req, res) => {
-    try {
-      const { fingerprint, backupId } = req.params;
-      
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Get backup
-      const backup = await deps.certificateManager.getCertificateBackup(fingerprint, backupId);
-      if (!backup || !backup.filePath) {
-        return res.status(404).json({
-          message: `Backup ${backupId} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Check if file exists
-      if (!fs.existsSync(backup.filePath)) {
-        return res.status(404).json({
-          message: `Backup file not found on disk`,
-          statusCode: 404
-        });
-      }
-      
-      // Set headers
-      res.setHeader('Content-Disposition', `attachment; filename="${backup.filename || 'certificate-backup.zip'}"`);
-      res.setHeader('Content-Type', 'application/zip');
-      
-      // Stream the file
-      fs.createReadStream(backup.filePath).pipe(res);
-    } catch (error) {
-      logger.error(`Error downloading backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({
-        message: `Failed to download backup: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Restore a backup
-  router.post('/:fingerprint/backups/:backupId/restore', async (req, res) => {
-    try {
-      const { fingerprint, backupId } = req.params;
-      
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-      
-      // Restore backup
-      await deps.certificateManager.restoreCertificateBackup(fingerprint, backupId);
-      
-      res.json({
-        message: 'Backup restored successfully'
-      });
-    } catch (error) {
-      logger.error(`Error restoring backup ${req.params.backupId} for certificate ${req.params.fingerprint}:`, error);
-      res.status(500).json({
-        message: `Failed to restore backup: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
   // Get all available files for a certificate
   router.get('/:fingerprint/files', async (req, res) => {
     try {
@@ -830,6 +713,123 @@ function initCertificatesRouter(deps) {
             message: `Failed to get certificate files: ${error.message}`,
             statusCode: 500
         });
+    }
+  });
+
+  // Renew certificate
+  router.post('/:fingerprint/renew', async (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      const { passphrase } = req.body || {};
+      
+      // Get the certificate
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
+      }
+      
+      // Find signing CA if needed
+      let signingCA = null;
+      if (cert.signWithCA && cert.caFingerprint) {
+        signingCA = certificateManager.getCertificate(cert.caFingerprint);
+      }
+      
+      // Get stored passphrase if not provided
+      let certPassphrase = passphrase;
+      if (!certPassphrase && cert.hasStoredPassphrase(certificateManager.passphraseManager)) {
+        certPassphrase = cert.getPassphrase(certificateManager.passphraseManager);
+      }
+      
+      // Renew the certificate
+      const result = await cert.createOrRenew(openSSL, {
+        certsDir: certificateManager.certsDir,
+        signingCA,
+        passphrase: certPassphrase
+      });
+      
+      // Update certificate manager and save config
+      certificateManager.certificates.set(cert.fingerprint, cert);
+      await certificateManager.saveCertificateConfigs();
+      
+      res.json(cert.toApiResponse(certificateManager.passphraseManager));
+    } catch (error) {
+      logger.error(`Error renewing certificate ${req.params.fingerprint}:`, error);
+      res.status(500).json({ message: `Failed to renew certificate: ${error.message}`, statusCode: 500 });
+    }
+  });
+  
+  // Verify key match
+  router.get('/:fingerprint/verify-key-match', async (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      
+      // Get the certificate
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
+      }
+      
+      const matches = await cert.verifyKeyMatch(openSSL);
+      
+      res.json({ matches });
+    } catch (error) {
+      logger.error(`Error verifying key match for ${req.params.fingerprint}:`, error);
+      res.status(500).json({ message: 'Failed to verify key match', statusCode: 500 });
+    }
+  });
+  
+  // Check if certificate has passphrase
+  router.get('/:fingerprint/passphrase', (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      
+      const hasPassphrase = certificateManager.hasPassphrase(fingerprint);
+      
+      res.json({ hasPassphrase });
+    } catch (error) {
+      logger.error(`Error checking passphrase for ${req.params.fingerprint}:`, error);
+      res.status(500).json({ message: 'Failed to check passphrase', statusCode: 500 });
+    }
+  });
+  
+  // Store certificate passphrase
+  router.post('/:fingerprint/passphrase', (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      const { passphrase } = req.body;
+      
+      if (!passphrase) {
+        return res.status(400).json({ message: 'Passphrase is required', statusCode: 400 });
+      }
+      
+      const success = certificateManager.storePassphrase(fingerprint, passphrase);
+      
+      if (!success) {
+        return res.status(500).json({ message: 'Failed to store passphrase', statusCode: 500 });
+      }
+      
+      res.status(201).json({ success: true });
+    } catch (error) {
+      logger.error(`Error storing passphrase for ${req.params.fingerprint}:`, error);
+      res.status(500).json({ message: 'Failed to store passphrase', statusCode: 500 });
+    }
+  });
+  
+  // Delete certificate passphrase
+  router.delete('/:fingerprint/passphrase', (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      
+      const success = certificateManager.deletePassphrase(fingerprint);
+      
+      if (!success) {
+        return res.status(404).json({ message: 'No passphrase found for this certificate', statusCode: 404 });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      logger.error(`Error deleting passphrase for ${req.params.fingerprint}:`, error);
+      res.status(500).json({ message: 'Failed to delete passphrase', statusCode: 500 });
     }
   });
 

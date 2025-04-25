@@ -406,6 +406,7 @@ class CertificateManager {
      * @returns {Promise<boolean>} Success status
      */
     async updateCertificateConfig(fingerprint, config) {
+        logger.debug(`Updating certificate config for ${fingerprint}`, config);
         try {
             if (!fingerprint) {
                 throw new Error('Fingerprint is required');
@@ -423,7 +424,7 @@ class CertificateManager {
                 cert.autoRenew = config.autoRenew;
             }
             
-            if (config.renewDaysBeforeExpiry) {
+            if (config.renewDaysBeforeExpiry !== undefined) {
                 cert.renewDaysBeforeExpiry = config.renewDaysBeforeExpiry;
             }
             
@@ -432,7 +433,7 @@ class CertificateManager {
                 cert.caFingerprint = config.caFingerprint || null;
             }
             
-            if (config.deployActions) {
+            if (config.deployActions !== undefined) {
                 cert.deployActions = config.deployActions;
             }
             

@@ -17,6 +17,9 @@ const app = express();
 
 // Load all configuration from config service
 const config = configService.get();
+logger.setLevel(config.logLevel || 'info');
+
+logger.info('Starting Certificate Manager...');
 
 // Check if config directory is writable
 try {

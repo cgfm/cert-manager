@@ -19,13 +19,26 @@ const Logger = {
    * @param {string} level - Log level name: 'debug', 'info', 'warn', 'error'
    */
   setLevel: function(level) {
-    const levelName = level.toUpperCase();
+    const levelName = (level || '').toUpperCase();
     if (this.LEVELS[levelName] !== undefined) {
+      // Set the current level immediately
       this.currentLevel = this.LEVELS[levelName];
-      this.info(`Log level set to ${level}`);
+      
+      // Store in localStorage for persistence
+      try {
+        localStorage.setItem('logger_level', levelName);
+      } catch (e) {
+        // Ignore storage errors
+      }
+      
+      // Always log level changes regardless of current level
+      console.info(`[LOGGER] Log level set to ${level} (${this.currentLevel})`);
     } else {
-      this.warn(`Invalid log level: ${level}`);
+      console.warn(`[LOGGER] Invalid log level: ${level}`);
     }
+    
+    // Return the current level for chaining
+    return this.currentLevel;
   },
   
   /**
@@ -107,7 +120,7 @@ const Logger = {
     
     switch (level) {
       case 'DEBUG':
-        console.debug(consoleMessage, data || '');
+        console.log(consoleMessage, data || '');
         break;
       case 'INFO':
         console.info(consoleMessage, data || '');
@@ -198,8 +211,96 @@ const Logger = {
   clearLogBuffer: function() {
     this._logBuffer = [];
     this.info('Log buffer cleared');
+  },
+
+  /**
+   * Get current log level name
+   * @returns {string} Current log level name
+   */
+  getCurrentLevel: function() {
+    for (const [name, value] of Object.entries(this.LEVELS)) {
+      if (value === this.currentLevel) {
+        return name;
+      }
+    }
+    return 'UNKNOWN';
+  },
+  
+  /**
+   * Initialize logger from stored settings or backend
+   */
+  initialize: function() {
+    // First check localStorage for saved level
+    try {
+      const savedLevel = localStorage.getItem('logger_level');
+      if (savedLevel && this.LEVELS[savedLevel] !== undefined) {
+        this.currentLevel = this.LEVELS[savedLevel];
+        console.info(`[LOGGER] Initialized from saved level: ${savedLevel}`);
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+    
+    // Then fetch backend level if available (will override localStorage)
+    this.syncWithBackend();
+  },
+  
+  /**
+   * Synchronize log level with backend
+   * @returns {Promise} Promise resolving with the synced level
+   */
+  syncWithBackend: function() {
+    return fetch('/api/config/log-level')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to get log level: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data && data.level) {
+          // Set level from backend
+          this.setLevel(data.level);
+          return data.level;
+        }
+      })
+      .catch(err => {
+        console.warn('[LOGGER] Could not sync with backend:', err);
+        // Fall back to default if backend sync fails
+        return null;
+      });
+  },
+  
+  /**
+   * Create console helper commands for easier debugging
+   */
+  setupConsoleHelpers: function() {
+    window.setLogLevel = function(level) {
+      return Logger.setLevel(level);
+    };
+    
+    window.getLogLevel = function() {
+      return Logger.getCurrentLevel();
+    };
+    
+    window.debugLog = function(msg, data) {
+      // Force debug log regardless of level
+      const originalLevel = Logger.currentLevel;
+      Logger.currentLevel = Logger.LEVELS.DEBUG;
+      Logger.debug(msg, data);
+      Logger.currentLevel = originalLevel;
+    };
   }
 };
 
 // Export for use in other modules
 window.Logger = Logger;
+
+(function() {
+  // Run initialization
+  Logger.initialize();
+  Logger.setupConsoleHelpers();
+  
+  // Log initialization complete at debug level
+  Logger.debug("Logger module enhanced and initialized");
+})();

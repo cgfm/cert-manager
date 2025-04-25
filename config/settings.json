@@ -12,7 +12,7 @@
   },
   "autoRenewByDefault": true,
   "renewDaysBeforeExpiry": 30,
-  "logLevel": "info",
+  "logLevel": "debug",
   "jsonOutput": false,
   "enableCertificateBackups": true,
   "keepBackupsForever": true,

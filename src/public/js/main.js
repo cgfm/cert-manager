@@ -389,6 +389,7 @@ function initModals() {
       const modal = closeBtn.closest('.modal');
       if (modal) {
         modal.classList.remove('visible');
+        modal.classList.add('hidden');
       }
     });
   });
@@ -398,6 +399,7 @@ function initModals() {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         modal.classList.remove('visible');
+        modal.classList.add('hidden');
       }
     });
   });
@@ -412,6 +414,7 @@ function initModals() {
         const fingerprint = detailsModal.getAttribute('data-cert-id');
         if (fingerprint && typeof renewCertificate === 'function') {
           detailsModal.classList.remove('visible');
+          detailsModal.classList.add('hidden');
           renewCertificate(fingerprint);
         }
       });
@@ -424,6 +427,7 @@ function initModals() {
         const fingerprint = detailsModal.getAttribute('data-cert-id');
         if (fingerprint && typeof deleteCertificate === 'function') {
           detailsModal.classList.remove('visible');
+          detailsModal.classList.add('hidden');
           deleteCertificate(fingerprint);
         }
       });

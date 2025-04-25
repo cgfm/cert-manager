@@ -116,6 +116,13 @@ function setupApi(deps) {
     res.json({ status: 'ok', version: '1.0.0' });
   });
   
+  apiRouter.get('/config/log-level', (req, res) => {
+    res.json({
+      level: logger.getLevel().toLowerCase(),
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Set up OpenAPI validation if available
   if (swaggerUi && OpenApiValidator && yaml) {
     try {

@@ -480,6 +480,11 @@ paths:
                 - $ref: '#/components/schemas/CommandAction'
                 - $ref: '#/components/schemas/DockerRestartAction'
                 - $ref: '#/components/schemas/WebhookAction'
+                - $ref: '#/components/schemas/NginxProxyManagerAction'
+                - $ref: '#/components/schemas/SmbCopyAction'
+                - $ref: '#/components/schemas/FtpCopyAction'
+                - $ref: '#/components/schemas/ApiCallAction'
+                - $ref: '#/components/schemas/EmailAction'
       responses:
         '201':
           description: Deployment action added
@@ -506,7 +511,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  
+
   /certificates/{fingerprint}/deploy-actions/execute:
     post:
       summary: Execute all deployment actions for a certificate
@@ -585,7 +590,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  
+
+    put:
+      summary: Update a deployment action
+      tags: [certificates, deployment]
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: actionIndex
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CopyAction'
+                - $ref: '#/components/schemas/SshCopyAction'
+                - $ref: '#/components/schemas/CommandAction'
+                - $ref: '#/components/schemas/DockerRestartAction'
+                - $ref: '#/components/schemas/WebhookAction'
+                - $ref: '#/components/schemas/NginxProxyManagerAction'
+                - $ref: '#/components/schemas/SmbCopyAction'
+                - $ref: '#/components/schemas/FtpCopyAction'
+                - $ref: '#/components/schemas/ApiCallAction'
+                - $ref: '#/components/schemas/EmailAction'
+      responses:
+        '200':
+          description: Deployment action updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  action:
+                    oneOf:
+                      - $ref: '#/components/schemas/CopyAction'
+                      - $ref: '#/components/schemas/SshCopyAction'
+                      - $ref: '#/components/schemas/CommandAction'
+                      - $ref: '#/components/schemas/DockerRestartAction'
+                      - $ref: '#/components/schemas/WebhookAction'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Certificate or action not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /certificates/{fingerprint}/deploy-actions/{actionIndex}/test:
     post:
       summary: Test a deployment action
@@ -1232,15 +1299,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /filesystem/roots:
+  /filesystem/check:
     get:
-      summary: Get filesystem roots and special locations
-      operationId: getFilesystemRoots
+      summary: Check if a path exists
+      operationId: checkPath
       tags:
         - filesystem
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Path to check
       responses:
         '200':
-          description: Filesystem roots and special locations
+          description: Path existence check result
           content:
             application/json:
               schema:
@@ -1248,28 +1322,34 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  roots:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        name:
-                          type: string
-                        path:
-                          type: string
-                  specialLocations:
-                    type: object
-                    properties:
-                      home:
-                        type: string
-                      temp:
-                        type: string
-                      desktop:
-                        type: string
-                      documents:
-                        type: string
+                  exists:
+                    type: boolean
+                  path:
+                    type: string
+                  isDirectory:
+                    type: boolean
+                  isFile:
+                    type: boolean
+                  size:
+                    type: integer
+                    nullable: true
+                  modified:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  created:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /filesystem/directory:
+
     get:
       summary: List directory contents
       operationId: listDirectory
@@ -1360,57 +1440,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
-  /filesystem/check:
-    get:
-      summary: Check if a path exists
-      operationId: checkPath
-      tags:
-        - filesystem
-      parameters:
-        - name: path
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Path to check
-      responses:
-        '200':
-          description: Path existence check result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  exists:
-                    type: boolean
-                  path:
-                    type: string
-                  isDirectory:
-                    type: boolean
-                  isFile:
-                    type: boolean
-                  size:
-                    type: integer
-                    nullable: true
-                  modified:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  created:
-                    type: string
-                    format: date-time
-                    nullable: true
-        '403':
-          description: Access denied
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /filesystem/directory:
     post:
       summary: Create a directory
       operationId: createDirectory
@@ -1488,6 +1517,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /filesystem/roots:
+    get:
+      summary: Get filesystem roots and special locations
+      operationId: getFilesystemRoots
+      tags:
+        - filesystem
+      responses:
+        '200':
+          description: Filesystem roots and special locations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  roots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        path:
+                          type: string
+                  specialLocations:
+                    type: object
+                    properties:
+                      home:
+                        type: string
+                      temp:
+                        type: string
+                      desktop:
+                        type: string
+                      documents:
+                        type: string
 
   /activity:
     get:

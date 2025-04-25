@@ -43,6 +43,17 @@ class Logger {
         this.logHistory = [];
         this.maxHistoryEntries = 1000; // Limit in-memory entries
     }
+
+    setLevel(level) {
+        if (this.logLevels.hasOwnProperty(level)) {
+            this.logLevel = level;
+            this.info(`Log level set to ${level}`);
+        }
+    }
+
+    getLevel() {
+        return this.logLevel;
+    }
     
     initLogFile() {
         if (!this.logToFile) return;
