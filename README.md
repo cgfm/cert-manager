@@ -1,5 +1,37 @@
-THIS IS NOT FUNCTIONAL JET!
+# THIS IS NOT FUNCTIONAL JET!
+
 There will be the first functional release very soon.
+
+
+## ToDos
+### Authentication 
+⬜ Frontend 
+⬜ Middleware
+⬜ Implementation 
+
+### Styling ToDos
+⬜ Tabs in modal -> responsive order left or top
+⬜ order and view style in cert list
+⬜ stacking backdrops 
+
+### Certificate
+✅ edit file meta
+☑️ reading/writing SANs (renewal test)
+
+### Deployment
+✅ frontend
+✅ api connect 
+⬜ test deployment
+❓ may be more deployments
+
+### Action log / Logging
+✅ Logger
+✅ Actionlog Service 
+✅ api connect 
+⬜ frontend 
+⬜ testing
+
+
 
 # Certificate Manager
 
