@@ -1,3 +1,6 @@
+THIS IS NOT FUNCTIONAL JET!
+There will be the first functional release very soon.
+
 # Certificate Manager
 
 A comprehensive web-based tool for managing SSL certificates:
