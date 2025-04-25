@@ -29,12 +29,18 @@ class Certificate {
         this._certType = 'standard';
         this._acmeSettings = null;
         this._pathes = {
-            crtPath: null,
-            pemPath: null,
-            p12Path: null,
-            csrPath: null,
-            extPath: null,
-            keyPath: null
+            crtPath: null,     // Certificate file
+            pemPath: null,     // PEM format certificate
+            p12Path: null,     // PKCS#12 format
+            pfxPath: null,     // PFX format (alternative to p12)
+            csrPath: null,     // Certificate signing request
+            extPath: null,     // Extensions
+            keyPath: null,     // Private key
+            cerPath: null,     // CER format certificate
+            derPath: null,     // DER format certificate
+            p7bPath: null,     // PKCS#7 format
+            chainPath: null,   // Certificate chain
+            fullchainPath: null // Full certificate chain
         };
         this._san = {
             domains: [],
@@ -477,8 +483,6 @@ class Certificate {
         try {
             const expiryDate = new Date(this._validTo);
             const now = new Date();
-            
-            if (expiryDate < now) return -1;
             
             const diffTime = expiryDate - now;
             return Math.ceil(diffTime / (1000 * 60 * 60 * 24));

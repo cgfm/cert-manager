@@ -401,11 +401,21 @@ function initCertificatesRouter(deps) {
       }
       
       // Create a certificate object structure compatible with the OpenSSLWrapper
+      // FIXED: Use consistent path keys from certificate paths property
+      const paths = certificate.paths || {};
       const certObj = {
         paths: {
-          crtPath: certificate.certPath,
-          keyPath: certificate.keyPath,
-          csrPath: certificate.csrPath
+          crtPath: paths.crtPath,
+          keyPath: paths.keyPath, 
+          csrPath: paths.csrPath,
+          pemPath: paths.pemPath,
+          p12Path: paths.p12Path,
+          pfxPath: paths.pfxPath,
+          derPath: paths.derPath,
+          p7bPath: paths.p7bPath,
+          chainPath: paths.chainPath,
+          fullchainPath: paths.fullchainPath,
+          extPath: paths.extPath
         }
       };
       
@@ -503,9 +513,12 @@ function initCertificatesRouter(deps) {
         });
       }
       
-      // Map fileType to paths in certificate
+      // Map fileType to consistent paths with Path suffix
+      // Also using certificate.paths instead of direct properties
+      const paths = certificate.paths || {};
+      
       const fileTypeMap = {
-        cert: 'certPath',
+        cert: 'crtPath',
         key: 'keyPath',
         chain: 'chainPath',
         fullchain: 'fullchainPath',
@@ -513,18 +526,22 @@ function initCertificatesRouter(deps) {
         p12: 'p12Path',
         pem: 'pemPath',
         csr: 'csrPath',
-        crt: 'certPath'
+        crt: 'crtPath',
+        cer: 'cerPath',
+        der: 'derPath',
+        p7b: 'p7bPath',
+        ext: 'extPath'
       };
       
       const pathKey = fileTypeMap[fileType];
-      if (!pathKey || !certificate[pathKey]) {
+      if (!pathKey || !paths[pathKey]) {
         return res.status(404).json({
           message: `File of type '${fileType}' not found for this certificate`,
           statusCode: 404
         });
       }
       
-      const filePath = certificate[pathKey];
+      const filePath = paths[pathKey];
       
       // Check if file exists
       if (!fs.existsSync(filePath)) {
@@ -599,17 +616,24 @@ function initCertificatesRouter(deps) {
         });
       }
       
+      // Use certificate.paths consistently and with proper path keys
+      const paths = certificate.paths || {};
+      
       // Create file paths map (only existing files)
       const filesToAdd = [
-        { key: 'certPath', name: 'certificate.crt' },
-        { key: 'keyPath', name: 'private-key.key' },
+        { key: 'crtPath', name: 'certificate.crt' },
+        { key: 'keyPath', name: 'private.key' },
+        { key: 'pemPath', name: 'certificate.pem' },
+        { key: 'p12Path', name: 'certificate.p12' },
+        { key: 'pfxPath', name: 'certificate.pfx' },
+        { key: 'csrPath', name: 'certificate.csr' },
         { key: 'chainPath', name: 'chain.pem' },
         { key: 'fullchainPath', name: 'fullchain.pem' },
-        { key: 'pfxPath', name: 'certificate.pfx' },
-        { key: 'p12Path', name: 'certificate.p12' },
-        { key: 'pemPath', name: 'certificate.pem' },
-        { key: 'csrPath', name: 'certificate.csr' }
-      ].filter(item => certificate[item.key] && fs.existsSync(certificate[item.key]));
+        { key: 'derPath', name: 'certificate.der' },
+        { key: 'p7bPath', name: 'certificate.p7b' },
+        { key: 'cerPath', name: 'certificate.cer' },
+        { key: 'extPath', name: 'certificate.ext' }
+      ].filter(item => paths[item.key] && fs.existsSync(paths[item.key]));
       
       if (filesToAdd.length === 0) {
         return res.status(404).json({
@@ -636,7 +660,7 @@ function initCertificatesRouter(deps) {
       
       // Add each file to the archive
       filesToAdd.forEach(file => {
-        archive.file(certificate[file.key], { name: file.name });
+        archive.file(paths[file.key], { name: file.name });
       });
       
       // Add metadata JSON

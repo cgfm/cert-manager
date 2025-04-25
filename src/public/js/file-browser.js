@@ -699,7 +699,7 @@ function handleItemDoubleClick(item) {
  */
 function closeFileBrowser() {
   console.log("Closing file browser");
-  ModalUtils.closeModal("file-browser-modal");
+  UIUtils.closeModal("file-browser-modal");
 
   // Reset state
   fileBrowserState.selectedPath = null;
@@ -725,7 +725,7 @@ function showFileBrowserModal() {
   }
 
   // Show the modal
-  ModalUtils.openModal("file-browser-modal");
+  UIUtils.openModal("file-browser-modal");
 }
 
 /**

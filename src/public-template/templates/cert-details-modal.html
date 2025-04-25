@@ -1,10 +1,3 @@
-<div class="modal-header cert-modal-header">
-  <h3>Certificate Details</h3>
-  <span class="cert-name">{{certificate.name}}</span>
-  <span class="cert-status {{statusClass}}">{{statusText}}</span>
-  <span class="close-modal">&times;</span>
-</div>
-
 <div class="cert-tabs">
   <button class="cert-tab-btn active" data-tab="details">Details</button>
   <button class="cert-tab-btn" data-tab="domains">Domains</button>
@@ -26,47 +19,47 @@
     <table class="cert-details-table">
       <tr>
         <th>Name:</th>
-        <td id="cert-name-display">{{certificate.name}}</td>
+        <td id="cert-name-display">${certificate.name}</td>
       </tr>
       <tr>
         <th>Fingerprint:</th>
-        <td><code>{{certificate.fingerprint}}</code></td>
+        <td><code>${certificate.fingerprint}</code></td>
       </tr>
       <tr>
         <th>Common Name:</th>
-        <td>{{domain}}</td>
+        <td>${domain}</td>
       </tr>
       <tr>
         <th>Certificate Type:</th>
-        <td>{{certificate.certType || 'Standard'}}</td>
+        <td>${certificate.certType || 'Standard'}</td>
       </tr>
       <tr>
         <th>Subject:</th>
-        <td>{{certificate.subject || 'N/A'}}</td>
+        <td>${certificate.subject || 'N/A'}</td>
       </tr>
       <tr>
         <th>Issuer:</th>
-        <td>{{certificate.issuer || 'N/A'}}</td>
+        <td>${certificate.issuer || 'N/A'}</td>
       </tr>
       <tr>
         <th>Valid From:</th>
-        <td>{{issueDate}}</td>
+        <td>${issueDate}</td>
       </tr>
       <tr>
         <th>Valid To:</th>
-        <td>{{expiryDate}}</td>
+        <td>${expiryDate}</td>
       </tr>
       <tr>
         <th>Days Until Expiry:</th>
-        <td>{{daysUntilExpiry}}</td>
+        <td>${daysUntilExpiry}</td>
       </tr>
       <tr>
         <th>Key Type:</th>
-        <td>{{certificate.keyType || 'RSA'}} {{certificate.keySize || '2048'}} bits</td>
+        <td>${certificate.keyType || 'RSA'} ${certificate.keySize || '2048'} bits</td>
       </tr>
       <tr>
         <th>Signature Algorithm:</th>
-        <td>{{certificate.sigAlg || 'N/A'}}</td>
+        <td>${certificate.sigAlg || 'N/A'}</td>
       </tr>
     </table>
   </div>
@@ -75,12 +68,12 @@
     <form id="edit-cert-form">
       <div class="form-group">
         <label for="edit-cert-name">Certificate Name:</label>
-        <input type="text" id="edit-cert-name" class="form-control" value="{{certificate.name}}">
+        <input type="text" id="edit-cert-name" class="form-control" value="${certificate.name}">
       </div>
       
       <div class="form-group">
         <label for="edit-cert-description">Description:</label>
-        <textarea id="edit-cert-description" class="form-control">{{certificate.description}}</textarea>
+        <textarea id="edit-cert-description" class="form-control">${certificate.description}</textarea>
       </div>
       
       <div class="form-group">
@@ -104,8 +97,8 @@
   <div class="domains-list-container">
     <h4>Certificate Domains</h4>
     <div class="domains-list">
-      {{#if certificate.domains.length}}
-      <table class="data-table">
+      ${certificate.domains && certificate.domains.length ? 
+      `<table class="data-table">
         <thead>
           <tr>
             <th>Domain</th>
@@ -117,10 +110,8 @@
           <!-- Will be filled dynamically -->
           <tr><td colspan="3" class="loading-cell"><div class="loading-spinner small"></div></td></tr>
         </tbody>
-      </table>
-      {{else}}
-      <p class="empty-message">No domains configured for this certificate.</p>
-      {{/if}}
+      </table>` : 
+      `<p class="empty-message">No domains configured for this certificate.</p>`}
     </div>
     
     <div class="domain-add-section">
@@ -213,7 +204,7 @@
     
     <div class="form-group">
       <label class="toggle-switch">
-        <input type="checkbox" id="cert-auto-renew" {{#if certificate.autoRenew}}checked{{/if}}>
+        <input type="checkbox" id="cert-auto-renew" ${certificate.autoRenew ? 'checked' : ''}>
         <span class="toggle-slider"></span>
         <span class="toggle-label">Auto-renew certificate</span>
       </label>
@@ -221,21 +212,21 @@
     
     <div class="form-group">
       <label for="cert-validity">Certificate Validity (days):</label>
-      <input type="number" id="cert-validity" class="form-control" min="1" max="825" value="{{certificate.validity}}">
+      <input type="number" id="cert-validity" class="form-control" min="1" max="825" value="${certificate.validity}">
       <small class="text-muted">Maximum validity is 825 days for publicly trusted certificates</small>
     </div>
     
     <div class="form-group">
       <label for="cert-renew-before">Renew Before Expiry (days):</label>
-      <input type="number" id="cert-renew-before" class="form-control" min="1" max="60" value="{{certificate.renewBefore}}">
+      <input type="number" id="cert-renew-before" class="form-control" min="1" max="60" value="${certificate.renewBefore}">
     </div>
     
     <div class="form-group">
       <label for="cert-key-size">Key Size (bits):</label>
       <select id="cert-key-size" class="form-control">
-        <option value="2048" {{#if (eq certificate.keySize "2048")}}selected{{/if}}>2048 (Standard)</option>
-        <option value="3072" {{#if (eq certificate.keySize "3072")}}selected{{/if}}>3072</option>
-        <option value="4096" {{#if (eq certificate.keySize "4096")}}selected{{/if}}>4096 (More Secure)</option>
+        <option value="2048" ${certificate.keySize === "2048" ? 'selected' : ''}>2048 (Standard)</option>
+        <option value="3072" ${certificate.keySize === "3072" ? 'selected' : ''}>3072</option>
+        <option value="4096" ${certificate.keySize === "4096" ? 'selected' : ''}>4096 (More Secure)</option>
       </select>
     </div>
     
@@ -243,15 +234,15 @@
       <label for="cert-notifications">Notification Settings:</label>
       <div class="checkbox-group">
         <label class="checkbox-label">
-          <input type="checkbox" id="notify-expiry" {{#if certificate.notifications.expiry}}checked{{/if}}>
+          <input type="checkbox" id="notify-expiry" ${certificate.notifications && certificate.notifications.expiry ? 'checked' : ''}>
           Notify before expiry
         </label>
         <label class="checkbox-label">
-          <input type="checkbox" id="notify-renewal" {{#if certificate.notifications.renewal}}checked{{/if}}>
+          <input type="checkbox" id="notify-renewal" ${certificate.notifications && certificate.notifications.renewal ? 'checked' : ''}>
           Notify on renewal
         </label>
         <label class="checkbox-label">
-          <input type="checkbox" id="notify-error" {{#if certificate.notifications.error}}checked{{/if}}>
+          <input type="checkbox" id="notify-error" ${certificate.notifications && certificate.notifications.error ? 'checked' : ''}>
           Notify on errors
         </label>
       </div>
@@ -261,13 +252,4 @@
       <button type="button" id="save-cert-settings-btn" class="button primary">Save Settings</button>
     </div>
   </form>
-</div>
-
-<div class="modal-footer">
-  <div class="modal-footer-actions">
-    <button class="button danger" id="delete-cert-btn">Delete</button>
-    <button class="button" id="download-cert-btn">Download</button>
-    <button class="button primary" id="renew-cert-btn">Renew Certificate</button>
-    <button class="button secondary" id="close-cert-details-btn">Close</button>
-  </div>
 </div>

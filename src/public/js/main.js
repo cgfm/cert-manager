@@ -404,35 +404,7 @@ function initModals() {
     });
   });
   
-  // Set up certificate detail modal actions
-  const detailsModal = document.getElementById('cert-details-modal');
-  if (detailsModal) {
-    // Renew button
-    const renewBtn = detailsModal.querySelector('.renew-certificate-btn');
-    if (renewBtn) {
-      renewBtn.addEventListener('click', () => {
-        const fingerprint = detailsModal.getAttribute('data-cert-id');
-        if (fingerprint && typeof renewCertificate === 'function') {
-          detailsModal.classList.remove('visible');
-          detailsModal.classList.add('hidden');
-          renewCertificate(fingerprint);
-        }
-      });
-    }
-    
-    // Delete button
-    const deleteBtn = detailsModal.querySelector('.delete-certificate-btn');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', () => {
-        const fingerprint = detailsModal.getAttribute('data-cert-id');
-        if (fingerprint && typeof deleteCertificate === 'function') {
-          detailsModal.classList.remove('visible');
-          detailsModal.classList.add('hidden');
-          deleteCertificate(fingerprint);
-        }
-      });
-    }
-  }
+  // Certificate details functionality moved to cert-actions.js
 }
 
 /**

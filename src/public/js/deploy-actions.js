@@ -897,7 +897,7 @@ async function saveDeploymentAction() {
     clearFormChangedStatus();
     
     // Close modal and show success message
-    ModalUtils.closeModal("deployment-action-modal");
+    UIUtils.closeModal("deployment-action-modal");
 
     UIUtils.showToast(
       isEditing ? "Deployment action updated" : "Deployment action added",
@@ -955,7 +955,7 @@ function showDeploymentActionForm(existingAction = null, actionIndex = null) {
   if (!modalElement) {
     modalElement = document.createElement("div");
     modalElement.id = modalId;
-    modalElement.className = "modal hidden"; // Use 'hidden' class for ModalUtils compatibility
+    modalElement.className = "modal hidden"; // Use 'hidden' class for UIUtils compatibility
     modalElement.style.zIndex = "1102"; // Higher z-index to appear on top
     modalElement.innerHTML = '<div class="modal-content"></div>';
     document.body.appendChild(modalElement);
@@ -1028,20 +1028,20 @@ function showDeploymentActionForm(existingAction = null, actionIndex = null) {
         });
       });
 
-      // Show the modal using ModalUtils
-      ModalUtils.openModal(modalId);
+      // Show the modal using UIUtils
+      UIUtils.openModal(modalId);
       
       // Add override for the modal's existing close behavior
-      const originalCloseModal = ModalUtils.closeModal;
-      ModalUtils.closeModal = function(modalIdToClose) {
+      const originalCloseModal = UIUtils.closeModal;
+      UIUtils.closeModal = function(modalIdToClose) {
         if (modalIdToClose === modalId) {
           if (checkUnsavedChangesBeforeClosing(modalId)) {
             // Only close if confirmed
-            originalCloseModal.call(ModalUtils, modalIdToClose);
+            originalCloseModal.call(UIUtils, modalIdToClose);
           }
         } else {
           // For other modals, use original behavior
-          originalCloseModal.call(ModalUtils, modalIdToClose);
+          originalCloseModal.call(UIUtils, modalIdToClose);
         }
       };
     })
@@ -1072,12 +1072,12 @@ function showDeploymentActionForm(existingAction = null, actionIndex = null) {
       // Set up close button handlers for error message
       modalElement.querySelectorAll(".close-modal").forEach((button) => {
         button.addEventListener("click", function () {
-          ModalUtils.closeModal(modalId);
+          UIUtils.closeModal(modalId);
         });
       });
 
       // Show the modal even on error
-      ModalUtils.openModal(modalId);
+      UIUtils.openModal(modalId);
     });
 }
 

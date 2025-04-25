@@ -33,6 +33,117 @@ const ModalUtils = {
   },
   
   /**
+   * Show a modal with content and options
+   * @param {string} modalId - ID of the modal to show
+   * @param {Object} options - Modal options
+   * @param {string} options.title - Modal title
+   * @param {string} options.content - Modal HTML content
+   * @param {Object[]} options.buttons - Button definitions
+   * @param {string} options.buttons[].text - Button text
+   * @param {string} options.buttons[].id - Button ID
+   * @param {string} options.buttons[].action - Button action (close, custom)
+   * @param {string} [options.buttons[].class] - Additional button classes
+   * @param {Object} [options.data] - Additional data to store with modal
+   */
+  showModal: function(modalId, options = {}) {
+    // First check if modal exists, create it if not
+    let modal = document.getElementById(modalId);
+    
+    if (!modal) {
+      // Create new modal element
+      modal = document.createElement('div');
+      modal.id = modalId;
+      modal.className = 'modal hidden';
+      document.body.appendChild(modal);
+      Logger.debug(`Created new modal with ID: ${modalId}`);
+    }
+    
+    // Update the modal content with new options
+    this.updateModal(modalId, options);
+    
+    // Open the modal
+    this.openModal(modalId);
+  },
+
+  
+  /**
+   * Update modal content
+   * @param {string} modalId - ID of the modal to update
+   * @param {Object} options - Modal options (same as showModal)
+   */
+  updateModal: function(modalId, options = {}) {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+      Logger.error(`Modal not found: ${modalId}`);
+      return;
+    }
+    
+    // Store any data with the modal element
+    if (options.data) {
+      Object.entries(options.data).forEach(([key, value]) => {
+        modal.dataset[key] = value;
+      });
+    }
+    
+    // Build modal content HTML
+    let contentHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>${UIUtils.sanitizeHTML(options.title || 'Modal')}</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          ${options.content || ''}
+        </div>
+    `;
+    
+    // Add footer with buttons if defined
+    if (options.buttons && options.buttons.length) {
+      contentHTML += `<div class="modal-footer">`;
+      
+      options.buttons.forEach(button => {
+        const btnClass = button.class ? ` ${button.class}` : '';
+        const btnId = button.id || '';
+        contentHTML += `<button id="${btnId}" class="button${btnClass}">${UIUtils.sanitizeHTML(button.text)}</button>`;
+      });
+      
+      contentHTML += `</div>`;
+    }
+    
+    contentHTML += `</div>`;
+    
+    // Set modal content
+    modal.innerHTML = contentHTML;
+    
+    // Set up button event handlers
+    if (options.buttons && options.buttons.length) {
+      options.buttons.forEach(button => {
+        if (!button.id) return;
+        
+        const buttonElement = document.getElementById(button.id);
+        if (!buttonElement) return;
+        
+        buttonElement.addEventListener('click', () => {
+          if (button.action === 'close') {
+            this.closeModal(modalId);
+          }
+          
+          // Dispatch custom event for any button click
+          modal.dispatchEvent(new CustomEvent('buttonClick', {
+            detail: {
+              buttonId: button.id,
+              action: button.action
+            }
+          }));
+        });
+      });
+    }
+    
+    // Setup close handlers
+    this.setupCloseHandlers(modal);
+  },
+  
+  /**
    * Close a modal by ID
    * @param {string} modalId - ID of the modal to close
    */
