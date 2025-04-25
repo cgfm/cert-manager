@@ -1,6 +1,22 @@
+/**
+ * Logger Service for cert-manager
+ * This service provides logging functionality with options for console and file logging,
+ * log rotation, and in-memory log history.
+ * It supports different log levels and allows filtering of logs based on level and time range.
+ * @module logger - Logger Service
+ * @requires fs - File system module for file operations
+ * @requires path - Path module for handling file paths
+ * @requires util - Utility module for formatting log messages
+ * @version 0.0.2
+ * @license MIT
+ * @author Christian Meiners
+ * @description This logger service is designed to be used in a Node.js environment, specifically for a cert-manager application.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const util = require('util');
+const os = require('os');
 
 class Logger {
     constructor(options = {}) {
@@ -34,7 +50,26 @@ class Logger {
         try {
             // Create log directory if it doesn't exist
             if (!fs.existsSync(this.logDir)) {
-                fs.mkdirSync(this.logDir, { recursive: true });
+                try {
+                    fs.mkdirSync(this.logDir, { recursive: true });
+                } catch (dirError) {
+                    console.error(`Error creating log directory: ${dirError.message}`);
+                    // Try to use a fallback directory if main log dir fails
+                    this.logDir = os.tmpdir();
+                    console.log(`Using fallback log directory: ${this.logDir}`);
+                }
+            }
+            
+            // Test if the directory is writable
+            try {
+                const testFile = path.join(this.logDir, '.write-test');
+                fs.writeFileSync(testFile, 'test');
+                fs.unlinkSync(testFile);
+            } catch (writeError) {
+                console.error(`Log directory is not writable: ${writeError.message}`);
+                // Fall back to temp directory
+                this.logDir = os.tmpdir();
+                console.log(`Using fallback log directory: ${this.logDir}`);
             }
             
             const logPath = path.join(this.logDir, this.logFile);
@@ -140,6 +175,21 @@ class Logger {
     
     error(message, details = null) {
         this.writeLog('error', message, details);
+    }
+    
+    /**
+     * Check if a specific log level is enabled
+     * @param {string} level - Log level to check
+     * @returns {boolean} Whether the level is enabled
+     */
+    isLevelEnabled(level) {
+        // Check if the provided level is valid
+        if (!this.logLevels.hasOwnProperty(level)) {
+            return false;
+        }
+        
+        // Compare the numeric values of the levels
+        return this.logLevels[level] >= this.logLevels[this.logLevel];
     }
     
     getLogHistory(options = {}) {

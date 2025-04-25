@@ -1,13 +1,24 @@
 {
   "certPath": "/certs",
-  "renewalDays": 30,
-  "autoRenewDefault": true,
-  "acmeServer": "letsencrypt",
-  "customAcmeUrl": "",
-  "defaultEmail": "",
-  "keySize": 2048,
-  "enableAuth": false,
-  "username": "",
+  "enableHttps": false,
   "httpsPort": 4443,
-  "enableDebugLogs": false
+  "httpsCertPath": null,
+  "httpsKeyPath": null,
+  "openSSLPath": "openssl",
+  "caValidityPeriod": {
+      "rootCA": 3650,
+      "intermediateCA": 1825,
+      "standard": 90
+  },
+  "autoRenewByDefault": true,
+  "renewDaysBeforeExpiry": 30,
+  "logLevel": "info",
+  "jsonOutput": false,
+  "enableCertificateBackups": true,
+  "keepBackupsForever": true,
+  "backupRetention": 90,
+  "signStandardCertsWithCA": false,
+  "enableAutoRenewalJob": true,
+  "renewalSchedule": "0 0 * * *",
+  "enableFileWatch": true
 }

@@ -1,131 +1,181 @@
 /**
- * Docker Utilities
- * This module provides utility functions for interacting with Docker containers.
- * It includes functions to fetch Docker containers, lazy load them, and manage caching.
- * @module docker-utils - Docker Utilities
- * @requires window - Global object for accessing browser APIs
- * @requires document - DOM manipulation
- * @requires fetch - Fetch API for making HTTP requests
- * @requires console - Console for logging messages
- * @requires logger - Logger utility for debugging
- * @version 1.0.0
- * @license MIT
- * @author Christian Meiners
- * @description This module is designed to work with Docker containers, providing functions to fetch and display them in a user-friendly manner. It also includes caching mechanisms to optimize performance and reduce unnecessary API calls.
+ * Certificate Manager - Docker Utilities
+ * Provides methods for interacting with Docker containers
  */
 
-// Cache for Docker containers data
-const dockerCache = {
-    containers: null,
-    timestamp: 0,
-    ttl: 60000 // Cache validity in ms (60 seconds)
+const DockerUtils = {
+    /**
+     * Check if Docker is available
+     * @returns {Promise<boolean>} True if Docker is available
+     */
+    async isDockerAvailable() {
+        try {
+            const response = await fetch('/api/docker/status');
+            
+            if (!response.ok) {
+                return false;
+            }
+            
+            const result = await response.json();
+            return result.available === true;
+        } catch (error) {
+            console.error('Error checking Docker availability:', error);
+            return false;
+        }
+    },
+    
+    /**
+     * Get list of Docker containers
+     * @returns {Promise<Array>} List of Docker containers
+     */
+    async getContainers() {
+        try {
+            const response = await fetch('/api/docker/containers');
+            
+            if (!response.ok) {
+                throw new Error(`Failed to get containers: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error getting Docker containers:', error);
+            throw error;
+        }
+    },
+    
+    /**
+     * Restart a Docker container
+     * @param {string} containerId - Container ID or name
+     * @returns {Promise<Object>} Result object
+     */
+    async restartContainer(containerId) {
+        try {
+            const response = await fetch(`/api/docker/containers/${containerId}/restart`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to restart container: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error restarting Docker container:', error);
+            throw error;
+        }
+    },
+    
+    /**
+     * Execute a command in a Docker container
+     * @param {string} containerId - Container ID or name
+     * @param {string} command - Command to execute
+     * @returns {Promise<Object>} Result with stdout and stderr
+     */
+    async executeCommand(containerId, command) {
+        try {
+            const response = await fetch(`/api/docker/containers/${containerId}/exec`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ command })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to execute command: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error executing command in Docker container:', error);
+            throw error;
+        }
+    },
+    
+    /**
+     * Copy a file to a Docker container
+     * @param {string} containerId - Container ID or name
+     * @param {string} sourcePath - Source path on host
+     * @param {string} destPath - Destination path in container
+     * @returns {Promise<Object>} Result object
+     */
+    async copyToContainer(containerId, sourcePath, destPath) {
+        try {
+            const formData = new FormData();
+            formData.append('sourcePath', sourcePath);
+            formData.append('destPath', destPath);
+            
+            const response = await fetch(`/api/docker/containers/${containerId}/copy`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to copy file: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error copying file to Docker container:', error);
+            throw error;
+        }
+    },
+    
+    /**
+     * Get Docker container names for dropdowns
+     * @returns {Promise<Array<{id: string, name: string}>>} Container options
+     */
+    async getContainerOptions() {
+        try {
+            const containers = await this.getContainers();
+            
+            return containers.map(container => {
+                const name = container.Names[0].replace(/^\//, '');
+                return {
+                    id: container.Id,
+                    name
+                };
+            });
+        } catch (error) {
+            console.error('Error getting container options:', error);
+            return [];
+        }
+    },
+    
+    /**
+     * Populate a select element with container options
+     * @param {HTMLSelectElement} selectElement - The select element to populate
+     * @returns {Promise<void>}
+     */
+    async populateContainerSelect(selectElement) {
+        try {
+            const options = await this.getContainerOptions();
+            
+            // Clear existing options
+            selectElement.innerHTML = '';
+            
+            // Add empty option
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = '- Select container -';
+            selectElement.appendChild(emptyOption);
+            
+            // Add container options
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.name; // Use name as it's more user-friendly
+                optionElement.textContent = option.name;
+                optionElement.dataset.id = option.id; // Store ID as data attribute
+                selectElement.appendChild(optionElement);
+            });
+        } catch (error) {
+            console.error('Error populating container select:', error);
+            
+            // Add error option
+            selectElement.innerHTML = '<option value="">Error loading containers</option>';
+        }
+    }
 };
 
-// Modify the Docker container fetching to use cache
-async function fetchDockerContainers() {
-    const now = Date.now();
-    
-    // Return cached data if it's still valid
-    if (dockerCache.containers && (now - dockerCache.timestamp < dockerCache.ttl)) {
-        return dockerCache.containers;
-    }
-    
-    try {
-        const response = await fetch('/api/docker/containers');
-        const result = await response.json();
-        
-        // Update cache
-        if (result.success) {
-            dockerCache.containers = result.containers;
-            dockerCache.timestamp = now;
-        }
-        
-        return result.containers || [];
-    } catch (error) {
-        logger.error('Error fetching Docker containers:', error);
-        return [];
-    }
-}
-
-// Add this function to lazy load Docker containers only when needed
-function lazyLoadDockerContainers(paramContainer) {
-    // Show loading message
-    paramContainer.innerHTML = `
-        <div class="docker-container-msg">
-            <i class="fas fa-spinner fa-spin"></i> Fetching Docker containers...
-        </div>
-    `;
-    
-    // Use setTimeout to defer the API call slightly for better UI responsiveness
-    setTimeout(async () => {
-        try {
-            // Use the new Docker API endpoint
-            const response = await fetch('/api/docker/containers');
-            const result = await response.json();
-            
-            if (result.success && result.containers && result.containers.length > 0) {
-                // Create select element for containers
-                const select = document.createElement('select');
-                select.id = 'actionParams';
-                select.className = 'container-select';
-                
-                // Add empty option
-                const emptyOption = document.createElement('option');
-                emptyOption.value = '';
-                emptyOption.textContent = '-- Select a container --';
-                select.appendChild(emptyOption);
-                
-                // Add container options
-                result.containers.forEach(container => {
-                    const option = document.createElement('option');
-                    const name = container.Names && container.Names.length > 0 
-                        ? container.Names[0].replace(/^\//, '') 
-                        : container.Id.substring(0, 12);
-                    
-                    // Show status alongside name
-                    const status = container.State || 'unknown';
-                    option.textContent = `${name} (${status})`;
-                    
-                    select.appendChild(option);
-                });
-                
-                // Replace loading message with select
-                paramContainer.innerHTML = '';
-                paramContainer.appendChild(select);
-                
-                // Add status indicator
-                const statusDiv = document.createElement('div');
-                statusDiv.className = 'docker-container-msg';
-                statusDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${result.containers.length} containers found`;
-                paramContainer.appendChild(statusDiv);
-            } else {
-                paramContainer.innerHTML = `
-                    <div class="docker-container-msg warning-message">
-                        <i class="fas fa-exclamation-triangle"></i> 
-                        No Docker containers found or Docker not available.
-                    </div>
-                    <input type="text" id="actionParams" placeholder="Enter container ID manually">
-                `;
-            }
-        } catch (error) {
-            logger.error('Error checking for Docker containers:', error);
-            
-            paramContainer.innerHTML = `
-                <div class="docker-container-msg error-message">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    Error: ${error.message || 'Failed to connect to Docker'}
-                </div>
-                <input type="text" id="actionParams" placeholder="Enter container ID manually">
-            `;
-        }
-    }, 100);
-}
-
-// Make utilities available globally
-if (typeof window !== 'undefined') {
-    window.dockerUtils = {
-        fetchDockerContainers,
-        lazyLoadDockerContainers
-    };
-    logger.info('Docker utilities registered in window object');
-}
+// Export to global scope
+window.DockerUtils = DockerUtils;

@@ -1,0 +1,662 @@
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    overflow-y: auto;
+}
+
+.modal.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: var(--card-bg, white);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 0 20px;
+    background-color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 800px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content.large {
+    max-width: 900px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #eee);
+    background-color: #f8f9fa;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+.close-modal {
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    color: var(--secondary-color);
+}
+
+.close-modal:hover {
+    color: var(--text-color);
+}
+
+.modal-body {
+    padding: 20px;
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+.modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color, #eee);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Certificate details tabs */
+.cert-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin: 1rem 0;
+}
+
+.cert-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.cert-tab-btn:hover {
+  color: var(--primary-color);
+}
+
+.cert-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.cert-tab-content {
+  display: none;
+}
+
+.cert-tab-content.active {
+  display: block;
+}
+
+.cert-tab-content > div > * {
+  padding: 0 1rem;
+}
+
+.cert-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  padding: 0 1rem;
+}
+
+.cert-details-table th, 
+.cert-details-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cert-details-table th {
+  width: 180px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.cert-files-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.cert-files-table th, 
+.cert-files-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cert-files-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.deployment-action-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+}
+
+.deployment-action-type {
+  display: inline-block;
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  margin-right: 0.5rem;
+}
+
+.deployment-action-desc {
+  color: var(--text-color);
+}
+
+.deployment-action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Detail tabs */
+.detail-tabs {
+  margin-top: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-tab-button {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  margin-right: 0.5rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.detail-tab-button.active {
+  border-bottom-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.detail-tab-content {
+  display: none;
+  padding: 1rem 0;
+}
+
+.detail-tab-content.active {
+  display: block;
+}
+
+/* Certificate details modal with fixed dimensions */
+#cert-details-modal .modal-content {
+  width: 100%;
+  max-width: 800px;
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent double scrollbars */
+}
+
+#cert-details-modal .modal-header {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#cert-details-modal .modal-body {
+  flex: 1;
+  overflow: hidden; /* Prevent scrollbar in the modal body */
+  padding: 0; /* Remove padding to maximize space */
+}
+
+#cert-details-modal #cert-details-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Cert header */
+#cert-details-modal .cert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+}
+
+/* Tabs styling */
+#cert-details-modal .cert-tabs {
+  display: flex;
+  background-color: var(--bg-light);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0;
+  margin: 0;
+  overflow-x: auto; /* Allow scrolling for many tabs on small screens */
+}
+
+#cert-details-modal .cert-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+#cert-details-modal .cert-tab-btn:hover {
+  color: var(--primary-color);
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+#cert-details-modal .cert-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+/* Content wrapper with correct scrolling */
+#cert-details-modal .cert-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Tab content with proper scrolling */
+#cert-details-modal .cert-tab-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px;
+  overflow-y: auto; /* Single scrollbar per tab */
+  display: none;
+}
+
+#cert-details-modal .cert-tab-content.active {
+  display: block;
+}
+
+/* Section styling */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+/* Form layouts */
+.form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* Tables styling */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  background-color: var(--bg-light);
+}
+
+/* Domains section */
+.domains-list-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.domains-list {
+  margin-bottom: 20px;
+  overflow-y: auto;
+  max-height: 200px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+/* Files section */
+.file-list {
+  margin-bottom: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-type {
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+
+.file-path {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.file-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* Toggle switch for settings */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  background-color: var(--border-color);
+  border-radius: 20px;
+  margin-right: 10px;
+  transition: .4s;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+}
+
+input:checked + .toggle-slider {
+  background-color: var(--primary-color);
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px var(--primary-color);
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  user-select: none;
+}
+
+/* Loading indicator */
+.loading-cell {
+  text-align: center;
+  padding: 20px !important;
+}
+
+/* Certificate details modal with fixed dimensions */
+#cert-details-modal .modal-content {
+  width: 100%;
+  max-width: 700px; /* Fixed maximum width */
+  height: 550px;    /* Fixed height */
+  display: flex;
+  flex-direction: column;
+}
+
+#cert-details-modal .modal-body {
+  flex: 1;
+  overflow-y: auto; /* Allow scrolling within the body */
+  padding-bottom: 20px;
+}
+
+#cert-details-modal #cert-details-content {
+  min-height: 400px; /* Minimum content height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure tab content areas maintain consistent height */
+#cert-details-modal .cert-tab-content {
+  min-height: 300px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 1rem 0.5rem 1rem 0;
+}
+
+/* Add subtle scrollbar styling */
+#cert-details-modal .cert-tab-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+#cert-details-modal .cert-tab-content::-webkit-scrollbar-track {
+  background: var(--bg-light, #f1f1f1);
+  border-radius: 10px;
+}
+
+#cert-details-modal .cert-tab-content::-webkit-scrollbar-thumb {
+  background: var(--border-color, #cccccc);
+  border-radius: 10px;
+}
+
+#cert-details-modal .cert-tab-content::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-color, #999999);
+}
+
+/* Maintain tab height consistency */
+#cert-details-modal .cert-tabs {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Add loading spinner consistent positioning */
+#cert-details-modal .loading-state {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Consistent error state positioning */
+#cert-details-modal .error-state {
+  min-height: 300px;
+}
+
+/* Deployment actions section - prevent layout shift */
+#cert-details-modal .deployment-actions {
+  margin-top: 0;
+}
+
+#cert-details-modal .deployment-options {
+  min-height: 100px; /* Ensure space for at least one action */
+}
+
+/* Add smooth transitions for tab content */
+#cert-details-modal .cert-tab-content {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  position: absolute;
+  visibility: hidden;
+}
+
+#cert-details-modal .cert-tab-content.active {
+  opacity: 1;
+  position: relative;
+  visibility: visible;
+}
+
+/* Container for tab content to enable absolute positioning */
+#cert-details-modal .cert-tabs-container {
+  position: relative;
+  min-height: 350px;
+  margin-top: 1rem;
+}
+
+/* Mobile adjustments for certificate details modal */
+@media (max-width: 768px) {
+  #cert-details-modal .modal-content {
+    height: 90vh;
+    max-height: 650px;
+  }
+  
+  #cert-details-modal .cert-tab-content {
+    min-height: 250px;
+    max-height: 250px;
+  }
+  
+  #cert-details-modal .cert-details-table th,
+  #cert-details-modal .cert-files-table th {
+    width: 120px;
+  }
+}
+
+/* Cert modal header */
+.cert-modal-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.cert-modal-header h3 {
+  margin: 0;
+  flex: 0 0 auto;
+  margin-right: 15px;
+}
+
+.cert-modal-header .cert-name {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cert-modal-header .cert-status {
+  margin-right: 15px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.close-modal {
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.close-modal:hover {
+  color: #000;
+}

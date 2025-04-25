@@ -1,0 +1,273 @@
+<div class="modal-header cert-modal-header">
+  <h3>Certificate Details</h3>
+  <span class="cert-name">{{certificate.name}}</span>
+  <span class="cert-status {{statusClass}}">{{statusText}}</span>
+  <span class="close-modal">&times;</span>
+</div>
+
+<div class="cert-tabs">
+  <button class="cert-tab-btn active" data-tab="details">Details</button>
+  <button class="cert-tab-btn" data-tab="domains">Domains</button>
+  <button class="cert-tab-btn" data-tab="files">Files</button>
+  <button class="cert-tab-btn" data-tab="deployment">Deployment</button>
+  <button class="cert-tab-btn" data-tab="backups">Backups</button>
+  <button class="cert-tab-btn" data-tab="settings">Settings</button>
+</div>
+
+<div class="cert-content-wrapper">
+<!-- DETAILS TAB -->
+<div class="cert-tab-content" id="details-tab">
+  <div class="tab-header">
+    <h4>Certificate Information</h4>
+    <button id="edit-cert-details-btn" class="button small">Edit Details</button>
+  </div>
+  
+  <div id="cert-details-view" class="cert-details-view">
+    <table class="cert-details-table">
+      <tr>
+        <th>Name:</th>
+        <td id="cert-name-display">{{certificate.name}}</td>
+      </tr>
+      <tr>
+        <th>Fingerprint:</th>
+        <td><code>{{certificate.fingerprint}}</code></td>
+      </tr>
+      <tr>
+        <th>Common Name:</th>
+        <td>{{domain}}</td>
+      </tr>
+      <tr>
+        <th>Certificate Type:</th>
+        <td>{{certificate.certType || 'Standard'}}</td>
+      </tr>
+      <tr>
+        <th>Subject:</th>
+        <td>{{certificate.subject || 'N/A'}}</td>
+      </tr>
+      <tr>
+        <th>Issuer:</th>
+        <td>{{certificate.issuer || 'N/A'}}</td>
+      </tr>
+      <tr>
+        <th>Valid From:</th>
+        <td>{{issueDate}}</td>
+      </tr>
+      <tr>
+        <th>Valid To:</th>
+        <td>{{expiryDate}}</td>
+      </tr>
+      <tr>
+        <th>Days Until Expiry:</th>
+        <td>{{daysUntilExpiry}}</td>
+      </tr>
+      <tr>
+        <th>Key Type:</th>
+        <td>{{certificate.keyType || 'RSA'}} {{certificate.keySize || '2048'}} bits</td>
+      </tr>
+      <tr>
+        <th>Signature Algorithm:</th>
+        <td>{{certificate.sigAlg || 'N/A'}}</td>
+      </tr>
+    </table>
+  </div>
+  
+  <div id="cert-details-edit" class="cert-details-edit hidden">
+    <form id="edit-cert-form">
+      <div class="form-group">
+        <label for="edit-cert-name">Certificate Name:</label>
+        <input type="text" id="edit-cert-name" class="form-control" value="{{certificate.name}}">
+      </div>
+      
+      <div class="form-group">
+        <label for="edit-cert-description">Description:</label>
+        <textarea id="edit-cert-description" class="form-control">{{certificate.description}}</textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="edit-cert-group">Certificate Group:</label>
+        <select id="edit-cert-group" class="form-control">
+          <option value="">None</option>
+          <!-- Groups will be loaded dynamically -->
+        </select>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" id="cancel-edit-details-btn" class="button">Cancel</button>
+        <button type="button" id="save-cert-details-btn" class="button primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DOMAINS TAB -->
+<div class="cert-tab-content" id="domains-tab">
+  <div class="domains-list-container">
+    <h4>Certificate Domains</h4>
+    <div class="domains-list">
+      {{#if certificate.domains.length}}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="domains-table-body">
+          <!-- Will be filled dynamically -->
+          <tr><td colspan="3" class="loading-cell"><div class="loading-spinner small"></div></td></tr>
+        </tbody>
+      </table>
+      {{else}}
+      <p class="empty-message">No domains configured for this certificate.</p>
+      {{/if}}
+    </div>
+    
+    <div class="domain-add-section">
+      <h4>Add Domain or IP</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="domain-value">Domain or IP Address:</label>
+          <input type="text" id="domain-value" placeholder="example.com or 192.168.1.1" class="form-control">
+          <small class="help-text">Enter a domain name or IP address. Type will be auto-detected.</small>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button id="add-domain-btn" class="button">Add Domain</button>
+        <button id="add-renew-domain-btn" class="button primary">Add & Renew</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILES TAB -->
+<div class="cert-tab-content" id="files-tab">
+  <div class="files-section">
+    <h4>Certificate Files</h4>
+    <div id="cert-files-list" class="file-list">
+      <div class="loading-spinner small"></div>
+    </div>
+    
+    <div class="file-format-section">
+      <h4>Convert Certificate</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="convert-format">Target Format:</label>
+          <select id="convert-format" class="form-control">
+            <option value="">Select format...</option>
+            <option value="pem">PEM Format</option>
+            <option value="der">DER Format</option>
+            <option value="p12">PKCS#12 (.p12)</option>
+            <option value="pfx">PFX (PKCS#12)</option>
+            <option value="p7b">PKCS#7 (.p7b)</option>
+            <option value="crt">X.509 Certificate (.crt)</option>
+            <option value="cer">X.509 Certificate (.cer)</option>
+          </select>
+        </div>
+        
+        <div class="form-group password-field hidden" id="convert-password-group">
+          <label for="convert-password">Password:</label>
+          <input type="password" id="convert-password" class="form-control" placeholder="Required for PKCS#12/PFX">
+        </div>
+      </div>
+      
+      <div class="form-actions">
+        <button id="convert-cert-btn" class="button" disabled>Convert</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOYMENT TAB -->
+<div class="cert-tab-content" id="deployment-tab">
+  <div class="deployment-section">
+    <div class="section-header">
+      <h4>Deployment Actions</h4>
+      <button id="add-deployment-action-btn" class="button small">Add Action</button>
+    </div>
+    
+    <div id="deployment-actions-list" class="actions-list">
+      <div class="loading-spinner small"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BACKUPS TAB -->
+<div class="cert-tab-content" id="backups-tab">
+  <div class="backups-section">
+    <div class="section-header">
+      <h4>Certificate Backups</h4>
+      <button id="create-backup-btn" class="button small">Create Backup</button>
+    </div>
+    
+    <div id="cert-backups-list" class="backups-list">
+      <div class="loading-spinner small"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div class="cert-tab-content" id="settings-tab">
+  <form id="cert-settings-form" class="cert-settings-form">
+    <h4>Certificate Settings</h4>
+    
+    <div class="form-group">
+      <label class="toggle-switch">
+        <input type="checkbox" id="cert-auto-renew" {{#if certificate.autoRenew}}checked{{/if}}>
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Auto-renew certificate</span>
+      </label>
+    </div>
+    
+    <div class="form-group">
+      <label for="cert-validity">Certificate Validity (days):</label>
+      <input type="number" id="cert-validity" class="form-control" min="1" max="825" value="{{certificate.validity}}">
+      <small class="text-muted">Maximum validity is 825 days for publicly trusted certificates</small>
+    </div>
+    
+    <div class="form-group">
+      <label for="cert-renew-before">Renew Before Expiry (days):</label>
+      <input type="number" id="cert-renew-before" class="form-control" min="1" max="60" value="{{certificate.renewBefore}}">
+    </div>
+    
+    <div class="form-group">
+      <label for="cert-key-size">Key Size (bits):</label>
+      <select id="cert-key-size" class="form-control">
+        <option value="2048" {{#if (eq certificate.keySize "2048")}}selected{{/if}}>2048 (Standard)</option>
+        <option value="3072" {{#if (eq certificate.keySize "3072")}}selected{{/if}}>3072</option>
+        <option value="4096" {{#if (eq certificate.keySize "4096")}}selected{{/if}}>4096 (More Secure)</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="cert-notifications">Notification Settings:</label>
+      <div class="checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="notify-expiry" {{#if certificate.notifications.expiry}}checked{{/if}}>
+          Notify before expiry
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="notify-renewal" {{#if certificate.notifications.renewal}}checked{{/if}}>
+          Notify on renewal
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="notify-error" {{#if certificate.notifications.error}}checked{{/if}}>
+          Notify on errors
+        </label>
+      </div>
+    </div>
+    
+    <div class="form-actions">
+      <button type="button" id="save-cert-settings-btn" class="button primary">Save Settings</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <div class="modal-footer-actions">
+    <button class="button danger" id="delete-cert-btn">Delete</button>
+    <button class="button" id="download-cert-btn">Download</button>
+    <button class="button primary" id="renew-cert-btn">Renew Certificate</button>
+    <button class="button secondary" id="close-cert-details-btn">Close</button>
+  </div>
+</div>

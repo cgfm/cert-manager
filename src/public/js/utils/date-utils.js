@@ -1,272 +1,166 @@
 /**
- * Date utility functions for Certificate Manager
- * This module provides functions to parse, format, and manipulate dates related to certificates.
- * @module date-utils - Date utility functions
- * @requires window - Global object for accessing browser APIs
- * @requires document - DOM manipulation
- * @requires console - Console for logging messages
- * @requires logger - Logger utility for debugging
- * @requires fetch - Fetch API for making HTTP requests
- * @version 1.0.0
- * @license MIT
- * @author Christian Meiners
- * @description This module is designed to work with dates, providing functions to parse, format, and calculate differences between dates. It also includes functions to handle certificate expiration and display relevant information in a user-friendly manner.
+ * Date Utilities
+ * Helper functions for date formatting and manipulation
  */
-
-/**
- * Parse a date string safely
- * @param {string} dateStr - Date string to parse
- * @returns {Date|null} Parsed date or null if invalid
- */
-function parseDate(dateStr) {
-    if (!dateStr) return null;
-    
-    try {
-        const date = new Date(dateStr);
-        return isNaN(date.getTime()) ? null : date;
-    } catch (e) {
-        logger.warn(`Failed to parse date: ${dateStr}`, e);
-        return null;
-    }
-}
-
-/**
- * Format a date into a human-readable string
- * @param {string|Date} date - The date to format
- * @returns {string} - Formatted date string
- */
-function formatDate(date) {
+const DateUtils = {
+  /**
+   * Format date as "YYYY-MM-DD"
+   * @param {string|Date} date - Date string or Date object
+   * @returns {string} Formatted date
+   */
+  formatDate: function(date) {
     if (!date) return 'N/A';
-    try {
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) return 'Invalid date';
-        return parsedDate.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    } catch (error) {
-        logger.error('Error formatting date:', error);
-        return String(date);
-    }
-}
-
-/**
- * Calculate days until a date
- * @param {Date|string} targetDate - Target date
- * @returns {number} Days until the date (negative if in past)
- */
-function daysUntil(targetDate) {
-    if (!targetDate) return null;
     
-    if (typeof targetDate === 'string') {
-        targetDate = parseDate(targetDate);
-    }
+    const d = new Date(date);
     
-    if (!targetDate || isNaN(targetDate.getTime())) {
-        return null;
-    }
+    // Check if date is valid
+    if (isNaN(d.getTime())) return 'Invalid Date';
     
-    const now = new Date();
-    const diffTime = targetDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     
-    return diffDays;
-}
-
-/**
- * Get a CSS class based on how close a date is to expiry
- * @param {Date|string} expiryDate - The expiry date
- * @returns {string} CSS class name for styling
- */
-function getExpiryClass(expiryDate) {
-    const days = daysUntil(expiryDate);
+    return `${year}-${month}-${day}`;
+  },
+  
+  /**
+   * Format date and time as "YYYY-MM-DD HH:MM:SS"
+   * @param {string|Date} date - Date string or Date object
+   * @returns {string} Formatted date and time
+   */
+  formatDateTime: function(date) {
+    if (!date) return 'N/A';
     
-    if (days === null) return 'unknown';
-    if (days <= 0) return 'expired';
-    if (days <= 7) return 'expiring-soon';
-    if (days <= 30) return 'expiring';
+    const d = new Date(date);
     
-    return 'valid';
-}
-
-/**
- * Get a human-readable description of time until expiry
- * @param {Date|string} expiryDate - The expiry date
- * @returns {string} Description of time until expiry
- */
-function getExpiryText(expiryDate) {
-    const days = daysUntil(expiryDate);
+    // Check if date is valid
+    if (isNaN(d.getTime())) return 'Invalid Date';
     
-    if (days === null) return 'Unknown';
-    if (days < 0) return `Expired ${Math.abs(days)} days ago`;
-    if (days === 0) return 'Expires today';
-    if (days === 1) return 'Expires tomorrow';
-    if (days < 30) return `Expires in ${days} days`;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
     
-    const months = Math.floor(days / 30);
-    return `Expires in ${months} month${months !== 1 ? 's' : ''}`;
-}
-
-
-/**
- * Format a date for display, with fallback for invalid dates
- * @param {Date|string} date - Date to format
- * @returns {string} Formatted date string
- */
-function formatCertificateDate(date) {
-    if (!date) return 'Not specified';
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  },
+  
+  /**
+   * Format relative time (e.g., "2 days ago")
+   * @param {string|Date} date - Date string or Date object
+   * @returns {string} Relative time string
+   */
+  formatRelativeTime: function(date) {
+    if (!date) return 'N/A';
     
-    if (typeof date === 'string') {
-        date = parseCertificateDate(date);
-    }
+    const d = new Date(date);
     
-    if (!date || isNaN(date.getTime())) {
-        return 'Invalid date';
-    }
-    
-    const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    };
-    
-    return date.toLocaleDateString(undefined, options);
-}
-
-/**
- * Safely parse a date string from a certificate
- * @param {string} dateStr - Date string to parse
- * @returns {Date|null} Parsed date or null if invalid
- */
-function parseCertificateDate(dateStr) {
-    if (!dateStr) return null;
-    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
-    
-    try {
-        // Try direct parsing first
-        let date = new Date(dateStr);
-        
-        // Check if valid
-        if (!isNaN(date.getTime())) {
-            return date;
-        }
-        
-        // Use window.dateUtils if available, otherwise use basic parsing
-        if (window.dateUtils && typeof window.dateUtils.parseDate === 'function') {
-            return window.dateUtils.parseDate(dateStr);
-        }
-        
-        // Various date formats to try
-        const formats = [
-            // Try direct Date parsing
-            (d) => new Date(d),
-            // Try ISO string
-            (d) => new Date(d),
-            // Try Unix timestamp (seconds)
-            (d) => new Date(parseInt(d) * 1000),
-            // Try Unix timestamp (milliseconds)
-            (d) => new Date(parseInt(d))
-        ];
-        
-        // Try each format
-        for (const format of formats) {
-            try {
-                const date = format(dateStr);
-                if (!isNaN(date.getTime())) {
-                    // Valid date found
-                    return date;
-                }
-            } catch (e) {
-                // Continue to next format
-            }
-        }
-        
-        // Try alternative formats
-        // Format: "Nov 16 12:00:00 2022 GMT"
-        const gmtMatch = /([A-Za-z]{3}\s+\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+\d{4}\s+GMT)/.exec(dateStr);
-        if (gmtMatch) {
-            date = new Date(gmtMatch[1]);
-            if (!isNaN(date.getTime())) {
-                return date;
-            }
-        }
-        
-        // Format: "2022-11-16T12:00:00.000Z" (ISO format)
-        const isoMatch = /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z)/.exec(dateStr);
-        if (isoMatch) {
-            date = new Date(isoMatch[1]);
-            if (!isNaN(date.getTime())) {
-                return date;
-            }
-        }
-        
-        // Format: "20221116120000Z" (ASN.1 TIME)
-        const asnMatch = /(\d{14}Z)/.exec(dateStr);
-        if (asnMatch) {
-            const matched = asnMatch[1];
-            const year = matched.substring(0, 4);
-            const month = matched.substring(4, 6);
-            const day = matched.substring(6, 8);
-            const hour = matched.substring(8, 10);
-            const minute = matched.substring(10, 12);
-            const second = matched.substring(12, 14);
-            
-            date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
-            if (!isNaN(date.getTime())) {
-                return date;
-            }
-        }
-        
-        // Failed to parse date
-        logger.warn(`Failed to parse certificate date: ${dateStr}`);
-        return null;
-    } catch (error) {
-        logger.error('Error parsing certificate date:', error);
-        return null;
-    }
-}
-
-
-/**
- * Calculate days remaining until a date
- * @param {Date|string} date - Target date
- * @returns {number|null} Days remaining or null if invalid
- */
-function getDaysRemaining(date) {
-    if (typeof date === 'string') {
-        date = parseCertificateDate(date);
-    }
-    
-    if (!date || isNaN(date.getTime())) {
-        return null;
-    }
+    // Check if date is valid
+    if (isNaN(d.getTime())) return 'Invalid Date';
     
     const now = new Date();
-    const diffTime = date - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffMs = now - d;
     
-    return diffDays;
-}
-// Make utilities available globally
-if (typeof window !== 'undefined') {
-    window.dateUtils = {
-        parseDate,
-        formatDate,
-        daysUntil,
-        getExpiryClass,
-        getExpiryText,
-        formatCertificateDate,
-        parseCertificateDate,
-        getDaysRemaining
-    };
-    logger.info('Date utilities registered in window object');
-}
+    // Convert to seconds
+    const diffSecs = Math.floor(diffMs / 1000);
+    
+    // Less than a minute
+    if (diffSecs < 60) {
+      return 'Just now';
+    }
+    
+    // Less than an hour
+    if (diffSecs < 3600) {
+      const mins = Math.floor(diffSecs / 60);
+      return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+    }
+    
+    // Less than a day
+    if (diffSecs < 86400) {
+      const hours = Math.floor(diffSecs / 3600);
+      return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    }
+    
+    // Less than a week
+    if (diffSecs < 604800) {
+      const days = Math.floor(diffSecs / 86400);
+      return `${days} day${days === 1 ? '' : 's'} ago`;
+    }
+    
+    // Less than a month
+    if (diffSecs < 2592000) {
+      const weeks = Math.floor(diffSecs / 604800);
+      return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+    }
+    
+    // Less than a year
+    if (diffSecs < 31536000) {
+      const months = Math.floor(diffSecs / 2592000);
+      return `${months} month${months === 1 ? '' : 's'} ago`;
+    }
+    
+    // More than a year
+    const years = Math.floor(diffSecs / 31536000);
+    return `${years} year${years === 1 ? '' : 's'} ago`;
+  },
+  
+  /**
+   * Calculate days until a date
+   * @param {string|Date} date - Date string or Date object
+   * @returns {number} Number of days until the date
+   */
+  daysUntil: function(date) {
+    if (!date) return null;
+    
+    const d = new Date(date);
+    
+    // Check if date is valid
+    if (isNaN(d.getTime())) return null;
+    
+    const now = new Date();
+    
+    // Set time to midnight for both dates to get full days
+    now.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    
+    const diffMs = d - now;
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  },
+  
+  /**
+   * Calculate days since a date
+   * @param {string|Date} date - Date string or Date object
+   * @returns {number} Number of days since the date
+   */
+  daysSince: function(date) {
+    if (!date) return null;
+    
+    const d = new Date(date);
+    
+    // Check if date is valid
+    if (isNaN(d.getTime())) return null;
+    
+    const now = new Date();
+    
+    // Set time to midnight for both dates to get full days
+    now.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    
+    const diffMs = now - d;
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  },
+  
+  /**
+   * Format date range
+   * @param {string|Date} startDate - Start date
+   * @param {string|Date} endDate - End date
+   * @returns {string} Formatted date range
+   */
+  formatDateRange: function(startDate, endDate) {
+    return `${this.formatDate(startDate)} to ${this.formatDate(endDate)}`;
+  }
+};
 
-// Expose to window object
-window.dateUtils = window.dateUtils || {};
-window.dateUtils.formatDate = formatDate;
+// Export for use in other modules
+window.DateUtils = DateUtils;

@@ -1,270 +1,542 @@
 /**
- * UI utility functions for Certificate Manager
- * @module ui-utils - UI utility functions for managing user interactions
- * @requires logger - Logger utility for debugging
- * @requires window - Global object for accessing browser APIs
- * @requires document - DOM manipulation
- * @requires Promise - Promise API for asynchronous operations
- * @requires HTMLElement - DOM element interface for manipulating HTML elements
- * @version 1.0.0
- * @license MIT
- * @description This module provides utility functions for UI interactions, including confirmation dialogs, notifications, and event delegation.
+ * UI Utilities
+ * Common UI helper functions
  */
-
-/**
- * Show a confirmation dialog
- * @param {Object} options - Dialog options
- * @returns {Promise<boolean>} User's choice
- */
-function confirm(options = {}) {
-    const defaults = {
-        title: 'Confirm',
-        message: 'Are you sure?',
-        confirmText: 'Yes',
-        cancelText: 'No',
-        type: 'warning' // warning, danger, info
-    };
+const UIUtils = {
+  /**
+   * Show loading state in a container
+   * @param {string} containerId - ID of container element
+   * @param {string} message - Optional loading message
+   */
+  showLoading: function(containerId, message = 'Loading...') {
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.innerHTML = `<div class="loading">${message}</div>`;
+    }
+  },
+  
+  /**
+   * Create a loading state element
+   * @param {string} message - Loading message to display
+   * @returns {HTMLElement} Loading state element
+   */
+  createLoadingState: function(message = 'Loading...') {
+    const loadingState = document.createElement('div');
+    loadingState.className = 'loading-state';
     
-    const settings = {...defaults, ...options};
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
     
-    return new Promise((resolve) => {
-        // Create confirm dialog HTML
-        const dialog = document.createElement('div');
-        dialog.className = 'confirm-dialog';
-        
-        dialog.innerHTML = `
-            <div class="confirm-content">
-                <h3><i class="fas fa-exclamation-triangle"></i> ${settings.title}</h3>
-                <p>${settings.message}</p>
-                <div class="button-group">
-                    <button class="secondary-btn" id="cancel-btn">${settings.cancelText}</button>
-                    <button class="primary-btn ${settings.type}-btn" id="confirm-btn">${settings.confirmText}</button>
-                </div>
-            </div>
-        `;
-        
-        // Add to document
-        document.body.appendChild(dialog);
-        
-        // Add event handlers
-        const confirmBtn = dialog.querySelector('#confirm-btn');
-        const cancelBtn = dialog.querySelector('#cancel-btn');
-        
-        confirmBtn.addEventListener('click', () => {
-            document.body.removeChild(dialog);
-            resolve(true);
-        });
-        
-        cancelBtn.addEventListener('click', () => {
-            document.body.removeChild(dialog);
-            resolve(false);
-        });
-    });
-}
-
-/**
- * Show a notification
- * @param {string} message - Message to display
- * @param {string} type - Type of notification (info, success, warning, error)
- * @param {number} duration - How long to show the notification in ms
- */
-function notify(message, type = 'info', duration = 3000) {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    const loadingText = document.createElement('p');
+    loadingText.className = 'loading-text';
+    loadingText.textContent = message;
     
-    const icon = getIconForType(type);
+    loadingState.appendChild(spinner);
+    loadingState.appendChild(loadingText);
     
-    notification.innerHTML = `
-        <i class="${icon}"></i>
-        <span>${message}</span>
-    `;
+    return loadingState;
+  },
+  
+  /**
+   * Create an empty state element
+   * @param {string} title - Empty state title
+   * @param {string} message - Empty state message
+   * @param {string} icon - Icon to display (emoji or icon class)
+   * @param {string} stateType - Type of empty state (for styling)
+   * @param {string} actionText - Text for action button (optional)
+   * @param {Function} actionFn - Function to call when action button is clicked (optional)
+   * @returns {HTMLElement} Empty state element
+   */
+  createEmptyState: function(title, message, icon = '📂', stateType = '', actionText = '', actionFn = null) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
     
-    // Create notifications container if it doesn't exist
-    let container = document.getElementById('notifications-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'notifications-container';
-        document.body.appendChild(container);
+    if (stateType) {
+      emptyState.classList.add(stateType);
     }
     
-    // Add to container
-    container.appendChild(notification);
+    const iconElement = document.createElement('div');
+    iconElement.className = 'empty-state-icon';
     
-    // Animate in
+    // Check if icon is an emoji (starts with a non-letter) or icon class
+    if (icon.match(/^[^a-zA-Z]/)) {
+      iconElement.textContent = icon;
+    } else {
+      iconElement.innerHTML = `<i class="${icon}"></i>`;
+    }
+    
+    const titleElement = document.createElement('h3');
+    titleElement.className = 'empty-state-title';
+    titleElement.textContent = title;
+    
+    const messageElement = document.createElement('p');
+    messageElement.className = 'empty-state-message';
+    messageElement.textContent = message;
+    
+    emptyState.appendChild(iconElement);
+    emptyState.appendChild(titleElement);
+    emptyState.appendChild(messageElement);
+    
+    // Add action button if provided
+    if (actionText && actionFn) {
+      const actionButton = document.createElement('button');
+      actionButton.className = 'button primary empty-state-action';
+      actionButton.textContent = actionText;
+      actionButton.addEventListener('click', actionFn);
+      
+      emptyState.appendChild(actionButton);
+    }
+    
+    return emptyState;
+  },
+  
+  /**
+   * Create an error state element
+   * @param {string} title - Error title
+   * @param {string} message - Error message
+   * @param {Function} retryFn - Function to call when retry button is clicked (optional)
+   * @returns {HTMLElement} Error state element
+   */
+  createErrorState: function(title, message, retryFn = null) {
+    const errorState = document.createElement('div');
+    errorState.className = 'error-state';
+    
+    const iconElement = document.createElement('div');
+    iconElement.className = 'error-state-icon';
+    iconElement.innerHTML = '⚠️'; // Warning emoji
+    
+    const titleElement = document.createElement('h3');
+    titleElement.className = 'error-state-title';
+    titleElement.textContent = title;
+    
+    const messageElement = document.createElement('p');
+    messageElement.className = 'error-state-message';
+    messageElement.textContent = message;
+    
+    errorState.appendChild(iconElement);
+    errorState.appendChild(titleElement);
+    errorState.appendChild(messageElement);
+    
+    // Add retry button if function provided
+    if (retryFn) {
+      const retryButton = document.createElement('button');
+      retryButton.className = 'button primary error-state-retry';
+      retryButton.textContent = 'Retry';
+      retryButton.addEventListener('click', retryFn);
+      
+      errorState.appendChild(retryButton);
+    }
+    
+    return errorState;
+  },
+  
+  /**
+   * Show a toast notification
+   * @param {string} message - Notification message
+   * @param {string} type - Notification type (success, error, info, warning)
+   * @param {number} duration - Duration in ms
+   */
+  showToast: function(message, type = 'info', duration = 3000) {
+    // Check if toast container exists, create if it doesn't
+    let toastContainer = document.getElementById('toast-container');
+    
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    
+    // Add to container
+    toastContainer.appendChild(toast);
+    
+    // Show with animation
     setTimeout(() => {
-        notification.classList.add('visible');
+      toast.classList.add('show');
     }, 10);
     
     // Remove after duration
     setTimeout(() => {
-        notification.classList.remove('visible');
-        setTimeout(() => {
-            container.removeChild(notification);
-        }, 300); // Match the CSS transition time
+      toast.classList.remove('show');
+      toast.addEventListener('transitionend', () => {
+        toast.remove();
+      });
     }, duration);
-}
-
-/**
- * Set up event delegation for a container element
- * @param {HTMLElement|string} container - Container element or selector
- * @param {string} selector - CSS selector for target elements
- * @param {string} eventType - Type of event to listen for
- * @param {Function} callback - Callback function (receives event and matched element)
- * @returns {Function} Cleanup function that removes the event listener
- */
-function delegateEvent(container, selector, eventType, callback) {
-    // Get container element if string was provided
-    const containerElement = typeof container === 'string' 
-        ? document.querySelector(container) 
-        : container;
+  },
+  
+  /**
+   * Show error message in a notification
+   * @param {string} title - Error title
+   * @param {Error|string} error - Error object or message
+   */
+  showError: function(title, error) {
+    const message = error instanceof Error ? error.message : error;
+    this.showNotification(title, message, 'error');
     
-    if (!containerElement) {
-        logger.error(`Container not found: ${container}`);
-        return () => {};
-    }
+    // Log to console for debugging
+    console.error(title, error);
+  },
+  
+  /**
+   * Show notification
+   * @param {string} title - Notification title
+   * @param {string} message - Notification message
+   * @param {string} type - Notification type: 'success', 'error', 'warning', 'info'
+   * @param {number} duration - Duration in milliseconds before auto-hiding
+   */
+  showNotification: function(title, message, type = 'info', duration = 5000) {
+    const container = document.getElementById('notifications-container');
+    if (!container) return;
     
-    // The event handler that implements delegation
-    const handler = (event) => {
-        // Find the target element that matches the selector, starting from event.target
-        // and working up through parents until reaching the container
-        let targetElement = event.target;
-        
-        while (targetElement && targetElement !== containerElement) {
-            if (targetElement.matches(selector)) {
-                // Call the callback with the event and matched element
-                callback(event, targetElement);
-                return;
-            }
-            targetElement = targetElement.parentElement;
-        }
-    };
+    const id = 'notification-' + Date.now();
     
-    // Attach the handler to the container
-    containerElement.addEventListener(eventType, handler);
+    // Use safeTemplate to prevent XSS
+    const notificationHTML = this.safeTemplate(`
+      <div id="\${id|attr}" class="notification \${type|attr}">
+        <div class="notification-content">
+          <h3 class="notification-title">\${title}</h3>
+          <p class="notification-message">\${message}</p>
+        </div>
+        <button class="notification-close">&times;</button>
+      </div>
+    `, { id, type, title, message });
     
-    // Return a cleanup function
-    return () => {
-        containerElement.removeEventListener(eventType, handler);
-    };
-}
-
-/**
- * Add event handlers to dynamically created content using event delegation
- * @param {Object} handlers - Object mapping selectors to event handlers
- * @param {HTMLElement|string} container - Container element or selector (defaults to document.body)
- */
-function setupDelegatedEvents(handlers, container = document.body) {
-    const containerElement = typeof container === 'string' 
-        ? document.querySelector(container) 
-        : container;
-        
-    if (!containerElement) {
-        logger.error(`Container not found: ${container}`);
-        return;
-    }
+    container.insertAdjacentHTML('afterbegin', notificationHTML);
     
-    // Store cleanup functions
-    const cleanupFunctions = [];
+    const notification = document.getElementById(id);
     
-    // Process each handler definition
-    for (const [selector, handlerConfig] of Object.entries(handlers)) {
-        for (const [eventType, callback] of Object.entries(handlerConfig)) {
-            const cleanup = delegateEvent(containerElement, selector, eventType, callback);
-            cleanupFunctions.push(cleanup);
-        }
-    }
-    
-    // Return function that removes all event listeners
-    return () => {
-        cleanupFunctions.forEach(cleanup => cleanup());
-    };
-}
-
-// Helper function to get icon for notification type
-function getIconForType(type) {
-    switch (type) {
-        case 'success': return 'fas fa-check-circle';
-        case 'warning': return 'fas fa-exclamation-triangle';
-        case 'error': return 'fas fa-times-circle';
-        default: return 'fas fa-info-circle'; // info
-    }
-}
-
-/**
- * Set up tab switching in a container
- * @param {HTMLElement} container - Container element with tabs
- * @returns {Function} Function to switch to a specific tab
- */
-function setupTabs(container) {
-    if (!container) {
-        logger.error('No container provided for setupTabs');
-        return null;
-    }
-    
-    const tabButtons = container.querySelectorAll('.tab-btn');
-    const tabContents = container.querySelectorAll('.tab-content');
-    
-    if (!tabButtons.length || !tabContents.length) {
-        logger.warn('No tabs found in container');
-        return null;
-    }
-    
-    logger.info(`Setting up ${tabButtons.length} tabs in container`);
-    
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            // Remove active class from all buttons
-            tabButtons.forEach(btn => {
-                btn.classList.remove('active');
-                btn.style.borderBottom = '3px solid transparent';
-                btn.style.color = '#333';
-            });
-            
-            // Add active class to clicked button
-            button.classList.add('active');
-            button.style.borderBottom = '3px solid #0078d7';
-            button.style.color = '#0078d7';
-            
-            // Hide all tab contents
-            tabContents.forEach(content => {
-                content.style.display = 'none';
-            });
-            
-            // Show the selected tab content
-            const tabName = button.getAttribute('data-tab');
-            const selectedTab = container.querySelector(`#${tabName}-tab`);
-            if (selectedTab) {
-                selectedTab.style.display = 'block';
-                
-                // Trigger a custom event that other components can listen for
-                const tabChangeEvent = new CustomEvent('tabchange', {
-                    detail: { tabName }
-                });
-                container.dispatchEvent(tabChangeEvent);
-            }
-        });
+    // Add event listener to close button
+    const closeBtn = notification.querySelector('.notification-close');
+    closeBtn.addEventListener('click', () => {
+      this.removeNotification(notification);
     });
     
-    // Return a function that can be used to switch to a specific tab
-    return function switchToTab(tabName) {
-        const tabBtn = container.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-        if (tabBtn) {
-            tabBtn.click();
-            return true;
+    // Auto-hide after duration
+    if (duration > 0) {
+      setTimeout(() => {
+        if (notification.parentNode) {
+          this.removeNotification(notification);
         }
-        return false;
-    };
-}
+      }, duration);
+    }
+    
+    return notification;
+  },
+  
+  /**
+   * Remove a notification with animation
+   * @param {HTMLElement} notification - The notification element
+   */
+  removeNotification: function(notification) {
+    notification.classList.add('removing');
+    
+    notification.addEventListener('animationend', () => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    });
+  },
+  
+  /**
+   * Format bytes to human-readable string
+   * @param {number} bytes - Size in bytes
+   * @param {number} decimals - Decimal places
+   * @returns {string} Formatted size string
+   */
+  formatBytes: function(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+  },
+  
+  /**
+   * Format a file size in bytes to a human-readable string (alias of formatBytes)
+   * @param {number} bytes - File size in bytes
+   * @param {number} decimals - Number of decimal places
+   * @returns {string} Formatted file size
+   */
+  formatFileSize: function(bytes, decimals = 2) {
+    return this.formatBytes(bytes, decimals);
+  },
+  
+  /**
+   * Safely escape HTML to prevent XSS
+   * @param {string} unsafe - String to escape
+   * @returns {string} Escaped string
+   */
+  escapeHTML: function(unsafe) {
+    if (!unsafe) return '';
+    
+    return unsafe
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
+  
+  /**
+   * Validate form inputs
+   * @param {HTMLFormElement} form - The form element
+   * @returns {boolean} True if valid
+   */
+  validateForm: function(form) {
+    const inputs = form.querySelectorAll('input, select, textarea');
+    let isValid = true;
+    
+    inputs.forEach(input => {
+      if (input.hasAttribute('required') && !input.value.trim()) {
+        this.showInputError(input, 'This field is required');
+        isValid = false;
+      } else if (input.type === 'email' && input.value && !this.isValidEmail(input.value)) {
+        this.showInputError(input, 'Please enter a valid email address');
+        isValid = false;
+      } else {
+        this.clearInputError(input);
+      }
+    });
+    
+    return isValid;
+  },
+  
+  /**
+   * Show error for input
+   * @param {HTMLElement} input - Input element
+   * @param {string} message - Error message
+   */
+  showInputError: function(input, message) {
+    this.clearInputError(input);
+    
+    input.classList.add('error');
+    const errorElement = document.createElement('div');
+    errorElement.className = 'input-error';
+    errorElement.textContent = message;
+    
+    // Insert after input or its parent for grouped elements
+    const parent = input.closest('.form-group');
+    if (parent) {
+      parent.appendChild(errorElement);
+    } else {
+      input.insertAdjacentElement('afterend', errorElement);
+    }
+  },
+  
+  /**
+   * Clear error for input
+   * @param {HTMLElement} input - Input element
+   */
+  clearInputError: function(input) {
+    input.classList.remove('error');
+    
+    // Find and remove error element
+    const parent = input.closest('.form-group');
+    if (parent) {
+      const errorElement = parent.querySelector('.input-error');
+      if (errorElement) {
+        parent.removeChild(errorElement);
+      }
+    }
+  },
+  
+  /**
+   * Validate email format
+   * @param {string} email - Email address
+   * @returns {boolean} True if valid
+   */
+  isValidEmail: function(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  },
+  
+  /**
+   * Serialize form data to object
+   * @param {HTMLFormElement} form - Form element
+   * @returns {Object} Form data object
+   */
+  serializeForm: function(form) {
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (const [key, value] of formData.entries()) {
+      // Handle checkbox values
+      if (form.elements[key].type === 'checkbox') {
+        data[key] = value === 'on';
+      } else {
+        data[key] = value;
+      }
+    }
+    
+    return data;
+  },
 
+  /**
+   * Sanitize error messages to remove sensitive information
+   * @param {Error|string} error - Error object or message
+   * @returns {string} Sanitized error message
+   */
+  sanitizeErrorMessage: function(error) {
+    if (!error) return 'An unknown error occurred';
+    
+    // If it's an Error object, get the message
+    const errorMessage = error.message || error.toString();
+    
+    // Sanitize the error message to remove potential sensitive information
+    let sanitized = errorMessage.replace(/at\s+.*?\(.*?\)/g, ''); // Remove stack trace info
+    sanitized = sanitized.replace(/([A-Za-z]:\\|\/var\/|\/etc\/|\/home\/).+?(?=\s|$)/g, '[path]'); // Remove file paths
+    sanitized = sanitized.replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g, '[ip-address]'); // Remove IP addresses
+    sanitized = sanitized.replace(/password=["']?.*?["']?(?=\s|&|$)/gi, 'password=[redacted]'); // Remove passwords
+    
+    return this.escapeHTML(sanitized);
+  },
 
-// Make utilities available globally
-if (typeof window !== 'undefined') {
-    window.uiUtils = {
-        confirm,
-        notify,
-        delegateEvent,
-        setupDelegatedEvents,
-        setupTabs
+  /**
+   * Safely escape attribute values
+   * @param {any} value - Value to escape
+   * @returns {string} Escaped attribute value
+   */
+  safeAttr: function(value) {
+    if (value === null || value === undefined) return '';
+    
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+  },
+
+  /**
+   * Safely render HTML template with automatic escaping of data properties
+   * @param {string} template - HTML template with ${prop} placeholders
+   * @param {Object} data - Data object with properties to insert
+   * @param {Object} options - Options for rendering
+   * @returns {string} - Safe HTML string
+   */
+  safeTemplate: function(template, data, options = {}) {
+    const { 
+      escapeAll = true, // Whether to escape all values by default
+      attrProps = [] // Props that should be escaped as attributes
+    } = options;
+    
+    if (!data) data = {};
+    
+    return template.replace(/\${([^}]+)}/g, (match, prop) => {
+      // Extract property name and any modifiers
+      const [rawProp, ...modifiers] = prop.trim().split('|');
+      const noEscape = modifiers.includes('noEscape');
+      const asAttr = modifiers.includes('attr') || attrProps.includes(rawProp);
+      
+      // Get the value from nested properties (e.g. 'user.name')
+      const getValue = (obj, path) => {
+        if (!obj) return '';
+        return path.split('.').reduce((o, p) => o && o[p] !== undefined ? o[p] : '', obj);
+      };
+      
+      const value = getValue(data, rawProp);
+      
+      // Escape based on context and modifiers
+      if (value == null) return '';
+      if (noEscape) return value;
+      if (asAttr) return this.safeAttr(value);
+      if (escapeAll) return this.escapeHTML(value);
+      return value;
+    });
+  },
+  
+  /**
+   * Create a confirmation dialog
+   * @param {string} title - Dialog title
+   * @param {string} message - Dialog message
+   * @param {Function} confirmFn - Function to call when confirmed
+   * @param {Function} cancelFn - Function to call when canceled (optional)
+   * @param {string} confirmText - Text for confirm button
+   * @param {string} cancelText - Text for cancel button
+   */
+  confirmDialog: function(title, message, confirmFn, cancelFn = null, confirmText = 'Confirm', cancelText = 'Cancel') {
+    // Create modal elements
+    const modal = document.createElement('div');
+    modal.className = 'modal confirm-dialog';
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'modal-header';
+    
+    const headerTitle = document.createElement('h3');
+    headerTitle.textContent = title;
+    
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'close-modal';
+    closeBtn.innerHTML = '&times;';
+    
+    modalHeader.appendChild(headerTitle);
+    modalHeader.appendChild(closeBtn);
+    
+    const modalBody = document.createElement('div');
+    modalBody.className = 'modal-body';
+    modalBody.textContent = message;
+    
+    const modalFooter = document.createElement('div');
+    modalFooter.className = 'modal-footer';
+    
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'button';
+    cancelButton.textContent = cancelText;
+    
+    const confirmButton = document.createElement('button');
+    confirmButton.className = 'button primary';
+    confirmButton.textContent = confirmText;
+    
+    modalFooter.appendChild(cancelButton);
+    modalFooter.appendChild(confirmButton);
+    
+    modalContent.appendChild(modalHeader);
+    modalContent.appendChild(modalBody);
+    modalContent.appendChild(modalFooter);
+    
+    modal.appendChild(modalContent);
+    
+    // Add to document
+    document.body.appendChild(modal);
+    
+    // Make modal visible
+    setTimeout(() => {
+      modal.classList.add('visible');
+    }, 10);
+    
+    // Event handlers
+    const closeModal = () => {
+      modal.classList.remove('visible');
+      modal.addEventListener('transitionend', () => {
+        modal.remove();
+      });
     };
-    logger.info('UI utilities registered in window object');
-}
+    
+    closeBtn.addEventListener('click', () => {
+      closeModal();
+      if (cancelFn) cancelFn();
+    });
+    
+    cancelButton.addEventListener('click', () => {
+      closeModal();
+      if (cancelFn) cancelFn();
+    });
+    
+    confirmButton.addEventListener('click', () => {
+      closeModal();
+      confirmFn();
+    });
+  }
+};
+
+// Export for use in other modules
+window.UIUtils = UIUtils;

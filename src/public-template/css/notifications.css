@@ -1,0 +1,110 @@
+#notifications-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1070;
+    width: 300px;
+    max-width: calc(100vw - 40px);
+}
+
+.notification {
+    margin-bottom: 10px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: var(--card-bg);
+    box-shadow: var(--box-shadow);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    animation: slideIn 0.3s ease;
+    transition: background-color var(--transition-speed);
+}
+
+.notification.success {
+    border-left: 4px solid var(--success-color);
+}
+
+.notification.error {
+    border-left: 4px solid var(--danger-color);
+}
+
+.notification.warning {
+    border-left: 4px solid var(--warning-color);
+}
+
+.notification.info {
+    border-left: 4px solid var(--info-color);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    margin: 0 0 5px;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.notification-message {
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--secondary-color);
+    align-self: flex-start;
+    margin-left: 10px;
+    transition: color var(--transition-speed);
+}
+
+.notification-close:hover {
+    color: var(--danger-color);
+}
+
+.notification.success .notification-title {
+    color: var(--success-color);
+}
+
+.notification.error .notification-title {
+    color: var(--danger-color);
+}
+
+.notification.warning .notification-title {
+    color: var(--warning-color);
+}
+
+.notification.info .notification-title {
+    color: var(--info-color);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+}
+
+.notification.removing {
+    animation: slideOut 0.3s ease forwards;
+}

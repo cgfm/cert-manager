@@ -1,92 +1,205 @@
 /**
- * Client-side logger service
- * Provides centralized logging with support for different levels and remote logging to a server.
- * @module logger
- * @requires window
- * @requires document
- * @requires fetch
- * @requires console
- * @version 1.0.0
- * @license MIT
- * @author Christian Meiners
- * @description This module is designed to provide a consistent logging interface across the application. It allows for different log levels (debug, info, warn, error) and can send logs to a server for storage and analysis. The logger can be configured to only log messages above a certain level, reducing noise in the logs.
+ * Logger Module
+ * Client-side logging functionality
  */
-
-class Logger {
-    constructor(minLevel = 'info') {
-        this.levels = {
-            debug: 0,
-            info: 1,
-            warn: 2,
-            error: 3
-        };
-        this.setLevel(minLevel);
+const Logger = {
+  // Log levels
+  LEVELS: {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  },
+  
+  // Current log level
+  currentLevel: 1, // INFO by default
+  
+  /**
+   * Set the logging level
+   * @param {string} level - Log level name: 'debug', 'info', 'warn', 'error'
+   */
+  setLevel: function(level) {
+    const levelName = level.toUpperCase();
+    if (this.LEVELS[levelName] !== undefined) {
+      this.currentLevel = this.LEVELS[levelName];
+      this.info(`Log level set to ${level}`);
+    } else {
+      this.warn(`Invalid log level: ${level}`);
     }
-
-    setLevel(level) {
-        this.minLevel = this.levels[level] || this.levels.info;
+  },
+  
+  /**
+   * Log a debug message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  debug: function(message, data) {
+    if (this.currentLevel <= this.LEVELS.DEBUG) {
+      this._log('DEBUG', message, data);
     }
-
-    debug(message, data) {
-        if (this.minLevel <= this.levels.debug) {
-            this._log('debug', message, data);
-        }
+  },
+  
+  /**
+   * Log an info message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  info: function(message, data) {
+    if (this.currentLevel <= this.LEVELS.INFO) {
+      this._log('INFO', message, data);
     }
-
-    info(message, data) {
-        if (this.minLevel <= this.levels.info) {
-            this._log('info', message, data);
-        }
+  },
+  
+  /**
+   * Log a warning message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  warn: function(message, data) {
+    if (this.currentLevel <= this.LEVELS.WARN) {
+      this._log('WARN', message, data);
     }
-
-    warn(message, data) {
-        if (this.minLevel <= this.levels.warn) {
-            this._log('warn', message, data);
-        }
+  },
+  
+  /**
+   * Log an error message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  error: function(message, data) {
+    if (this.currentLevel <= this.LEVELS.ERROR) {
+      this._log('ERROR', message, data);
     }
-
-    error(message, data) {
-        if (this.minLevel <= this.levels.error) {
-            this._log('error', message, data);
-        }
-    }
-
-    _log(level, message, data) {
-        // Check if data is undefined
-        const hasData = typeof data !== 'undefined';
-        
-        // Log to console - only include data if defined
-        const logMethod = level === 'debug' ? 'log' : level;
-        
-        if (hasData) {
-            console[logMethod](`[${level.toUpperCase()}] ${message}`, data);
-        } else {
-            console[logMethod](`[${level.toUpperCase()}] ${message}`);
-        }
-        
-        // Send important logs to server (info and higher)
-        if (this.levels[level] >= this.levels.info) {
-            // Only include data property in JSON if data exists
-            const logData = {
-                level,
-                message,
-                ...(hasData && { data })
-            };
-            
-            fetch('/api/logs/client', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(logData)
-            }).catch(e => console.error('Failed to send log to server', e));
-        }
-    }
-}
-
-// Export a singleton instance if not already defined
-if (!window.logger) {
-    let logger = new Logger(window.logLevel || 'info');
+  },
+  
+  /**
+   * Send logs to server
+   * @param {Array} logs - Collection of log entries
+   */
+  sendLogsToServer: function(logs) {
+    return fetch('/api/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ logs })
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to send logs: ${response.status}`);
+      }
+      return response.json();
+    });
+  },
+  
+  /**
+   * Internal logging method
+   * @param {string} level - Log level
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   * @private
+   */
+  _log: function(level, message, data) {
+    const timestamp = new Date().toISOString();
     
-    // Make it globally available
-    window.logger = logger;
-    console.log('Logger initialized with level:', window.logLevel || 'info');
-}
+    // Console logging
+    const consoleMessage = `[${timestamp}] [${level}] ${message}`;
+    
+    switch (level) {
+      case 'DEBUG':
+        console.debug(consoleMessage, data || '');
+        break;
+      case 'INFO':
+        console.info(consoleMessage, data || '');
+        break;
+      case 'WARN':
+        console.warn(consoleMessage, data || '');
+        break;
+      case 'ERROR':
+        console.error(consoleMessage, data || '');
+        break;
+    }
+    
+    // Add to in-memory log
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      data: data ? JSON.stringify(data) : null
+    };
+    
+    this._addLogToBuffer(logEntry);
+    
+    // Trigger log event for subscribers
+    this._triggerLogEvent(logEntry);
+  },
+  
+  // Event listeners for log events
+  _eventListeners: [],
+  
+  /**
+   * Add log event listener
+   * @param {Function} callback - Callback function
+   * @returns {Function} Unsubscribe function
+   */
+  subscribe: function(callback) {
+    this._eventListeners.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this._eventListeners = this._eventListeners.filter(cb => cb !== callback);
+    };
+  },
+  
+  /**
+   * Trigger log event for subscribers
+   * @param {Object} logEntry - Log entry to send
+   * @private
+   */
+  _triggerLogEvent: function(logEntry) {
+    this._eventListeners.forEach(callback => {
+      try {
+        callback(logEntry);
+      } catch (err) {
+        console.error('Error in log event handler:', err);
+      }
+    });
+  },
+  
+  // In-memory log buffer
+  _logBuffer: [],
+  _maxBufferSize: 1000,
+  
+  /**
+   * Add log entry to buffer
+   * @param {Object} logEntry - Log entry to add
+   * @private
+   */
+  _addLogToBuffer: function(logEntry) {
+    this._logBuffer.push(logEntry);
+    
+    // Trim buffer if it gets too large
+    if (this._logBuffer.length > this._maxBufferSize) {
+      this._logBuffer = this._logBuffer.slice(-this._maxBufferSize);
+    }
+  },
+  
+  /**
+   * Get log buffer contents
+   * @returns {Array} Array of log entries
+   */
+  getLogBuffer: function() {
+    return [...this._logBuffer];
+  },
+  
+  /**
+   * Clear log buffer
+   */
+  clearLogBuffer: function() {
+    this._logBuffer = [];
+    this.info('Log buffer cleared');
+  }
+};
+
+// Export for use in other modules
+window.Logger = Logger;

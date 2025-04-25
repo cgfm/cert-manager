@@ -6,16 +6,33 @@
   "scripts": {
     "start": "node src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "swagger-gen": "node src/api/swagger-gen.js"
   },
   "dependencies": {
     "dockerode": "^4.0.0",
     "express": "^4.18.2",
     "node-cron": "^3.0.3",
-    "socket.io": "^4.7.3"
+    "chokidar": "^3.5.3",
+    "openssl-wrapper": "^0.3.4",
+    "swagger-ui-express": "^5.0.0",
+    "express-openapi-validator": "^5.0.1",
+    "js-yaml": "^4.1.0",
+    "cors": "^2.8.5",
+    "ssh2-sftp-client": "^9.1.0",
+    "smb2": "^0.2.11",
+    "basic-ftp": "^5.0.3",
+    "axios": "^1.6.2",
+    "form-data": "^4.0.0",
+    "nodemailer": "^6.9.7",
+    "mustache": "^4.2.0",
+    "os": "^0.1.2",
+    "archiver": "^5.3.1",
+    "extract-zip": "^2.0.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.7"
+    "nodemon": "^2.0.7",
+    "swagger-jsdoc": "^6.2.8"
   },
   "author": "Christian Meiners",
   "license": "MIT"

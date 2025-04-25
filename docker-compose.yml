@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   cert-manager:
     build:
@@ -7,22 +6,16 @@ services:
     volumes:
       - ./certs:/certs
       - ./config:/config
-      - ./src:/app/src
+      - ./logs:/logs
       - ./dummyParent:/dummyParent
       - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - AUTO_RENEW_DEFAULT=false
-      - RENEW_DAYS_BEFORE_EXPIRY=30
-      - ROOT_CA_VALIDITY_DAYS=3650
-      - INTERMEDIATE_CA_VALIDITY_DAYS=1825
-      - STANDARD_CERT_VALIDITY_DAYS=90
-      - ENABLE_CERTIFICATE_BACKUPS=true
-      - NODE_ENV=production
-      - CONFIG_PATH=/config/cert-config.json
-      - HTTPS_PORT=4443  # Added missing HTTPS_PORT
     ports:
       - "3000:3000"
-      - "4443:4443"  # Also expose HTTPS port if you're using it
+      - "4443:4443"
+    environment:
+      - CONFIG_DIR=/config
+      - CERT_MANAGER_CERT_PATH=/certs
+      - VSCODE_DISABLE_CACHE=true
+      - DOCKER_HOST_OS=windows
     restart: unless-stopped
-    # Add volume permissions fix for Linux hosts
-    user: "${UID:-1000}:${GID:-1000}"  # Use current user's UID/GID or default to 1000
+    #user: "${UID:-1000}:${GID:-1000}"

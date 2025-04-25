@@ -4,24 +4,17 @@ RUN apt-get update && apt-get install -y openssl && apt-get clean
 
 WORKDIR /app
 
+# Copy package files and install dependencies
 COPY package*.json ./
-
 RUN npm install
 
+# Copy application files
 COPY src ./src
 
-ENV NODE_ENV=production
+# Create necessary directories with correct permissions
+RUN mkdir -p /logs /config /certs /app/public && \
+    chmod 777 /logs /config /certs && \
+    cp -r /app/src/public-template/* /app/public/
 
-# Create logs directory
-RUN mkdir -p /logs && chmod 777 /logs
-
-# Expose both HTTP and HTTPS ports
-EXPOSE 3000 4443
-
-VOLUME ["/certs", "/config", "/logs"]
-
+# Set command to run
 CMD ["node", "src/app.js"]
-
-LABEL org.opencontainers.image.title="cert-manager" \
-      org.opencontainers.image.description="Certificate management tool for self signed certificates." \
-      org.opencontainers.image.vendor="Christian Meiners"

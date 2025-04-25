@@ -1,0 +1,344 @@
+/**
+ * UI States - Empty states, Error states, and Loading states
+ */
+
+/* Common state styles */
+.empty-state,
+.error-state,
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  margin: 1.5rem 0;
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+}
+
+/* Icon styles */
+.empty-state-icon,
+.error-state-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  height: 4rem;
+  width: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.empty-state-icon {
+  background-color: var(--bg-light);
+  color: var(--primary-color);
+}
+
+.error-state-icon {
+  background-color: var(--danger-lighter, #fbe9e7);
+  color: var(--danger-color, #d32f2f);
+}
+
+/* Title styles */
+.empty-state-title,
+.error-state-title {
+  margin: 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.empty-state-title {
+  color: var(--text-color);
+}
+
+.error-state-title {
+  color: var(--danger-color, #d32f2f);
+}
+
+/* Message styles */
+.empty-state-message,
+.error-state-message,
+.loading-text {
+  margin: 0.5rem 0 1.5rem;
+  color: var(--secondary-color);
+  max-width: 500px;
+  line-height: 1.5;
+}
+
+/* Action button styles */
+.empty-state-action,
+.error-state-retry {
+  margin-top: 1rem;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--bg-light);
+  border-radius: 50%;
+  border-top: 3px solid var(--primary-color);
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty state variations */
+.empty-state.certificates .empty-state-icon {
+  background-color: var(--primary-lighter, #e3f2fd);
+  color: var(--primary-color);
+}
+
+.empty-state.ca-certificates .empty-state-icon {
+  background-color: var(--success-lighter, #e8f5e9);
+  color: var(--success-color, #2e7d32);
+}
+
+.empty-state.logs .empty-state-icon {
+  background-color: var(--info-lighter, #e1f5fe);
+  color: var(--info-color, #0288d1);
+}
+
+.empty-state.activities .empty-state-icon {
+  background-color: var(--warning-lighter, #fff8e1);
+  color: var(--warning-color, #ffa000);
+}
+
+/* Certificate and CA Certificate List Styles */
+.certificate-list,
+.ca-certificate-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+/* Certificate items */
+.certificate-item,
+.ca-item {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.certificate-item:hover,
+.ca-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow-hover, 0 8px 15px rgba(0, 0, 0, 0.1));
+}
+
+/* Certificate header */
+.cert-header,
+.ca-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cert-name,
+.ca-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+/* Certificate status indicators */
+.cert-status,
+.ca-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-valid {
+  background-color: var(--success-light);
+  color: var(--success);
+}
+
+.status-warning {
+  background-color: var(--warning-light);
+  color: var(--warning);
+}
+
+.status-expired {
+  background-color: var(--danger-light);
+  color: var(--danger);
+}
+
+.status-unknown {
+  background-color: var(--gray-light);
+  color: var(--gray);
+}
+.status-valid {
+  background-color: var(--success-light, #e8f5e9);
+  color: var(--success-color, #2e7d32);
+}
+
+.status-warning,
+.status-expiring {
+  background-color: var(--warning-lighter, #fff8e1);
+  color: var(--warning-color, #ffa000);
+}
+
+.status-expired {
+  background-color: var(--danger-lighter, #fbe9e7);
+  color: var(--danger-color, #d32f2f);
+}
+
+.status-unknown {
+  background-color: var(--secondary-light, #f5f5f5);
+  color: var(--secondary-color);
+}
+
+/* Certificate details section */
+.cert-details,
+.ca-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  flex: 1;
+}
+
+.cert-info,
+.ca-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.cert-domain,
+.cert-expiry,
+.ca-subject,
+.ca-expiry {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cert-domain,
+.ca-subject {
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.cert-expiry,
+.ca-expiry {
+  color: var(--text-muted);
+}
+
+/* Certificate actions */
+.cert-actions,
+.ca-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .certificate-list,
+  .ca-certificate-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .cert-details,
+  .ca-details {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .cert-actions,
+  .ca-actions {
+    margin-top: 1rem;
+    width: 100%;
+  }
+  
+  .cert-name,
+  .ca-name {
+    max-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .cert-header,
+  .ca-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Toast notifications */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 4px;
+  color: white;
+  min-width: 250px;
+  max-width: 350px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  transform: translateX(120%);
+  transition: transform 0.3s ease-out;
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+
+.toast-success {
+  background-color: var(--success-color, #2e7d32);
+}
+
+.toast-error {
+  background-color: var(--danger-color, #d32f2f);
+}
+
+.toast-info {
+  background-color: var(--info-color, #0288d1);
+}
+
+.toast-warning {
+  background-color: var(--warning-color, #ffa000);
+}
+
+/* Confirmation dialog */
+.confirm-dialog.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.confirm-dialog .modal-content {
+  max-width: 400px;
+}
+
+.confirm-dialog .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

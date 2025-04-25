@@ -1,78 +1,129 @@
 /**
- * Client-side utility functions for validating domains and IP addresses
- * @module domain-validator - Utility functions for validating domain names and IP addresses
- * @requires logger - Logger utility for debugging
- * @version 1.0.0
- * @license MIT
- * @author Christian Meiners
- * @description This module provides functions to validate domain names and IP addresses (both IPv4 and IPv6). It includes regex patterns for validation and utility functions to check if a given string is a valid domain or IP address. The module is designed to be used in a web environment, making it suitable for client-side applications.
+ * Domain Validator
+ * Utilities for validating domain names and IP addresses
  */
-
-// Domain regex based on RFC 1034/1035 with some simplifications
-const domainRegex = /^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$/;
-// IPv4 regex
-const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-// IPv6 regex (simplified)
-const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-
-/**
- * Validates if a string is a valid domain name
- * @param {string} domain - Domain to validate
- * @returns {boolean} True if valid domain
- */
-function isValidDomain(domain) {
+const DomainValidator = {
+  /**
+   * Validate a domain name
+   * @param {string} domain - Domain name to validate
+   * @returns {boolean} True if valid
+   */
+  isValidDomain: function(domain) {
     if (!domain) return false;
     
-    // Allow localhost
-    if (domain === 'localhost') return true;
+    // Check for overall length
+    if (domain.length > 253) return false;
     
-    // Check for wildcard domain
-    if (domain.startsWith('*.')) {
-        return domainRegex.test(domain.substring(2));
+    // Regular expression for domain validation
+    // - Can contain letters, numbers, hyphens
+    // - Labels separated by periods
+    // - No consecutive periods
+    // - No hyphens at start or end of labels
+    // - Labels max 63 chars
+    const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i;
+    
+    if (!domainRegex.test(domain)) {
+      // Special case: localhost is valid
+      if (domain === 'localhost') return true;
+      
+      return false;
     }
     
-    return domainRegex.test(domain);
-}
-
-/**
- * Validates if a string is a valid IPv4 address
- * @param {string} ip - IP address to validate
- * @returns {boolean} True if valid IPv4
- */
-function isValidIPv4(ip) {
-    if (!ipv4Regex.test(ip)) return false;
+    // Make sure no labels are longer than 63 chars
+    const labels = domain.split('.');
+    for (const label of labels) {
+      if (label.length > 63) return false;
+    }
     
-    // Check octets are in valid range (0-255)
-    const octets = ip.split('.').map(Number);
-    return octets.every(octet => octet >= 0 && octet <= 255);
-}
-
-/**
- * Validates if a string is a valid IPv6 address
- * @param {string} ip - IP address to validate
- * @returns {boolean} True if valid IPv6
- */
-function isValidIPv6(ip) {
+    return true;
+  },
+  
+  /**
+   * Validate an IP address (IPv4 or IPv6)
+   * @param {string} ip - IP address to validate
+   * @returns {boolean} True if valid
+   */
+  isValidIP: function(ip) {
+    return this.isValidIPv4(ip) || this.isValidIPv6(ip);
+  },
+  
+  /**
+   * Validate an IPv4 address
+   * @param {string} ip - IPv4 address to validate
+   * @returns {boolean} True if valid
+   */
+  isValidIPv4: function(ip) {
+    if (!ip) return false;
+    
+    // Regular expression for IPv4 validation
+    const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    
+    return ipv4Regex.test(ip);
+  },
+  
+  /**
+   * Validate an IPv6 address
+   * @param {string} ip - IPv6 address to validate
+   * @returns {boolean} True if valid
+   */
+  isValidIPv6: function(ip) {
+    if (!ip) return false;
+    
+    // Simplified and fixed regex for IPv6 validation
+    const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}([0-9a-fA-F]{1,4}|:)|([0-9a-fA-F]{1,4}:){6}(:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:)|([0-9a-fA-F]{1,4}:){5}(((:[0-9a-fA-F]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:)|([0-9a-fA-F]{1,4}:){4}(((:[0-9a-fA-F]{1,4}){1,3})|((:[0-9a-fA-F]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)|([0-9a-fA-F]{1,4}:){3}(((:[0-9a-fA-F]{1,4}){1,4})|((:[0-9a-fA-F]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)|([0-9a-fA-F]{1,4}:){2}(((:[0-9a-fA-F]{1,4}){1,5})|((:[0-9a-fA-F]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)|([0-9a-fA-F]{1,4}:){1}(((:[0-9a-fA-F]{1,4}){1,6})|((:[0-9a-fA-F]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)|(:(((:[0-9a-fA-F]{1,4}){1,7})|((:[0-9a-fA-F]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))$/;
+    
     return ipv6Regex.test(ip);
-}
-
-/**
- * Validates if a string is a valid domain name or IP address
- * @param {string} value - The domain or IP to validate
- * @returns {boolean} True if valid
- */
-function isValidDomainOrIP(value) {
-    if (!value) return false;
-    return isValidDomain(value) || isValidIPv4(value) || isValidIPv6(value);
-}
-
-// Make functions globally available
-window.domainValidator = {
-    isValidDomain,
-    isValidIPv4,
-    isValidIPv6,
-    isValidDomainOrIP
+  },
+    
+  /**
+   * Validate wildcard domain
+   * @param {string} domain - Wildcard domain to validate (e.g., *.example.com)
+   * @returns {boolean} True if valid
+   */
+  isValidWildcardDomain: function(domain) {
+    if (!domain) return false;
+    
+    // Check if it starts with *. and has more after
+    if (!domain.startsWith('*.') || domain.length <= 2) return false;
+    
+    // Validate the part after *. as a regular domain
+    const baseDomain = domain.substring(2);
+    return this.isValidDomain(baseDomain);
+  },
+  
+  /**
+   * Batch validate a list of domains
+   * @param {Array|string} domains - Array of domains or newline-separated string
+   * @returns {Object} Object with valid and invalid domains
+   */
+  validateDomains: function(domains) {
+    let domainList = domains;
+    
+    // Convert string to array if needed
+    if (typeof domains === 'string') {
+      domainList = domains.split(/[\n,]/)
+        .map(d => d.trim())
+        .filter(d => d.length > 0);
+    }
+    
+    const result = {
+      valid: [],
+      invalid: []
+    };
+    
+    for (const domain of domainList) {
+      if (this.isValidDomain(domain) || 
+          this.isValidWildcardDomain(domain) || 
+          this.isValidIP(domain)) {
+        result.valid.push(domain);
+      } else {
+        result.invalid.push(domain);
+      }
+    }
+    
+    return result;
+  }
 };
 
-// Also make the main function directly available for backwards compatibility
-window.isValidDomainOrIP = isValidDomainOrIP;
+// Export for use in other modules
+window.DomainValidator = DomainValidator;

@@ -1,0 +1,767 @@
+:root {
+    /* Base colors */
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --primary-light: rgba(52, 152, 219, 0.15);
+    
+    --secondary-color: #748194;
+    --secondary-light: #rgba(116, 129, 148, 0.15);
+
+    --success-color: #2ecc71;
+    --success-light: rgba(46, 204, 113, 0.15);
+    
+    --warning-color: #f6c343;
+    --warning-light: rgba(243, 156, 18, 0.15);
+    
+    --danger-color: #e74c3c;
+    --danger-hover: #d93348;
+    --danger-light: rgba(231, 76, 60, 0.15);
+    
+    --info-color: #3498db;
+    --info-light: rgba(52, 152, 219, 0.15);
+    
+    --gray: #7f8c8d;
+    --gray-light: rgba(127, 140, 141, 0.15);
+    
+    --light-color: #f9fafd;
+    --dark-color: #232e3c;
+    
+    /* Light theme */
+    --bg-color: #f8f9fa;
+    --card-bg: #ffffff;
+    --text-color: #333333;
+    --text-muted: #6c757d;
+    --heading-color: #2c3e50;
+    --border-color: #dee2e6;
+    --hover-bg: #f1f3f5;
+    --header-bg: #ffffff;
+    --btn-bg: #e9ecef; /* Added button background for light theme */
+    
+    /* Shadows */
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    
+    /* Other */
+    --border-radius: 6px;
+    --transition-speed: 0.2s;
+    --font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+
+    /* Logo and Favicon colors */
+    --logo-primary: #000035;
+    --logo-blueAccent: #82a4bf;
+    --favicon-primary: #000035;
+  }
+  
+  /* Dark theme colors */
+  [data-theme="dark"] {
+    --primary-color: #2c7be5;
+    --primary-hover: #4d8df3;
+    --secondary-color: #748194;
+    --secondary-light: #rgba(116, 129, 148, 0.15);
+    --success-color: #00d27a;
+    --danger-color: #e63757;
+    --warning-color: #f6c343;
+    --info-color: #39afd1;
+    --light-color: #4d5969;
+    --dark-color: #edf2f9;
+    --bg-color: #1e2e42;
+    --text-color: #b6c1d2;
+    --border-color: #344050;
+    --card-bg: #2c3542;
+    --header-bg: #232e3c;
+    --hover-bg: #344050;
+    --btn-bg: #344050;  /* Already defined for dark theme */
+    --box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+    --bg-color: #1a1d21;
+    --card-bg: #2d3035;
+    --text-color: #e9ecef;
+    --text-muted: #adb5bd;
+    --heading-color: #f8f9fa;
+    --border-color: #444;
+    --hover-bg: #34383e;
+    
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+
+    --logo-primary: #ffffca;
+    --logo-blueAccent: #82a4bf;
+    --favicon-primary: #ffffca;
+  }
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--dark-color);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color var(--transition-speed);
+}
+
+a:hover {
+    color: var(--primary-hover);
+}
+
+/* Header styles */
+header {
+    background-color: var(--header-bg);
+    box-shadow: var(--box-shadow);
+    padding: 0.75rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background-color var(--transition-speed);
+}
+
+/* App logo styling */
+.app-logo {
+    display: flex;
+    align-items: center;
+}
+
+.app-logo .logo-svg {
+    margin-right: 10px;
+    width: 50px;
+}
+
+.app-logo h1 {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+/* Apply colors to SVG elements */
+.logo-fill {
+    fill: var(--logo-primary) !important;
+}
+
+.favicon-fill {
+    fill: var(--favicon-primary) !important;
+}
+
+.logo-stroke {
+    stroke: var(--logo-primary) !important;
+}
+
+.favicon-stroke {
+    stroke: var(--favicon-primary) !important;
+}
+
+.logo-blue-accent {
+    fill: var(--logo-blueAccent) !important;
+    stroke: var(--logo-blueAccent) !important;
+}
+
+/* For the favicon: we need to inject these styles */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --favicon-primary: #ffffca;
+    }
+}
+
+nav ul {
+    display: flex;
+    list-style: none;
+    margin: 0;
+}
+
+nav ul li {
+    margin: 0 0.5rem;
+}
+
+nav ul li a {
+    color: var(--secondary-color);
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    transition: all var(--transition-speed);
+}
+
+nav ul li a:hover,
+nav ul li a.active {
+    color: var(--primary-color);
+    background-color: var(--hover-bg);
+}
+
+.user-menu {
+    display: flex;
+}
+
+#theme-toggle {
+    background: none;
+    border: none;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#theme-toggle:hover {
+    background-color: var(--hover-bg);
+}
+
+#theme-toggle svg {
+    fill: currentColor;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+body:not([data-theme="dark"]) .moon-icon {
+    display: none;
+}
+
+body[data-theme="dark"] .sun-icon {
+    display: none;
+}
+
+/* Main content with logo background */
+main {
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+/* Add logo background to main */
+main::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    background-image: url('../img/logo.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 70%;
+    opacity: 0.03;
+    pointer-events: none;
+    
+    /* Use CSS mask for dynamic coloring */
+    -webkit-mask-image: url('../img/logo.svg');
+    mask-image: url('../img/logo.svg');
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: 70%;
+    mask-size: 70%;
+    
+}
+
+/* Dark mode version for the fallback */
+[data-theme="dark"] main::before {
+    background-image: url('../img/logo-dark.svg');
+}
+
+/* Tab content */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Card styles */
+.dashboard-card {
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    box-shadow: var(--box-shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: background-color var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+/* Stats styles */
+.stats-card {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    flex: 1;
+    min-width: 120px;
+    padding: 1rem;
+    text-align: center;
+    border-right: 1px solid var(--border-color);
+}
+
+.stat-item:last-child {
+    border-right: none;
+}
+
+.stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--secondary-color);
+}
+
+/* Button styles */
+.button {
+    display: inline-block;
+    font-weight: 500;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.25rem;
+    transition: all var(--transition-speed);
+    background-color: var(--btn-bg);
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.button:hover {
+    background-color: var(--hover-bg);
+}
+
+.button.primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.button.primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.button.danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.button.danger:hover {
+    background-color: var(--danger-hover);
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    transition: border-color var(--transition-speed);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-group.checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.form-group.checkbox input {
+    margin-right: 0.5rem;
+    width: auto;
+}
+
+.form-group.checkbox label {
+    margin-bottom: 0;
+}
+
+.form-help {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--secondary-color);
+    margin-top: 0.25rem;
+}
+
+.input-with-button {
+    display: flex;
+}
+
+.input-with-button input {
+    flex: 1;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.input-with-button button {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--secondary-color);
+}
+
+/* Feature-specific styles */
+.certificates-header,
+.ca-header,
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.filter-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: var(--card-bg);
+    border-radius: 0.25rem;
+    box-shadow: var(--box-shadow);
+}
+
+.filter-bar input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+.filter-options {
+    display: flex;
+    margin-left: 1rem;
+}
+
+.filter-options label {
+    margin-right: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.filter-options input {
+    margin-right: 0.25rem;
+}
+
+.certificates-list, 
+.ca-certificates {
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+/* Settings */
+.settings-container {
+    display: flex;
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+.settings-sidebar {
+    width: 200px;
+    border-right: 1px solid var(--border-color);
+    padding: 1rem 0;
+}
+
+.settings-sidebar ul {
+    list-style: none;
+}
+
+.settings-sidebar a {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--text-color);
+    transition: all var(--transition-speed);
+}
+
+.settings-sidebar a.active {
+    background-color: var(--hover-bg);
+    color: var(--primary-color);
+    font-weight: 500;
+    border-left: 3px solid var(--primary-color);
+}
+
+.settings-sidebar a:hover {
+    background-color: var(--hover-bg);
+}
+
+.settings-content {
+    flex: 1;
+    padding: 1.5rem;
+}
+
+.settings-panel {
+    display: none;
+}
+
+.settings-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Logs */
+.logs-controls {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    background-color: var(--card-bg);
+    border-radius: 0.5rem 0.5rem 0 0;
+    padding: 0.75rem;
+    box-shadow: var(--box-shadow);
+    gap: 1rem;
+}
+
+.logs-controls label {
+    display: flex;
+    align-items: center;
+}
+
+.logs-controls span {
+    margin-right: 0.5rem;
+}
+
+.logs-container {
+    background-color: var(--card-bg);
+    border-radius: 0 0 0.5rem 0.5rem;
+    box-shadow: var(--box-shadow);
+    height: 500px;
+    overflow: auto;
+}
+
+.logs-output {
+    padding: 1rem;
+    font-family: monospace;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+}
+
+/* Placeholder */
+.placeholder-note {
+    color: var(--secondary-color);
+    font-style: italic;
+    padding: 1rem;
+    text-align: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 0.25rem;
+}
+
+/* Certificate and CA item cards */
+.certificate-item, .ca-item {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  margin-bottom: 1rem;
+  padding: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.certificate-item:hover, .ca-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-hover-shadow);
+}
+
+/* Dashboard certificate sections */
+.dashboard-section {
+  margin-bottom: 2rem;
+}
+
+.expiring-cert-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.expiring-cert-item:last-child {
+  border-bottom: none;
+}
+
+.expiring-cert-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.expiring-cert-domain {
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.expiring-days {
+  margin-right: 1rem;
+}
+
+/* Activity feed */
+.activity-item {
+  display: flex;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.activity-time {
+  color: var(--text-muted);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.activity-action {
+  margin: 0 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.activity-create {
+  background-color: var(--success-light);
+  color: var(--success);
+}
+
+.activity-renew {
+  background-color: var(--info-light);
+  color: var(--info);
+}
+
+.activity-delete {
+  background-color: var(--danger-light);
+  color: var(--danger);
+}
+
+.activity-target {
+  margin-left: 0.5rem;
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .settings-container {
+        flex-direction: column;
+    }
+    
+    .settings-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    header {
+        flex-direction: column;
+        padding-bottom: 0;
+    }
+    
+    nav ul {
+        justify-content: center;
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    
+    main::before {
+        -webkit-mask-size: 120%;
+        mask-size: 120%;
+        background-size: 120%;
+    }
+    
+    .cert-details, .ca-details {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .cert-actions, .ca-actions {
+        margin-top: 0.5rem;
+    }
+    
+    .cert-details-table th {
+        width: 120px;
+    }
+    
+    .activity-time {
+        width: 80px;
+    }
+    
+    .expiring-cert-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .expiring-cert-name, 
+    .expiring-cert-domain, 
+    .expiring-days {
+        margin-bottom: 0.5rem;
+    }
+}
