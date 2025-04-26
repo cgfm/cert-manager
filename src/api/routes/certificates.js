@@ -21,6 +21,7 @@ const logger = require('../../services/logger');
 const initDeploymentActionsRouter = require('./deployment-actions');
 const fs = require('fs');
 const path = require('path');
+const DomainValidator = require('../../utils/DomainValidator');
 
 /**
  * Initialize the certificates router with dependencies
@@ -36,12 +37,24 @@ function initCertificatesRouter(deps) {
   // Get all certificates
   router.get('/', async (req, res) => {
     try {
-      await certificateManager.loadCertificates();
-      const certificates = certificateManager.getAllCertificatesWithMetadata();
-      res.json(certificates);
+      // Check if we need to force refresh
+      const forceRefresh = req.query.refresh === 'true';
+      
+      // Load certificates with cache
+      const certificates = await deps.certificateManager.loadCertificates(forceRefresh);
+      
+      // Format certificates for API response
+      const response = Array.from(certificates.values()).map(cert => 
+        cert.toApiResponse(deps.certificateManager.passphraseManager)
+      );
+      
+      res.json(response);
     } catch (error) {
-      logger.error('Error getting certificates', error);
-      res.status(500).json({ message: 'Failed to retrieve certificates', statusCode: 500 });
+      logger.error('Error getting certificates:', error);
+      res.status(500).json({ 
+        message: `Failed to get certificates: ${error.message}`,
+        statusCode: 500 
+      });
     }
   });
   
@@ -162,6 +175,93 @@ function initCertificatesRouter(deps) {
     } catch (error) {
       logger.error(`Error updating certificate ${req.params.fingerprint}`, error);
       res.status(500).json({ message: 'Failed to update certificate', statusCode: 500 });
+    }
+  });
+  
+  // Update certificate metadata (PATCH)
+  router.patch('/:fingerprint', async (req, res) => {
+    try {
+      const { fingerprint } = req.params;
+      const { name, description, group, tags, metadata } = req.body;
+      
+      // Validate input
+      if (name !== undefined && (!name || name.trim() === '')) {
+        return res.status(400).json({
+          message: 'Certificate name cannot be empty',
+          statusCode: 400
+        });
+      }
+      
+      // Get the certificate
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
+      }
+      
+      // Only update fields that were provided
+      const updateData = {};
+      
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (group !== undefined) updateData.group = group;
+      if (tags !== undefined) updateData.tags = tags;
+      if (metadata !== undefined) updateData.metadata = metadata;
+      
+      // Update the certificate
+      const success = await certificateManager.updateCertificateConfig(fingerprint, updateData);
+      
+      if (!success) {
+        return res.status(500).json({
+          message: 'Failed to update certificate configuration',
+          statusCode: 500
+        });
+      }
+      
+      // Get the updated certificate
+      const updatedCert = certificateManager.getCertificate(fingerprint);
+      
+      // Add entry to activity log
+      try {
+        // Check if activity service exists and has the required function
+        const activityServicePath = '../../services/activity-service';
+        let activityService;
+        
+        try {
+          activityService = require(activityServicePath);
+        } catch (moduleError) {
+          logger.debug(`Activity service module not found: ${moduleError.message}`);
+          activityService = null;
+        }
+        
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Updated metadata for certificate '${updatedCert.name}'`,
+            type: 'update',
+            target: updatedCert.name,
+            metadata: {
+              fingerprint: updatedCert.fingerprint,
+              fields: Object.keys(updateData)
+            }
+          });
+          logger.debug(`Logged activity for certificate update: ${updatedCert.name}`);
+        } else {
+          logger.debug('Activity logging skipped: service not available or missing addActivity function');
+        }
+      } catch (error) {
+        logger.warn('Failed to log certificate update activity:', error);
+      }
+      
+      // Return the updated certificate
+      res.json(updatedCert.toApiResponse(certificateManager.passphraseManager));
+    } catch (error) {
+      logger.error(`Error updating certificate metadata for ${req.params.fingerprint}:`, error);
+      res.status(500).json({
+        message: `Failed to update certificate: ${error.message}`,
+        statusCode: 500
+      });
     }
   });
   
@@ -406,6 +506,7 @@ function initCertificatesRouter(deps) {
       const certObj = {
         paths: {
           crtPath: paths.crtPath,
+          cerPath: paths.cerPath,
           keyPath: paths.keyPath, 
           csrPath: paths.csrPath,
           pemPath: paths.pemPath,
@@ -513,55 +614,56 @@ function initCertificatesRouter(deps) {
         });
       }
       
-      // Map fileType to consistent paths with Path suffix
-      // Also using certificate.paths instead of direct properties
-      const paths = certificate.paths || {};
-      
+      // Map fileType to path property based on Certificate class properties
       const fileTypeMap = {
-        cert: 'crtPath',
+        crt: 'crtPath',
         key: 'keyPath',
         chain: 'chainPath',
         fullchain: 'fullchainPath',
-        pfx: 'pfxPath',
         p12: 'p12Path',
+        pfx: 'pfxPath',
         pem: 'pemPath',
+        p7b: 'p7bPath',
         csr: 'csrPath',
-        crt: 'crtPath',
         cer: 'cerPath',
         der: 'derPath',
-        p7b: 'p7bPath',
         ext: 'extPath'
       };
       
       const pathKey = fileTypeMap[fileType];
-      if (!pathKey || !paths[pathKey]) {
-        return res.status(404).json({
-          message: `File of type '${fileType}' not found for this certificate`,
-          statusCode: 404
+      if (!pathKey) {
+        return res.status(400).json({
+          message: `Invalid file type: ${fileType}`,
+          statusCode: 400
         });
       }
       
-      const filePath = paths[pathKey];
+      // Get the file path from the certificate
+      const filePath = certificate.getPath(pathKey.replace('Path', ''));
+      
+      if (!filePath) {
+        return res.status(404).json({
+          message: `No ${fileType} file found for certificate ${fingerprint}`,
+          statusCode: 404
+        });
+      }
       
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({
-          message: `File '${filePath}' does not exist`,
+          message: `File ${filePath} does not exist`,
           statusCode: 404
         });
       }
       
-      // Generate download filename based on certificate name and file type
+      // Generate download filename based on certificate name
       const safeName = certificate.name.replace(/[^\w.-]/g, '_');
-      let downloadFilename;
+      let downloadFilename = `${safeName}.${fileType}`;
       
+      // Special case handling for certain file types
       switch (fileType) {
-        case 'cert':
         case 'crt':
           downloadFilename = `${safeName}.crt`;
-          break;
-        case 'key':
-          downloadFilename = `${safeName}.key`;
           break;
         case 'chain':
           downloadFilename = `${safeName}.chain.pem`;
@@ -569,31 +671,39 @@ function initCertificatesRouter(deps) {
         case 'fullchain':
           downloadFilename = `${safeName}.fullchain.pem`;
           break;
-        case 'pfx':
-        case 'p12':
-          downloadFilename = `${safeName}.${fileType}`;
-          break;
-        case 'pem':
-          downloadFilename = `${safeName}.pem`;
-          break;
-        case 'csr':
-          downloadFilename = `${safeName}.csr`;
-          break;
-        default:
-          downloadFilename = path.basename(filePath);
       }
+      
+      // Set appropriate content type based on file extension
+      const mimeTypes = {
+        'crt': 'application/x-x509-ca-cert',
+        'cer': 'application/x-x509-ca-cert',
+        'key': 'application/pkcs8',
+        'pem': 'application/x-pem-file',
+        'p12': 'application/x-pkcs12',
+        'pfx': 'application/x-pkcs12',
+        'p7b': 'application/x-pkcs7-certificates',
+        'der': 'application/x-x509-ca-cert',
+        'csr': 'application/pkcs10',
+        'ext': 'text/plain',
+        'chain': 'application/x-pem-file',
+        'fullchain': 'application/x-pem-file'
+      };
+      
+      const contentType = mimeTypes[fileType] || 'application/octet-stream';
       
       // Set headers for file download
       res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
-      
-      // Log download
-      logger.info(`Download requested for certificate ${certificate.name} (${fileType})`);
+      res.setHeader('Content-Type', contentType);
       
       // Stream the file
-      fs.createReadStream(filePath).pipe(res);
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+      
+      // Log the download
+      logger.info(`Certificate file downloaded: ${downloadFilename} (${fileType}) for ${certificate.name}`);
+      
     } catch (error) {
-      logger.error(`Error downloading file from certificate ${req.params.fingerprint}:`, error);
+      logger.error(`Error downloading certificate file: ${error.message}`, error);
       res.status(500).json({
         message: `Failed to download certificate file: ${error.message}`,
         statusCode: 500
@@ -856,6 +966,326 @@ function initCertificatesRouter(deps) {
       res.status(500).json({ message: 'Failed to delete passphrase', statusCode: 500 });
     }
   });
+
+  // Get all certificate groups
+  router.get('/groups', (req, res) => {
+    try {
+      const groups = new Set();
+      
+      // Extract all groups from certificates
+      const certificates = deps.certificateManager.getAllCertificates();
+      certificates.forEach(cert => {
+        if (cert.group && cert.group.trim() !== '') {
+          groups.add(cert.group.trim());
+        }
+      });
+      
+      // Sort groups alphabetically
+      const sortedGroups = Array.from(groups).sort();
+      
+      res.json({
+        groups: sortedGroups
+      });
+    } catch (error) {
+      logger.error('Error getting certificate groups:', error);
+      res.status(500).json({
+        message: `Failed to get certificate groups: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
+  // Get certificate SAN entries
+  router.get('/:fingerprint/san', async (req, res) => {
+    try {
+        const { fingerprint } = req.params;
+        
+        // Get the certificate
+        const cert = deps.certificateManager.getCertificate(fingerprint);
+        if (!cert) {
+            return res.status(404).json({
+                message: `Certificate with fingerprint ${fingerprint} not found`,
+                statusCode: 404
+            });
+        }
+        
+        // Return all SAN entries
+        res.json({
+            domains: cert.domains,
+            idleDomains: cert.idleDomains,
+            ips: cert.ips,
+            idleIps: cert.idleIps,
+            needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        });
+    } catch (error) {
+        logger.error(`Error getting SAN entries for certificate ${req.params.fingerprint}:`, error);
+        res.status(500).json({
+            message: `Failed to get SAN entries: ${error.message}`,
+            statusCode: 500
+        });
+    }
+});
+
+// Add a new domain or IP to certificate
+router.post('/:fingerprint/san', async (req, res) => {
+    try {
+        const { fingerprint } = req.params;
+        const { value, type = 'auto', idle = true } = req.body;
+        
+        if (!value) {
+            return res.status(400).json({
+                message: 'Domain or IP address value is required',
+                statusCode: 400
+            });
+        }
+        
+        // Get the certificate
+        const cert = deps.certificateManager.getCertificate(fingerprint);
+        if (!cert) {
+            return res.status(404).json({
+                message: `Certificate with fingerprint ${fingerprint} not found`,
+                statusCode: 404
+            });
+        }
+        
+        // Auto-detect type if not specified or set to 'auto'
+        let subjectType = type;
+        if (type === 'auto' || !type) {
+            const validation = DomainValidator.validate(value);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    message: 'Invalid domain name or IP address format',
+                    statusCode: 400
+                });
+            }
+            subjectType = validation.type;
+        } else {
+            // Validate based on specified type
+            if (type === 'ip' && !DomainValidator.isValidIPv4(value) && !DomainValidator.isValidIPv6(value)) {
+                return res.status(400).json({
+                    message: 'Invalid IP address format',
+                    statusCode: 400
+                });
+            } else if (type === 'domain' && !DomainValidator.isValidDomain(value) && 
+                      !DomainValidator.isValidWildcardDomain(value) && 
+                      value.toLowerCase() !== 'localhost') {
+                return res.status(400).json({
+                    message: 'Invalid domain format',
+                    statusCode: 400
+                });
+            }
+        }
+        
+        let added = false;
+        
+        // Add domain or IP based on type
+        if (subjectType === 'ip') {
+            added = await deps.certificateManager.addIp(fingerprint, value, idle);
+        } else {
+            added = await deps.certificateManager.addDomain(fingerprint, value, idle);
+        }
+        
+        if (!added) {
+            return res.status(400).json({
+                message: `Failed to add ${subjectType}: ${value}. It may already exist.`,
+                statusCode: 400
+            });
+        }
+        
+        // Log activity
+        try {
+            const activityServicePath = '../../services/activity-service';
+            let activityService;
+            
+            try {
+                activityService = require(activityServicePath);
+            } catch (moduleError) {
+                logger.debug(`Activity service module not found: ${moduleError.message}`);
+                activityService = null;
+            }
+            
+            if (activityService && typeof activityService.addActivity === 'function') {
+                await activityService.addActivity({
+                    action: `Added ${idle ? 'idle ' : ''}${subjectType} "${value}" to certificate`,
+                    type: 'update',
+                    target: cert.name,
+                    metadata: {
+                        fingerprint,
+                        value,
+                        type: subjectType,
+                        idle
+                    }
+                });
+            }
+        } catch (activityError) {
+            logger.warn('Failed to log SAN update activity:', activityError);
+        }
+        
+        // Return updated SAN entries
+        res.status(201).json({
+            message: `${subjectType === 'ip' ? 'IP address' : 'Domain'} added successfully${idle ? ' (idle until renewal)' : ''}`,
+            domains: cert.domains,
+            idleDomains: cert.idleDomains,
+            ips: cert.ips,
+            idleIps: cert.idleIps,
+            needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        });
+    } catch (error) {
+        logger.error(`Error adding SAN entry to certificate ${req.params.fingerprint}:`, error);
+        res.status(500).json({
+            message: `Failed to add SAN entry: ${error.message}`,
+            statusCode: 500
+        });
+    }
+});
+
+// Remove a domain or IP from certificate
+router.delete('/:fingerprint/san/:type/:value', async (req, res) => {
+    try {
+        const { fingerprint, type, value } = req.params;
+        const fromIdle = req.query.idle === 'true';
+        
+        // Get the certificate
+        const cert = deps.certificateManager.getCertificate(fingerprint);
+        if (!cert) {
+            return res.status(404).json({
+                message: `Certificate with fingerprint ${fingerprint} not found`,
+                statusCode: 404
+            });
+        }
+        
+        let removed = false;
+        
+        // Remove domain or IP based on type
+        if (type === 'ip') {
+            removed = await deps.certificateManager.removeIp(fingerprint, value, fromIdle);
+        } else if (type === 'domain') {
+            removed = await deps.certificateManager.removeDomain(fingerprint, value, fromIdle);
+        } else {
+            return res.status(400).json({
+                message: `Invalid SAN type: ${type}. Must be 'domain' or 'ip'.`,
+                statusCode: 400
+            });
+        }
+        
+        if (!removed) {
+            return res.status(404).json({
+                message: `${type} "${value}" not found in certificate${fromIdle ? ' idle list' : ''}`,
+                statusCode: 404
+            });
+        }
+        
+        // Log activity
+        try {
+            const activityServicePath = '../../services/activity-service';
+            let activityService;
+            
+            try {
+                activityService = require(activityServicePath);
+            } catch (moduleError) {
+                logger.debug(`Activity service module not found: ${moduleError.message}`);
+                activityService = null;
+            }
+            
+            if (activityService && typeof activityService.addActivity === 'function') {
+                await activityService.addActivity({
+                    action: `Removed ${fromIdle ? 'idle ' : ''}${type} "${value}" from certificate`,
+                    type: 'update',
+                    target: cert.name,
+                    metadata: {
+                        fingerprint,
+                        value,
+                        type,
+                        fromIdle
+                    }
+                });
+            }
+        } catch (activityError) {
+            logger.warn('Failed to log SAN removal activity:', activityError);
+        }
+        
+        // Return updated SAN entries
+        res.json({
+            message: `${type === 'ip' ? 'IP address' : 'Domain'} removed successfully`,
+            domains: cert.domains,
+            idleDomains: cert.idleDomains,
+            ips: cert.ips,
+            idleIps: cert.idleIps,
+            needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        });
+    } catch (error) {
+        logger.error(`Error removing SAN entry from certificate ${req.params.fingerprint}:`, error);
+        res.status(500).json({
+            message: `Failed to remove SAN entry: ${error.message}`,
+            statusCode: 500
+        });
+    }
+});
+
+// Apply idle domains/IPs and renew certificate
+router.post('/:fingerprint/san/apply', async (req, res) => {
+    try {
+        const { fingerprint } = req.params;
+        
+        // Get the certificate
+        const cert = deps.certificateManager.getCertificate(fingerprint);
+        if (!cert) {
+            return res.status(404).json({
+                message: `Certificate with fingerprint ${fingerprint} not found`,
+                statusCode: 404
+            });
+        }
+        
+        // Check if there are any idle domains or IPs
+        if (cert.idleDomains.length === 0 && cert.idleIps.length === 0) {
+            return res.status(400).json({
+                message: 'No idle domains or IPs to apply',
+                statusCode: 400
+            });
+        }
+        
+        // Apply idle subjects and renew
+        const result = await deps.certificateManager.applyIdleSubjectsAndRenew(fingerprint);
+        
+        // Log activity
+        try {
+            const activityServicePath = '../../services/activity-service';
+            let activityService;
+            
+            try {
+                activityService = require(activityServicePath);
+            } catch (moduleError) {
+                logger.debug(`Activity service module not found: ${moduleError.message}`);
+                activityService = null;
+            }
+            
+            if (activityService && typeof activityService.addActivity === 'function') {
+                await activityService.addActivity({
+                    action: `Applied idle domains/IPs and renewed certificate`,
+                    type: 'renew',
+                    target: cert.name,
+                    metadata: {
+                        fingerprint
+                    }
+                });
+            }
+        } catch (activityError) {
+            logger.warn('Failed to log SAN apply activity:', activityError);
+        }
+        
+        res.json({
+            message: 'Idle domains and IPs applied and certificate renewed successfully',
+            success: true,
+            result
+        });
+    } catch (error) {
+        logger.error(`Error applying idle subjects for certificate ${req.params.fingerprint}:`, error);
+        res.status(500).json({
+            message: `Failed to apply idle subjects: ${error.message}`,
+            statusCode: 500
+        });
+    }
+});
 
   return router;
 }

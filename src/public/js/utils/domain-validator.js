@@ -122,6 +122,22 @@ const DomainValidator = {
     }
     
     return result;
+  },
+
+  /**
+   * Validate a value based on its type (domain or IP)
+   * @param {string} value - The value to validate
+   * @param {string} type - The type of value ('domain' or 'ip')
+   * @returns {boolean} True if valid
+   */
+  validate: function(value, type) {
+    if (!value) return false;
+    
+    if (type === 'ip') {
+      return this.isValidIPv4(value) || this.isValidIPv6(value);
+    } else {
+      return this.isValidDomain(value) || this.isValidWildcardDomain(value);
+    }
   }
 };
 

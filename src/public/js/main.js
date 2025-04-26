@@ -602,7 +602,7 @@ function renderDashboardCertificatesList(certificates, container) {
       // Create certificate item element
       const certItem = document.createElement('div');
       certItem.className = 'certificate-item';
-      certItem.setAttribute('data-cert-id', UIUtils.safeAttr(cert.fingerprint));
+      certItem.setAttribute('data-cert-id', UIUtils.escapeAttr(cert.fingerprint));
 
       // Create header
       const header = document.createElement('div');
@@ -643,7 +643,7 @@ function renderDashboardCertificatesList(certificates, container) {
       const viewBtn = document.createElement('button');
       viewBtn.className = 'button view-cert-btn';
       viewBtn.textContent = 'View';
-      viewBtn.setAttribute('data-cert-id', UIUtils.safeAttr(cert.fingerprint));
+      viewBtn.setAttribute('data-cert-id', UIUtils.escapeAttr(cert.fingerprint));
 
       actions.appendChild(viewBtn);
       

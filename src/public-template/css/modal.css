@@ -115,6 +115,11 @@
     }
 }
 
+.button-spacer {
+  visibility: hidden;
+  flex: auto;
+}
+
 /* Certificate details tabs */
 .cert-tabs {
   display: flex;
@@ -177,19 +182,19 @@
 .cert-files-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1rem 0;
+  margin-bottom: 20px;
 }
 
-.cert-files-table th, 
+.cert-files-table th,
 .cert-files-table td {
-  padding: 0.75rem;
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .cert-files-table th {
-  color: var(--text-muted);
-  font-weight: 500;
+  background-color: #f5f5f5;
+  font-weight: 600;
 }
 
 .deployment-action-item {
@@ -256,6 +261,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden; /* Prevent double scrollbars */
+}
+
+#edit-cert-details-btn{
+  margin-bottom: 0.25rem;
 }
 
 #cert-details-modal .modal-header {
@@ -429,17 +438,27 @@
 }
 
 .file-path {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
+  white-space: nowrap;
 }
 
 .file-actions {
   display: flex;
   gap: 5px;
+}
+
+.file-description {
+  color: #666;
+  font-size: 0.9em;
+}
+
+/* More responsive handling for small screens */
+@media (max-width: 768px) {
+  .cert-files-table .file-path {
+    max-width: 150px;
+  }
 }
 
 /* Toggle switch for settings */
@@ -659,4 +678,389 @@ input:checked + .toggle-slider:before {
 
 .close-modal:hover {
   color: #000;
+}
+
+/* Add this to your CSS file */
+.convert-form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.format-selection-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.convert-button-group {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+.password-row {
+  margin-top: 10px;
+}
+
+.password-row.hidden {
+  display: none;
+}
+
+.format-selection-group select {
+  width: 100%;
+}
+
+/* Enhanced responsive certificate conversion form */
+.convert-form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+
+.format-selection-group {
+  flex: 1.5;
+  min-width: 180px;
+}
+
+.password-field-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.convert-button-group {
+  flex: 0 0 auto;
+}
+
+/* Hide standalone password row by default */
+.password-row.standalone {
+  display: none;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 600px) {
+  .convert-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .format-selection-group,
+  .password-field-group,
+  .convert-button-group {
+    width: 100%;
+  }
+  
+  /* On small screens, show the standalone password row */
+  .password-row.standalone {
+    display: block;
+    margin-top: 10px;
+  }
+  
+  /* And hide the inline password field */
+  .password-field-group.inline {
+    display: none;
+  }
+}
+
+.format-selection-group select {
+  width: 100%;
+}
+
+.password-field-group input {
+  width: 100%;
+}
+
+/* Transition for showing/hiding password fields */
+.password-field-group,
+.password-row {
+  transition: opacity 0.3s, max-height 0.3s;
+  overflow: hidden;
+}
+
+.password-field-group.hidden,
+.password-row.hidden {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+}
+
+.password-field-group:not(.hidden),
+.password-row:not(.hidden):not(.standalone) {
+  opacity: 1;
+  max-height: 80px;
+}
+
+/* Add to your CSS file */
+.domains-section {
+  padding: 15px 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h4 {
+  margin: 0;
+}
+
+.domains-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.domains-table th,
+.domains-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.domains-table th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.empty-cell {
+  text-align: center;
+  color: #666;
+  padding: 20px;
+}
+
+.loading-cell {
+  text-align: center;
+  padding: 20px;
+}
+
+.add-domain-form {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.add-domain-form .form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media (min-width: 768px) {
+  .add-domain-form .form-row {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+  
+  .add-domain-form .form-group {
+    flex: 1;
+  }
+}
+
+/* Add these styles at the end of the file */
+
+/* Group selection with new group input */
+.group-select-container {
+  position: relative;
+}
+
+.new-group-input-container {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.new-group-input-container.hidden {
+  display: none;
+}
+
+.new-group-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+/* No results item */
+.select-no-results {
+  padding: 8px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Create new group option styling */
+option[value="__new__"] {
+  font-weight: 500;
+  color: #0078d4;
+  background-color: #f0f8ff;
+}
+
+/* Domain management styles */
+.domain-row {
+    transition: background-color 0.2s ease;
+}
+
+.domain-row:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.domain-row.idle-row {
+    background-color: rgba(255, 248, 230, 0.5);
+}
+
+.domain-row.idle-row:hover {
+    background-color: rgba(255, 248, 230, 0.8);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background-color: #e6f7e6;
+    color: #2e7d32;
+}
+
+.status-badge.idle {
+    background-color: #fff8e1;
+    color: #ff8f00;
+}
+
+.status-badge i {
+    margin-right: 4px;
+}
+
+.pending-renewal-banner {
+    margin-top: 20px;
+    padding: 12px 15px;
+    background-color: #fff8e1;
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+}
+
+.pending-renewal-banner.hidden {
+    display: none;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.banner-content i {
+    font-size: 1.2em;
+    color: #ff8f00;
+}
+
+.banner-content span {
+    flex: 1;
+}
+
+.add-domain-form {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.add-domain-form.hidden {
+    display: none;
+}
+
+.add-domain-form .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.add-domain-form .form-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.add-domain-form .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+    flex: 1 0 100%;
+}
+
+/* Make tables more responsive */
+.domains-table-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+.domains-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.domains-table th,
+.domains-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.domains-table th {
+    font-weight: 600;
+    background-color: #f5f5f5;
+}
+
+.domains-table .text-center {
+    text-align: center;
+}
+
+/* Add these styles to your CSS file */
+.input-feedback {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    min-height: 18px; /* Maintain height even when empty */
+}
+
+.valid-feedback {
+    color: #28a745;
+}
+
+.invalid-feedback {
+    color: #dc3545;
+}
+
+input.is-valid {
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+input.is-invalid {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+/* Add a bit of transition for smoother UI */
+input.form-control {
+    transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }

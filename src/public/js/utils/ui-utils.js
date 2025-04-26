@@ -125,6 +125,7 @@ const UIUtils = {
         const buttonElement = document.getElementById(button.id);
         if (!buttonElement) return;
         
+        if(!button.action) return;
         buttonElement.addEventListener('click', () => {
           if (button.action === 'close') {
             this.closeModal(modalId);
@@ -589,23 +590,6 @@ const UIUtils = {
   },
   
   /**
-   * Safely escape HTML to prevent XSS
-   * @param {string} unsafe - String to escape
-   * @returns {string} Escaped string
-   */
-  escapeHTML: function(unsafe) {
-    if (!unsafe) return '';
-    
-    return unsafe
-      .toString()
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  },
-  
-  /**
    * Validate form inputs
    * @param {HTMLFormElement} form - The form element
    * @returns {boolean} True if valid
@@ -719,11 +703,28 @@ const UIUtils = {
   },
 
   /**
+   * Safely escape HTML to prevent XSS
+   * @param {string} unsafe - String to escape
+   * @returns {string} Escaped string
+   */
+  escapeHTML: function(unsafe) {
+    if (!unsafe) return '';
+    
+    return unsafe
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
+  
+  /**
    * Safely escape attribute values
    * @param {any} value - Value to escape
    * @returns {string} Escaped attribute value
    */
-  safeAttr: function(value) {
+  escapeAttr: function(value) {
     if (value === null || value === undefined) return '';
     
     return String(value)
@@ -766,7 +767,7 @@ const UIUtils = {
       // Escape based on context and modifiers
       if (value == null) return '';
       if (noEscape) return value;
-      if (asAttr) return this.safeAttr(value);
+      if (asAttr) return this.escapeAttr(value);
       if (escapeAll) return this.escapeHTML(value);
       return value;
     });

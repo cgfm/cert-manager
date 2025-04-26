@@ -480,6 +480,9 @@ class RenewalService {
             
             logger.info(`Certificate ${certificate.name} renewed successfully`);
             
+            // Notify CertificateManager about the change
+            certificateManager.notifyCertificateChanged(fingerprint, 'update');
+            
             return {
                 success: true,
                 certificate,

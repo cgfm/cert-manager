@@ -5,6 +5,10 @@ const PassphraseManager = require('../services/PassphraseManager');
 const OpenSSLWrapper = require('../services/openssl-wrapper');
 const logger = require('../services/logger');
 
+/**
+ * @class CertificateManager
+ * Enhanced with a caching mechanism to improve performance when refreshing the frontend.
+ */
 class CertificateManager {
     /**
      * Create a certificate manager
@@ -16,29 +20,175 @@ class CertificateManager {
         this.certsDir = certsDir;
         this.configPath = configPath;
         this.certificates = new Map();
+        
+        // Cache-related properties
         this.lastRefreshTime = 0;
+        this.cacheExpiryTime = 5 * 60 * 1000; // Default 5 minutes
+        this.configLastModified = 0;
+        this.certificatesLastModified = {}; // Map of fingerprint -> last modified time
+        this.pendingChanges = new Set(); // Set of fingerprints with pending changes
         
         // Initialize passphrase manager
         this.passphraseManager = new PassphraseManager(configDir);
         
         // Initialize OpenSSL wrapper
         this.openssl = new OpenSSLWrapper();
+        
+        // Load the configuration file's last modified time
+        try {
+            const stats = fs.statSync(configPath);
+            this.configLastModified = stats.mtimeMs;
+        } catch (error) {
+            // Config file might not exist yet
+            logger.debug(`No certificate config found at ${configPath} or couldn't read stats`);
+        }
+    }
+    
+    /**
+     * Set cache expiry time
+     * @param {number} milliseconds - Time in milliseconds for cache to live
+     */
+    setCacheExpiryTime(milliseconds) {
+        if (typeof milliseconds === 'number' && milliseconds >= 0) {
+            this.cacheExpiryTime = milliseconds;
+            logger.info(`Certificate cache expiry time set to ${milliseconds}ms`);
+        } else {
+            logger.warn(`Invalid cache expiry time: ${milliseconds}, using default`);
+        }
+    }
+    
+    /**
+     * Check if cache is still valid
+     * @param {boolean} deepCheck - Whether to check file modifications as well
+     * @returns {boolean} True if cache is valid
+     */
+    isCacheValid(deepCheck = false) {
+        const now = Date.now();
+        
+        // Basic time-based cache validation
+        if (this.certificates.size > 0 && 
+            (now - this.lastRefreshTime < this.cacheExpiryTime) &&
+            this.pendingChanges.size === 0) {
+            
+            // Skip deep check if not requested
+            if (!deepCheck) {
+                return true;
+            }
+            
+            // Check if config file has been modified
+            try {
+                const stats = fs.statSync(this.configPath);
+                if (stats.mtimeMs > this.configLastModified) {
+                    logger.debug('Config file has been modified since last load');
+                    return false;
+                }
+            } catch (error) {
+                // If we can't check, assume invalid cache
+                return false;
+            }
+            
+            // Cache is valid
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Invalidate the cache for specific certificates or entire cache
+     * @param {string|Array<string>} [fingerprints] - Specific certificate fingerprint(s) to invalidate, or all if omitted
+     */
+    invalidateCache(fingerprints = null) {
+        if (fingerprints === null) {
+            // Invalidate entire cache
+            this.lastRefreshTime = 0;
+            this.pendingChanges.clear(); // Clear pending changes since we're reloading everything
+            logger.debug('Invalidated entire certificate cache');
+        } else {
+            // Convert single fingerprint to array if needed
+            const fingerprintArray = Array.isArray(fingerprints) ? fingerprints : [fingerprints];
+            
+            // Add to pending changes
+            fingerprintArray.forEach(fingerprint => {
+                this.pendingChanges.add(fingerprint);
+                logger.debug(`Marked certificate ${fingerprint} as needing refresh`);
+            });
+        }
+    }
+    
+    /**
+     * Notify the certificate manager about a certificate change
+     * @param {string} fingerprint - Certificate fingerprint that was changed
+     * @param {string} [changeType='update'] - Type of change ('update', 'create', 'delete')
+     */
+    notifyCertificateChanged(fingerprint, changeType = 'update') {
+        if (!fingerprint) return;
+        
+        this.pendingChanges.add(fingerprint);
+        logger.debug(`Certificate ${fingerprint} changed (${changeType})`);
+        
+        // For created or deleted certificates, we should also invalidate filesystem scanning
+        if (changeType === 'create' || changeType === 'delete') {
+            // Mark last refresh time as expired
+            this.lastRefreshTime = 0;
+        }
+    }
+    
+    /**
+     * Refresh specific certificates in the cache
+     * @param {Array<string>} fingerprints - Certificate fingerprints to refresh 
+     * @returns {Promise<number>} Number of certificates refreshed
+     */
+    async refreshCachedCertificates(fingerprints) {
+        if (!fingerprints || fingerprints.length === 0) return 0;
+        
+        let refreshed = 0;
+        
+        for (const fingerprint of fingerprints) {
+            try {
+                // Try to load certificate from disk
+                const cert = await this.loadCertificate(fingerprint);
+                
+                if (cert) {
+                    this.certificates.set(fingerprint, cert);
+                    refreshed++;
+                    this.pendingChanges.delete(fingerprint);
+                    logger.debug(`Refreshed certificate ${fingerprint} in cache`);
+                } else {
+                    // If certificate no longer exists, remove from cache
+                    this.certificates.delete(fingerprint);
+                    this.pendingChanges.delete(fingerprint);
+                    logger.debug(`Removed certificate ${fingerprint} from cache`);
+                }
+            } catch (error) {
+                logger.error(`Error refreshing certificate ${fingerprint}:`, error);
+            }
+        }
+        
+        return refreshed;
     }
     
     /**
      * Load certificates from the file system and configuration
-     * @param {boolean} forceRefresh - Force refresh even if recently loaded
+     * @param {boolean} forceRefresh - Force refresh even if cache is valid
      * @returns {Promise<Map<string, Certificate>>} Loaded certificates
      */
     async loadCertificates(forceRefresh = false) {
-        const now = Date.now();
-        
-        // If certificates were recently loaded and no refresh is forced, return cached data
-        if (!forceRefresh && 
-            this.certificates.size > 0 && 
-            (now - this.lastRefreshTime < 5 * 60 * 1000)) {  // 5 minute cache
+        // Check if we need to refresh the cache
+        if (!forceRefresh && this.isCacheValid()) {
+            logger.debug('Using cached certificates data');
+            
+            // If there are pending changes, refresh just those certificates
+            if (this.pendingChanges.size > 0) {
+                logger.debug(`Refreshing ${this.pendingChanges.size} certificates with pending changes`);
+                await this.refreshCachedCertificates([...this.pendingChanges]);
+            }
+            
             return this.certificates;
         }
+        
+        const now = Date.now();
+        logger.debug('Loading certificates from filesystem and config');
         
         try {
             // Clear current certificates
@@ -54,6 +204,14 @@ class CertificateManager {
                     if (certData && certData.fingerprint) {
                         const cert = new Certificate(certData);
                         this.certificates.set(cert.fingerprint, cert);
+                        
+                        // Record last modified time for certificate files
+                        try {
+                            const stats = fs.statSync(file);
+                            this.certificatesLastModified[cert.fingerprint] = stats.mtimeMs;
+                        } catch (error) {
+                            logger.warn(`Couldn't get stats for ${file}:`, error);
+                        }
                     }
                 } catch (error) {
                     logger.error(`Error parsing certificate file ${file}:`, error);
@@ -68,7 +226,18 @@ class CertificateManager {
                 await this.saveCertificateConfigs();
             }
             
+            // Update cache metadata
             this.lastRefreshTime = now;
+            this.pendingChanges.clear();
+            
+            // Update config file last modified time
+            try {
+                const stats = fs.statSync(this.configPath);
+                this.configLastModified = stats.mtimeMs;
+            } catch (error) {
+                logger.debug(`Couldn't get stats for config file:`, error);
+            }
+            
             logger.info(`Loaded ${this.certificates.size} certificates`);
             
             return this.certificates;
@@ -400,7 +569,7 @@ class CertificateManager {
     }
     
     /**
-     * Update a certificate's configuration
+     * Update a certificate's configuration and notify about changes
      * @param {string} fingerprint - Certificate fingerprint
      * @param {Object} config - Updated configuration
      * @returns {Promise<boolean>} Success status
@@ -419,7 +588,24 @@ class CertificateManager {
             
             const cert = this.certificates.get(fingerprint);
             
-            // Update configuration values
+            // Update basic metadata
+            if (config.name !== undefined) {
+                cert.name = config.name;
+            }
+            
+            if (config.description !== undefined) {
+                cert.description = config.description;
+            }
+            
+            if (config.group !== undefined) {
+                cert.group = config.group;
+            }
+            
+            if (config.tags !== undefined) {
+                cert.tags = config.tags;
+            }
+            
+            // Update renewal settings
             if (config.autoRenew !== undefined) {
                 cert.autoRenew = config.autoRenew;
             }
@@ -428,17 +614,50 @@ class CertificateManager {
                 cert.renewDaysBeforeExpiry = config.renewDaysBeforeExpiry;
             }
             
+            if (config.validity !== undefined) {
+                cert.validity = config.validity;
+            }
+            
+            if (config.renewBefore !== undefined) {
+                cert.renewBefore = config.renewBefore;
+            }
+            
+            if (config.keySize !== undefined) {
+                cert.keySize = config.keySize;
+            }
+            
+            // Update CA settings
             if (config.signWithCA !== undefined) {
                 cert.signWithCA = config.signWithCA;
                 cert.caFingerprint = config.caFingerprint || null;
             }
             
+            // Update deployment settings
             if (config.deployActions !== undefined) {
                 cert.deployActions = config.deployActions;
             }
             
+            // Update notification settings
+            if (config.notifications !== undefined) {
+                cert.notifications = {
+                    ...cert.notifications || {},
+                    ...config.notifications
+                };
+            }
+            
+            // Update custom metadata
+            if (config.metadata !== undefined) {
+                cert.metadata = {
+                    ...cert.metadata || {},
+                    ...config.metadata
+                };
+            }
+            
             // Save all configurations
             await this.saveCertificateConfigs();
+            
+            // Add notification about the change
+            this.notifyCertificateChanged(fingerprint, 'update');
             
             return true;
         } catch (error) {
@@ -453,8 +672,18 @@ class CertificateManager {
      * @returns {Certificate} - Certificate object or null if not found
      */
     getCertificate(fingerprint) {
+        if (!fingerprint) {
+            return null;
+        }
+        
         // Clean any potential prefix from the fingerprint
         const cleanedFingerprint = fingerprint.replace(/SHA256 FINGERPRINT=|sha256 Fingerprint=/i, '');
+        
+        // Check if this certificate needs refresh
+        if (this.pendingChanges.has(cleanedFingerprint) || this.pendingChanges.has(fingerprint)) {
+            logger.debug(`Certificate ${fingerprint} has pending changes, refreshing`);
+            this.refreshCachedCertificates([cleanedFingerprint]);
+        }
         
         if (this.certificates.has(cleanedFingerprint)) {
             const cert = this.certificates.get(cleanedFingerprint);
@@ -471,7 +700,7 @@ class CertificateManager {
         
         // Try to load certificate from disk
         const loadedCert = this.loadCertificate(cleanedFingerprint) || 
-                          this.loadCertificate(fingerprint);
+                        this.loadCertificate(fingerprint);
         
         if (loadedCert) {
             // Store with clean fingerprint
@@ -513,7 +742,7 @@ class CertificateManager {
     }
     
     /**
-     * Delete a certificate
+     * Delete a certificate and notify about the change
      * @param {string} fingerprint - Certificate fingerprint
      * @returns {Promise<Object>} Result object with success status
      */
@@ -548,6 +777,9 @@ class CertificateManager {
             
             // Save updated configuration
             await this.saveCertificateConfigs();
+            
+            // Add notification about the change
+            this.notifyCertificateChanged(fingerprint, 'delete');
             
             return { success: true };
         } catch (error) {
@@ -668,7 +900,7 @@ class CertificateManager {
     }
 
     /**
-     * Renew a certificate and execute deployment actions
+     * Renew a certificate and execute deployment actions, then notify about the change
      * @param {string} fingerprint - Certificate fingerprint
      * @param {Object} options - Renewal options
      * @returns {Promise<Object>} Result of renewal and deployment
@@ -718,6 +950,9 @@ class CertificateManager {
                     deployResult
                 };
             }
+            
+            // Add notification about the change
+            this.notifyCertificateChanged(fingerprint, 'update');
             
             return {
                 success: true,
@@ -1119,6 +1354,215 @@ class CertificateManager {
         } catch (error) {
             logger.error(`Error getting certificate config for ${fingerprint}:`, error);
             return {};
+        }
+    }
+
+    /**
+     * Get changes since last frontend refresh
+     * @returns {Promise<Object>} Object with added, updated, and deleted certificates
+     */
+    async getChangesSinceLastRefresh() {
+        try {
+            const changes = {
+                added: [],
+                updated: [...this.pendingChanges],
+                deleted: []
+            };
+            
+            // If cache is expired, need to do a full refresh
+            if (!this.isCacheValid()) {
+                return null; // Signal that a full refresh is needed
+            }
+            
+            // Process pending changes
+            for (const fingerprint of this.pendingChanges) {
+                try {
+                    const cert = await this.loadCertificate(fingerprint);
+                    
+                    if (cert) {
+                        // Update in cache
+                        this.certificates.set(fingerprint, cert);
+                    } else {
+                        // Certificate no longer exists
+                        this.certificates.delete(fingerprint);
+                        changes.updated = changes.updated.filter(fp => fp !== fingerprint);
+                        changes.deleted.push(fingerprint);
+                    }
+                } catch (error) {
+                    logger.error(`Error processing certificate change for ${fingerprint}:`, error);
+                }
+            }
+            
+            // Clear pending changes
+            this.pendingChanges.clear();
+            
+            return changes;
+        } catch (error) {
+            logger.error('Error getting certificate changes:', error);
+            return null; // Signal that a full refresh is needed
+        }
+    }
+
+    /**
+     * Add a domain to a certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {string} domain - Domain to add
+     * @param {boolean} [idle=true] - Whether the domain should be idle until renewal
+     * @returns {Promise<object>} Result object with success status and message
+     */
+    async addDomain(fingerprint, domain, idle = true) {
+        try {
+            const cert = this.getCertificate(fingerprint);
+            if (!cert) {
+                return { success: false, message: 'Certificate not found' };
+            }
+            
+            const result = cert.addDomain(domain, idle);
+            
+            if (result.success) {
+                // Save changes to configuration
+                await this.saveCertificateConfigs();
+                
+                // Notify about certificate change
+                this.notifyCertificateChanged(fingerprint, 'update');
+            }
+            
+            return result;
+        } catch (error) {
+            logger.error(`Error adding domain to certificate ${fingerprint}:`, error);
+            return { success: false, message: error.message };
+        }
+    }
+
+    /**
+     * Remove a domain from a certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {string} domain - Domain to remove
+     * @param {boolean} [fromIdle=false] - Whether to remove from idle domains
+     * @returns {Promise<boolean>} Success status
+     */
+    async removeDomain(fingerprint, domain, fromIdle = false) {
+        try {
+            const cert = this.getCertificate(fingerprint);
+            if (!cert) {
+                return false;
+            }
+            
+            const removed = cert.removeDomain(domain, fromIdle);
+            
+            if (removed) {
+                // Save changes to configuration
+                await this.saveCertificateConfigs();
+                
+                // Notify about certificate change
+                this.notifyCertificateChanged(fingerprint, 'update');
+            }
+            
+            return removed;
+        } catch (error) {
+            logger.error(`Error removing domain from certificate ${fingerprint}:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Add an IP address to a certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {string} ip - IP address to add
+     * @param {boolean} [idle=true] - Whether the IP should be idle until renewal
+     * @returns {Promise<object>} Result object with success status and message
+     */
+    async addIp(fingerprint, ip, idle = true) {
+        try {
+            const cert = this.getCertificate(fingerprint);
+            if (!cert) {
+                return { success: false, message: 'Certificate not found' };
+            }
+            
+            const result = cert.addIp(ip, idle);
+            
+            if (result.success) {
+                // Save changes to configuration
+                await this.saveCertificateConfigs();
+                
+                // Notify about certificate change
+                this.notifyCertificateChanged(fingerprint, 'update');
+            }
+            
+            return result;
+        } catch (error) {
+            logger.error(`Error adding IP to certificate ${fingerprint}:`, error);
+            return { success: false, message: error.message };
+        }
+    }
+
+    /**
+     * Remove an IP address from a certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {string} ip - IP address to remove
+     * @param {boolean} [fromIdle=false] - Whether to remove from idle IPs
+     * @returns {Promise<boolean>} Success status
+     */
+    async removeIp(fingerprint, ip, fromIdle = false) {
+        try {
+            const cert = this.getCertificate(fingerprint);
+            if (!cert) {
+                return false;
+            }
+            
+            const removed = cert.removeIp(ip, fromIdle);
+            
+            if (removed) {
+                // Save changes to configuration
+                await this.saveCertificateConfigs();
+                
+                // Notify about certificate change
+                this.notifyCertificateChanged(fingerprint, 'update');
+            }
+            
+            return removed;
+        } catch (error) {
+            logger.error(`Error removing IP from certificate ${fingerprint}:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Apply idle domains and IPs (moves them to active) and renews the certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @returns {Promise<Object>} Result of renewal operation
+     */
+    async applyIdleSubjectsAndRenew(fingerprint) {
+        try {
+            const cert = this.getCertificate(fingerprint);
+            if (!cert) {
+                throw new Error(`Certificate not found: ${fingerprint}`);
+            }
+            
+            // Apply idle domains and IPs to active lists
+            const hadChanges = cert.applyIdleSubjects();
+            
+            if (!hadChanges) {
+                return { 
+                    success: false, 
+                    message: 'No idle subjects to apply' 
+                };
+            }
+            
+            // Save configuration changes
+            await this.saveCertificateConfigs();
+            
+            // Now renew the certificate with the new subjects
+            const renewResult = await this.renewAndDeployCertificate(fingerprint);
+            
+            return {
+                success: true,
+                message: 'Applied idle subjects and renewed certificate',
+                renewResult
+            };
+        } catch (error) {
+            logger.error(`Error applying idle subjects for certificate ${fingerprint}:`, error);
+            throw error;
         }
     }
 }

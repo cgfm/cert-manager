@@ -214,7 +214,8 @@ async function saveCertificate() {
       return;
     }
 
-    if (!DomainValidator.isValid(commonName)) {
+    // Fix: Use the correct method name
+    if (!DomainValidator.isValidDomain(commonName)) {
       UIUtils.showError("Invalid domain name format");
       Logger.warn(
         `Certificate save failed: invalid domain format: ${commonName}`
@@ -253,10 +254,11 @@ async function saveCertificate() {
 
   // Process alternative names
   if (data.altNames) {
+    // Fix: Use the correct method name
     data.domains = data.altNames
       .split(/[\r\n]+/)
       .map((domain) => domain.trim())
-      .filter((domain) => domain && DomainValidator.isValid(domain));
+      .filter((domain) => domain && DomainValidator.isValidDomain(domain));
 
     delete data.altNames;
   }
@@ -319,14 +321,14 @@ async function saveCertificate() {
 }
 
 /**
- * Show certificate details modal using UIUtils
+ * Show certificate details modal using template approach
  * @param {string} fingerprint - Certificate fingerprint
  */
 async function showCertificateDetails(fingerprint) {
   Logger.debug("Showing certificate details for:", fingerprint);
 
   if (!fingerprint) {
-    UIUtils.showToast("Certificate ID is missing", "error");
+    UIUtils.showToast('Certificate ID is missing', 'error');
     return;
   }
 
@@ -365,9 +367,8 @@ async function showCertificateDetails(fingerprint) {
 
     // Process the template with certificate data
     const processedHtmlHeader = processCertificateTemplate(
-      `
-  <span class="cert-name">\${certificate.name}</span>
-  <span class="cert-status \${statusClass}">\${statusText}</span>`,
+      `<span class="cert-name">\${certificate.name}</span>
+      <span class="cert-status \${statusClass}">\${statusText}</span>`,
       certificate
     );
     const processedHtml = processCertificateTemplate(templateHtml, certificate);
@@ -378,7 +379,6 @@ async function showCertificateDetails(fingerprint) {
       content: processedHtml,
       data: { certId: fingerprint },
       buttons: [
-        { text: "Close", id: "close-cert-details-btn", action: "close" },
         { text: "Download", id: "download-cert-btn", action: "custom" },
         {
           text: "Renew",
@@ -392,19 +392,36 @@ async function showCertificateDetails(fingerprint) {
           action: "custom",
           class: "danger",
         },
+        { text:"", class: "button-spacer" },
+        { text: "Close", id: "close-cert-details-btn", action: "close" },
       ],
     });
 
-    // Initialize tabs and event handlers - use the container-based version
+    // Initialize tabs and event handlers
     const modalContent = document.querySelector(
       "#cert-details-modal .modal-content"
     );
-    initializeCertificateDetailsTabs(modalContent);
-
-    // Load additional data for tabs
-    loadCertificateTabData(certificate);
-
-    Logger.info(`Displayed details for certificate: ${certificate.name}`);
+    
+    // Wait a short time to ensure the DOM is fully updated
+    setTimeout(() => {
+      try {
+        // Initialize tabs and handlers
+        initializeCertificateDetailsTabs(modalContent);
+        
+        // Verify if required elements exist
+        const domainsTableBody = document.getElementById('domains-table-body');
+        if (!domainsTableBody) {
+          Logger.warn('Domains table body not found in the DOM');
+        }
+        
+        // Load additional data for tabs
+        loadCertificateTabData(certificate);
+        
+        Logger.info(`Displayed details for certificate: ${certificate.name}`);
+      } catch (error) {
+        Logger.error('Error initializing certificate details UI:', error);
+      }
+    }, 100);
   } catch (error) {
     Logger.error("Error showing certificate details:", error);
 
@@ -747,7 +764,7 @@ function prepareTemplateData(certificate) {
 }
 
 /**
- * Initialize tabs and event handlers for certificate details
+ * Initialize certificate details tabs and UI elements
  * @param {HTMLElement} container - Container element
  */
 function initializeCertificateDetailsTabs(container) {
@@ -791,6 +808,9 @@ function initializeCertificateDetailsTabs(container) {
 
   Logger.debug("Setting up certificate action buttons");
 
+  // Initialize certificate conversion
+  initializeCertificateConversion();
+  
   // Initialize close button
   container
     .querySelector(".close-modal")
@@ -883,30 +903,50 @@ function initializeCertificateDetailsTabs(container) {
     });
   }
 
-  Logger.info("Certificate details tabs and buttons initialized");
-}
-
-/**
- * Load tab content if it hasn't been loaded yet
- * @param {string} tabId - Tab ID
- * @param {Object} certificate - Certificate object
- */
-function loadTabContentIfNeeded(tabId, certificate) {
-  switch (tabId) {
-    case "files":
-      loadCertificateFiles(certificate);
-      break;
-    case "domains":
-      loadCertificateDomains(certificate);
-      break;
-    case "deployment":
-      loadDeploymentActions(certificate);
-      break;
-    case "backups":
-      loadCertificateBackups(certificate);
-      break;
-    // Other tabs are loaded with static content from the template
+  // Add domain functionality
+  const addDomainBtn = container.querySelector('#add-domain-btn');
+  const cancelAddDomainBtn = container.querySelector('#cancel-add-domain-btn');
+  const saveDomainBtn = container.querySelector('#save-domain-btn');
+  const saveAndRenewDomainBtn = container.querySelector('#save-and-renew-domain-btn');
+  
+  if (addDomainBtn) {
+    addDomainBtn.addEventListener('click', () => {
+      const addDomainForm = document.getElementById('add-domain-form');
+      if (addDomainForm) {
+        addDomainForm.classList.remove('hidden');
+      }
+    });
   }
+  
+  if (cancelAddDomainBtn) {
+    cancelAddDomainBtn.addEventListener('click', () => {
+      const addDomainForm = document.getElementById('add-domain-form');
+      if (addDomainForm) {
+        addDomainForm.classList.add('hidden');
+        document.getElementById('domain-value').value = '';
+      }
+    });
+  }
+  
+  if (saveDomainBtn) {
+    saveDomainBtn.addEventListener('click', () => {
+      addCertificateSubject(false);
+    });
+  }
+  
+  if (saveAndRenewDomainBtn) {
+    saveAndRenewDomainBtn.addEventListener('click', () => {
+      addCertificateSubject(true);
+    });
+  }
+
+  // Initialize certificate group management
+  initializeGroupManagement();
+
+  // Initialize domain management
+  initializeDomainManagement();
+
+  Logger.info("Certificate details tabs and buttons initialized");
 }
 
 /**
@@ -1172,7 +1212,7 @@ async function downloadAllCertificateFiles(certificate) {
     const response = await fetch(
       `/api/certificates/${encodeAPIFingerprint(
         certificate.fingerprint
-      )}/download-all`
+      )}/download`
     );
 
     if (!response.ok) {
@@ -1302,175 +1342,129 @@ function getDisplayName(fileType) {
 }
 
 /**
- * Load certificate domains into the domains tab
- * @param {Object} certificate - Certificate object
+ * Add a new subject (domain or IP) to the certificate
+ * @param {boolean} applyImmediately - Whether to apply immediately and renew
  */
-function loadCertificateDomains(certificate) {
-  Logger.debug(`Loading domain list for certificate: ${certificate.name}`);
+async function addCertificateSubject(applyImmediately) {
+    const fingerprint = document
+        .getElementById("cert-details-modal")
+        .getAttribute("data-cert-id");
+    const subjectValue = document.getElementById("domain-value").value.trim();
 
-  const container = document.getElementById("domains-table-body");
-  if (!container) {
-    Logger.error("Domains table body container not found");
-    return;
-  }
-
-  const domains = certificate.domains || [];
-
-  if (domains.length === 0) {
-    Logger.warn(`No domains configured for certificate: ${certificate.name}`);
-    container.innerHTML = `<tr><td colspan="3" class="empty-cell">No domains configured.</td></tr>`;
-    return;
-  }
-
-  Logger.debug(
-    `Found ${domains.length} domains for certificate: ${certificate.name}`
-  );
-
-  let html = "";
-  domains.forEach((domain, index) => {
-    // Determine if domain is an IP address
-    const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(domain);
-    const domainType = isIP ? "IP Address" : "DNS";
-
-    html += `
-          <tr>
-            <td>${UIUtils.escapeHTML(domain)}</td>
-            <td>${domainType}</td>
-            <td>
-              <button class="button small danger remove-domain-btn" data-index="${index}">
-                Remove
-              </button>
-            </td>
-          </tr>
-        `;
-  });
-
-  container.innerHTML = html;
-
-  // Add event listeners for remove buttons
-  container.querySelectorAll(".remove-domain-btn").forEach((btn) => {
-    btn.addEventListener("click", function () {
-      const index = parseInt(this.getAttribute("data-index"), 10);
-      const domain = domains[index];
-      Logger.debug(`Removing domain at index ${index}: ${domain}`);
-      removeCertificateDomain(certificate.fingerprint, index);
-    });
-  });
-
-  Logger.info(`Domains loaded for certificate: ${certificate.name}`);
-}
-
-/**
- * Add a new domain to the certificate
- * @param {boolean} renewAfterAdd - Whether to renew the certificate after adding the domain
- */
-async function addCertificateDomain(renewAfterAdd) {
-  const fingerprint = document
-    .getElementById("cert-details-modal")
-    .getAttribute("data-cert-id");
-  const domainValue = document.getElementById("domain-value").value.trim();
-
-  if (!domainValue) {
-    UIUtils.showToast("Please enter a domain or IP address", "warning");
-    return;
-  }
-
-  try {
-    // Automatically determine if it's an IP or domain
-    const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(domainValue);
-    const domainType = isIP ? "ip" : "dns";
-
-    // Validate based on detected type
-    if (!isIP && !DomainValidator.isValid(domainValue)) {
-      UIUtils.showToast("Invalid domain name format", "error");
-      return;
-    } else if (isIP && !IPValidator.isValid(domainValue)) {
-      UIUtils.showToast("Invalid IP address format", "error");
-      return;
+    if (!subjectValue) {
+        UIUtils.showToast("Please enter a domain or IP address", "warning");
+        return;
     }
 
-    // Show loading
-    UIUtils.showToast("Adding domain...", "info");
-
-    // Send API request to add domain
-    const response = await fetch(`/api/certificates/${fingerprint}/domains`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        domain: domainValue,
-        type: domainType,
-        renew: renewAfterAdd,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to add domain: ${errorText}`);
-    }
-
-    // Clear input
-    document.getElementById("domain-value").value = "";
-
-    // If renewing, show a different message
-    if (renewAfterAdd) {
-      UIUtils.showToast(
-        "Domain added and certificate renewal started",
-        "success"
-      );
-    } else {
-      UIUtils.showToast("Domain added successfully", "success");
-
-      // Reload domains list
-      const certificate = await fetchCertificateDetails(fingerprint);
-      loadCertificateDomains(certificate);
-    }
-  } catch (error) {
-    UIUtils.showError(`Failed to add domain: ${error.message}`);
-  }
-}
-
-/**
- * Remove a domain from certificate
- * @param {string} fingerprint - Certificate fingerprint
- * @param {number} index - Domain index to remove
- */
-async function removeCertificateDomain(fingerprint, index) {
-  try {
-    // Show confirmation dialog
-    UIUtils.confirm(
-      "Remove Domain",
-      "Are you sure you want to remove this domain? This will require renewing the certificate to take effect.",
-      async () => {
-        try {
-          // Send API request to remove domain
-          const response = await fetch(
-            `/api/certificates/${fingerprint}/domains/${index}`,
-            {
-              method: "DELETE",
-            }
-          );
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to remove domain: ${errorText}`);
-          }
-
-          // Show success message
-          UIUtils.showToast("Domain removed successfully", "success");
-
-          // Reload domains list
-          const certificate = await fetchCertificateDetails(fingerprint);
-          loadCertificateDomains(certificate);
-        } catch (error) {
-          UIUtils.showError(`Failed to remove domain: ${error.message}`);
+    try {
+        // Auto-detect if the input is an IP address or domain name
+        let subjectType = 'domain';
+        let isValid = false;
+        
+        // Special case for localhost
+        if (subjectValue.toLowerCase() === 'localhost') {
+            isValid = true;
+        } 
+        // Check if it's an IPv4 or IPv6 address
+        else if (DomainValidator.isValidIPv4(subjectValue) || DomainValidator.isValidIPv6(subjectValue)) {
+            subjectType = 'ip';
+            isValid = true;
+        } 
+        // Check if it's a valid domain
+        else if (DomainValidator.isValidDomain(subjectValue) || DomainValidator.isValidWildcardDomain(subjectValue)) {
+            subjectType = 'domain';
+            isValid = true;
         }
-      }
-    );
-  } catch (error) {
-    UIUtils.showError(`Error: ${error.message}`);
-  }
+        
+        if (!isValid) {
+            UIUtils.showToast("Invalid domain name or IP address format", "error");
+            return;
+        }
+        
+        // Check for duplicates in the current certificate
+        const currentCert = getCurrentCertificate();
+        if (currentCert) {
+            const duplicate = checkDuplicateInCertificate(subjectValue, currentCert);
+            if (duplicate.exists) {
+                UIUtils.showToast(`This ${subjectType} already exists in ${duplicate.where}`, "warning");
+                return;
+            }
+        }
+
+        // Show loading with detected type
+        UIUtils.showToast(`Adding ${subjectType === 'ip' ? 'IP address' : 'domain'}...`, "info");
+
+        // Encode fingerprint for API use
+        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+
+        // Send API request to add domain/IP
+        const response = await fetch(`/api/certificates/${encodedFingerprint}/san`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                value: subjectValue,
+                type: subjectType,
+                idle: !applyImmediately
+            }),
+        });
+
+        // Handle specific status codes
+        if (response.status === 409) {
+            // It's a duplicate entry
+            const errorData = await response.json();
+            const entityType = subjectType === 'ip' ? 'IP address' : 'domain';
+            const status = errorData.existsIn === 'active' ? 'active' : 'pending renewal';
+            
+            UIUtils.showToast(`This ${entityType} is already in the ${status} list`, "warning");
+            
+            // Clear input and close form anyway
+            document.getElementById("domain-value").value = "";
+            document.getElementById("add-domain-form").classList.add('hidden');
+            clearDomainValidationFeedback();
+            return;
+        }
+
+        if (!response.ok) {
+            // Handle other errors
+            let errorMessage = `HTTP error: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+                // Couldn't parse JSON error, use default
+            }
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+
+        // Clear input
+        document.getElementById("domain-value").value = "";
+        document.getElementById("add-domain-form").classList.add('hidden');
+        clearDomainValidationFeedback();
+
+        // If applying immediately, show a different message
+        if (applyImmediately) {
+            UIUtils.showToast(
+                `${subjectType === 'ip' ? 'IP address' : 'Domain'} added and certificate renewal started`,
+                "success"
+            );
+            
+            // Start the renewal process
+            applyIdleSubjectsAndRenew(fingerprint);
+        } else {
+            UIUtils.showToast(result.message || `${subjectType === 'ip' ? 'IP address' : 'Domain'} added successfully (pending renewal)`, "success");
+
+            // Reload domains list
+            const certificate = await fetchCertificateDetails(fingerprint);
+            loadCertificateDomains(certificate);
+        }
+    } catch (error) {
+        console.error("Error adding subject:", error);
+        UIUtils.showError(`Failed to add domain or IP: ${error.message}`);
+    }
 }
 
 /**
@@ -1499,7 +1493,374 @@ function loadDeploymentActions(fingerprint) {
 }
 
 /**
- * Save certificate settings
+ * Remove a subject (domain or IP) from the certificate
+ * @param {string} fingerprint - Certificate fingerprint
+ * @param {string} type - Type of subject (domain or ip)
+ * @param {string} value - The domain or IP value
+ * @param {boolean} isIdle - Whether the subject is idle
+ */
+async function removeCertificateSubject(fingerprint, type, value, isIdle) {
+    try {
+        // Show loading
+        UIUtils.showToast(`Removing ${type}...`, "info");
+
+        // URL encode the value and type for safety
+        const encodedValue = encodeURIComponent(value);
+        const encodedType = encodeURIComponent(type);
+        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+        
+        // Send API request to remove domain/IP
+        const response = await fetch(
+            `/api/certificates/${encodedFingerprint}/san/${encodedType}/${encodedValue}?idle=${isIdle}`,
+            {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                }
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Failed to remove ${type}: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        UIUtils.showToast(result.message || `${type === 'ip' ? 'IP' : 'Domain'} removed successfully`, "success");
+
+        // Reload domains list
+        const certificate = await fetchCertificateDetails(fingerprint);
+        loadCertificateDomains(certificate);
+    } catch (error) {
+        UIUtils.showError(`Failed to remove ${type}: ${error.message}`);
+    }
+}
+
+/**
+ * Apply idle subjects and renew certificate
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+async function applyIdleSubjectsAndRenew(fingerprint) {
+    try {
+        // Show loading
+        UIUtils.showToast("Applying changes and renewing certificate...", "info");
+        
+        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+        
+        // Send API request
+        const response = await fetch(`/api/certificates/${encodedFingerprint}/san/apply`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Failed to apply changes: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        UIUtils.showToast(result.message || "Changes applied and certificate renewed successfully", "success");
+
+        // Reload certificate details
+        await showCertificateDetails(fingerprint);
+    } catch (error) {
+        UIUtils.showError(`Failed to apply changes: ${error.message}`);
+    }
+}
+
+/**
+ * Initialize domain/IP management in the certificate details modal
+ */
+function initializeDomainManagement() {
+    const addDomainBtn = document.getElementById('add-domain-btn');
+    const cancelAddDomainBtn = document.getElementById('cancel-add-domain-btn');
+    const saveDomainBtn = document.getElementById('save-domain-btn');
+    const applyImmediatelyCheckbox = document.getElementById('apply-immediately');
+    
+    if (addDomainBtn) {
+        addDomainBtn.addEventListener('click', () => {
+            const addDomainForm = document.getElementById('add-domain-form');
+            if (addDomainForm) {
+                addDomainForm.classList.remove('hidden');
+                document.getElementById('domain-value').focus();
+            }
+        });
+    }
+    
+    if (cancelAddDomainBtn) {
+        cancelAddDomainBtn.addEventListener('click', () => {
+            const addDomainForm = document.getElementById('add-domain-form');
+            if (addDomainForm) {
+                addDomainForm.classList.add('hidden');
+                document.getElementById('domain-value').value = '';
+                clearDomainValidationFeedback();
+                if (applyImmediatelyCheckbox) {
+                    applyImmediatelyCheckbox.checked = false;
+                }
+            }
+        });
+    }
+    
+    if (saveDomainBtn) {
+        saveDomainBtn.addEventListener('click', () => {
+            const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
+            addCertificateSubject(applyImmediately);
+        });
+    }
+    
+    // Add live validation for domain input
+    const domainValue = document.getElementById('domain-value');
+    if (domainValue) {
+        // Handle Enter key in domain value input
+        domainValue.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
+                addCertificateSubject(applyImmediately);
+            } else {
+                // Provide live validation feedback
+                validateDomainInput(domainValue.value.trim());
+            }
+        });
+        
+        // Also validate on blur for better UX
+        domainValue.addEventListener('blur', () => {
+            validateDomainInput(domainValue.value.trim());
+        });
+    }
+}
+
+/**
+ * Validate domain input and show feedback, including duplicate checking
+ * @param {string} value - The input value to validate
+ * @returns {boolean} True if valid, false otherwise
+ */
+function validateDomainInput(value) {
+    if (!value) {
+        clearDomainValidationFeedback();
+        return false;
+    }
+    
+    const inputElement = document.getElementById('domain-value');
+    const feedbackElement = document.getElementById('domain-input-feedback');
+    
+    // Create feedback element if it doesn't exist
+    if (!feedbackElement && inputElement) {
+        const feedback = document.createElement('div');
+        feedback.id = 'domain-input-feedback';
+        feedback.className = 'input-feedback';
+        inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
+    }
+    
+    // Check if the current certificate is loaded
+    const currentCert = getCurrentCertificate();
+    
+    // Check for duplicates in the current certificate
+    if (currentCert) {
+        const duplicate = checkDuplicateInCertificate(value, currentCert);
+        if (duplicate.exists) {
+            // Show duplicate warning
+            if (feedbackElement) {
+                feedbackElement.textContent = `Already exists in ${duplicate.where}`;
+                feedbackElement.className = 'input-feedback duplicate-feedback';
+            }
+            
+            if (inputElement) {
+                inputElement.classList.remove('is-valid', 'is-invalid');
+                inputElement.classList.add('is-duplicate');
+            }
+            
+            return false;
+        }
+    }
+    
+    // Regular validation logic
+    let isValid = false;
+    let type = '';
+    let feedbackMessage = '';
+    let feedbackClass = '';
+    
+    // Special case for localhost
+    if (value.toLowerCase() === 'localhost') {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: localhost';
+        feedbackClass = 'valid-feedback';
+    } 
+    // Check if it's an IPv4 or IPv6 address
+    else if (DomainValidator.isValidIPv4(value)) {
+        isValid = true;
+        type = 'ip';
+        feedbackMessage = 'Valid: IPv4 Address';
+        feedbackClass = 'valid-feedback';
+    }
+    else if (DomainValidator.isValidIPv6(value)) {
+        isValid = true;
+        type = 'ip';
+        feedbackMessage = 'Valid: IPv6 Address';
+        feedbackClass = 'valid-feedback';
+    }
+    // Check if it's a wildcard domain
+    else if (DomainValidator.isValidWildcardDomain(value)) {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: Wildcard Domain';
+        feedbackClass = 'valid-feedback';
+    }
+    // Check if it's a regular domain
+    else if (DomainValidator.isValidDomain(value)) {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: Domain Name';
+        feedbackClass = 'valid-feedback';
+    }
+    // Invalid input
+    else {
+        isValid = false;
+        feedbackMessage = 'Invalid domain name or IP address format';
+        feedbackClass = 'invalid-feedback';
+    }
+    
+    // Update the feedback element
+    const updatedFeedback = document.getElementById('domain-input-feedback');
+    if (updatedFeedback) {
+        updatedFeedback.textContent = feedbackMessage;
+        updatedFeedback.className = `input-feedback ${feedbackClass}`;
+    }
+    
+    // Update input field styling
+    if (inputElement) {
+        inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
+        inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
+    }
+    
+    return isValid;
+}
+
+/**
+ * Clear domain validation feedback
+ */
+function clearDomainValidationFeedback() {
+    const inputElement = document.getElementById('domain-value');
+    const feedbackElement = document.getElementById('domain-input-feedback');
+    
+    if (inputElement) {
+        inputElement.classList.remove('is-valid', 'is-invalid');
+    }
+    
+    if (feedbackElement) {
+        feedbackElement.textContent = '';
+        feedbackElement.className = 'input-feedback';
+    }
+}
+
+/**
+ * Load certificate domains into the domains tab
+ * @param {Object} certificate - Certificate object
+ */
+function loadCertificateDomains(certificate) {
+    Logger.debug(`Loading domain list for certificate: ${certificate.name}`);
+
+    const container = document.getElementById("domains-table-body");
+    if (!container) {
+        Logger.error("Domains table body container not found");
+        return;
+    }
+
+    // Get domains and IPs (both active and idle)
+    const activeDomains = certificate.domains || [];
+    const activeIPs = certificate.ips || [];
+    const idleDomains = certificate.idleDomains || [];
+    const idleIPs = certificate.idleIps || [];
+    
+    // Show/hide the pending renewal banner
+    const pendingRenewalBanner = document.getElementById('pending-renewal-banner');
+    if (pendingRenewalBanner) {
+        if (idleDomains.length > 0 || idleIPs.length > 0) {
+            pendingRenewalBanner.classList.remove('hidden');
+        } else {
+            pendingRenewalBanner.classList.add('hidden');
+        }
+    }
+
+    // Combined list of all entries for display
+    const allEntries = [
+        ...activeDomains.map(domain => ({ value: domain, type: 'domain', status: 'active' })),
+        ...activeIPs.map(ip => ({ value: ip, type: 'ip', status: 'active' })),
+        ...idleDomains.map(domain => ({ value: domain, type: 'domain', status: 'idle' })),
+        ...idleIPs.map(ip => ({ value: ip, type: 'ip', status: 'idle' }))
+    ];
+
+    if (allEntries.length === 0) {
+        Logger.warn(`No domains or IPs configured for certificate: ${certificate.name}`);
+        container.innerHTML = `<tr><td colspan="4" class="empty-cell">No domains or IPs configured.</td></tr>`;
+        return;
+    }
+
+    Logger.debug(
+        `Found ${allEntries.length} entries for certificate: ${certificate.name}`
+    );
+
+    let html = "";
+    allEntries.forEach((entry, index) => {
+        const { value, type, status } = entry;
+        const isIdle = status === 'idle';
+        
+        html += `
+        <tr class="domain-row ${isIdle ? 'idle-row' : ''}">
+            <td>${UIUtils.escapeHTML(value)}</td>
+            <td>${type === 'ip' ? 'IP Address' : 'Domain'}</td>
+            <td class="text-center">
+                ${isIdle ? 
+                    '<span class="status-badge idle" title="This entry will be applied on next renewal"><i class="fas fa-hourglass-half"></i> Pending</span>' : 
+                    '<span class="status-badge active" title="Active"><i class="fas fa-check-circle"></i> Active</span>'}
+            </td>
+            <td>
+                <button class="button small danger remove-domain-btn" 
+                    data-value="${UIUtils.escapeAttr(value)}" 
+                    data-type="${type}" 
+                    data-idle="${isIdle ? 'true' : 'false'}">
+                    Remove
+                </button>
+            </td>
+        </tr>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Add event listeners for remove buttons
+    container.querySelectorAll(".remove-domain-btn").forEach((btn) => {
+        btn.addEventListener("click", function () {
+            const value = this.getAttribute("data-value");
+            const type = this.getAttribute("data-type");
+            const idle = this.getAttribute("data-idle") === 'true';
+            
+            if (confirm(`Are you sure you want to remove this ${type === 'ip' ? 'IP address' : 'domain'}?`)) {
+                removeCertificateSubject(certificate.fingerprint, type, value, idle);
+            }
+        });
+    });
+
+    // Add event listener for apply and renew button
+    const applyAndRenewBtn = document.getElementById('apply-and-renew-btn');
+    if (applyAndRenewBtn) {
+        applyAndRenewBtn.addEventListener('click', () => {
+            if (confirm('This will apply all pending domains/IPs and renew the certificate. Continue?')) {
+                applyIdleSubjectsAndRenew(certificate.fingerprint);
+            }
+        });
+    }
+
+    Logger.info(`Domains loaded for certificate: ${certificate.name}`);
+}
+
+/**
+ * Save certificate settings                                                 
  */
 async function saveCertificateSettings() {
   const fingerprint = document
@@ -1562,9 +1923,10 @@ async function saveCertificateSettings() {
     }
 
     UIUtils.showToast("Certificate settings saved successfully", "success");
-
+   
     // Reload certificate details to reflect changes
     await loadCertificateDetails(fingerprint);
+                      
   } catch (error) {
     UIUtils.showError(`Failed to save settings: ${error.message}`);
   }
@@ -1880,118 +2242,142 @@ async function downloadCertificateFile(fingerprint, fileType) {
  * @param {Object} certificate - Certificate object
  */
 function loadCertificateFiles(certificate) {
-  Logger.debug(`Loading certificate files for: ${certificate.name}`);
-  
-  const container = document.getElementById("cert-files-list");
-  if (!container) {
-    Logger.error("Certificate files container not found");
-    return;
-  }
-  
-  // Get certificate fingerprint for API call
-  const fingerprint = certificate.fingerprint;
-  if (!fingerprint) {
-    Logger.error("Certificate fingerprint is missing");
-    container.innerHTML = '<p class="error-message">Certificate ID is missing</p>';
-    return;
-  }
-  
-  // Show loading state
-  container.innerHTML = '<div class="loading-spinner small"></div>';
-  
-  // Fetch files from the API endpoint directly
-  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
-  fetch(`/api/certificates/${encodedFingerprint}/files`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`Failed to fetch certificate files: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(files => {
-      Logger.debug(`Received ${files.length} certificate files`);
-      
-      if (files.length === 0) {
-        container.innerHTML = '<p class="empty-message">No certificate files available.</p>';
+    const container = document.getElementById('cert-files-list');
+    if (!container) {
+        console.error('Certificate files container not found');
         return;
-      }
-      
-      // Map file types to display names
-      const fileTypeDisplayNames = {
-        'crt': 'Certificate',
-        'key': 'Private Key',
-        'pem': 'PEM Certificate',
-        'p12': 'PKCS#12 Bundle',
-        'pfx': 'PFX Certificate',
-        'csr': 'Certificate Signing Request',
-        'ext': 'Extensions',
-        'der': 'DER Certificate',
-        'p7b': 'PKCS#7 Certificate',
-        'chain': 'Certificate Chain',
-        'fullchain': 'Full Certificate Chain',
-        'cer': 'X.509 Certificate'
-      };
-      
-      // Create table rows
-      const rows = files.map(file => {
-        const displayName = fileTypeDisplayNames[file.type] || `${file.type.toUpperCase()} File`;
-        
-        return UIUtils.safeTemplate(`
-          <tr>
-            <td>${displayName}</td>
-            <td><code>${file.path}</code></td>
-            <td>${UIUtils.formatFileSize(file.size)}</td>
-            <td>
-              <button class="button small download-file-btn" data-type="${file.type}" data-fingerprint="${fingerprint}">
-                Download
-              </button>
-            </td>
-          </tr>
+    }
+    
+    const paths = certificate.paths || {};
+    
+    // Create array of file data
+    const files = [];
+    
+    // Add all certificate files with proper display names and file types
+    // We use path keys without the 'Path' suffix as that's what the API expects
+    if (paths.crt) {
+        files.push({ type: 'Certificate', path: paths.crt, fileType: 'crt', description: 'X.509 Certificate (PEM format)' });
+    }
+    
+    if (paths.key) {
+        files.push({ type: 'Private Key', path: paths.key, fileType: 'key', description: 'Private key file' });
+    }
+    
+    if (paths.pem) {
+        files.push({ type: 'PEM Certificate', path: paths.pem, fileType: 'pem', description: 'PEM encoded certificate' });
+    }
+    
+    if (paths.p12) {
+        files.push({ type: 'PKCS#12', path: paths.p12, fileType: 'p12', description: 'PKCS#12 bundle (.p12)' });
+    }
+    
+    if (paths.pfx) {
+        files.push({ type: 'PFX', path: paths.pfx, fileType: 'pfx', description: 'PFX certificate bundle' });
+    }
+    
+    if (paths.csr) {
+        files.push({ type: 'CSR', path: paths.csr, fileType: 'csr', description: 'Certificate Signing Request' });
+    }
+    
+    if (paths.ext) {
+        files.push({ type: 'Extensions', path: paths.ext, fileType: 'ext', description: 'OpenSSL extensions file' });
+    }
+    
+    if (paths.cer) {
+        files.push({ type: 'CER Certificate', path: paths.cer, fileType: 'cer', description: 'Windows CER format' });
+    }
+    
+    if (paths.der) {
+        files.push({ type: 'DER Certificate', path: paths.der, fileType: 'der', description: 'DER encoded certificate' });
+    }
+    
+    if (paths.p7b) {
+        files.push({ type: 'PKCS#7', path: paths.p7b, fileType: 'p7b', description: 'PKCS#7 certificate bundle' });
+    }
+    
+    if (paths.chain) {
+        files.push({ type: 'Certificate Chain', path: paths.chain, fileType: 'chain', description: 'Certificate chain without end entity' });
+    }
+    
+    if (paths.fullchain) {
+        files.push({ type: 'Full Chain', path: paths.fullchain, fileType: 'fullchain', description: 'Complete certificate chain' });
+    }
+    
+    if (files.length === 0) {
+        container.innerHTML = UIUtils.safeTemplate(`
+            <p class="empty-message">No certificate files available.</p>
         `, {});
-      }).join('');
-      
-      // Render the table with download all button
-      container.innerHTML = UIUtils.safeTemplate(`
-        <table class="cert-files-table">
-          <thead>
+        return;
+    }
+    
+    // Create table rows
+    const rows = files.map(file => {
+        return UIUtils.safeTemplate(`
             <tr>
-              <th>Type</th>
-              <th>Path</th>
-              <th>Size</th>
-              <th>Actions</th>
+                <td>\${type}</td>
+                <td class="file-path"><code>\${path}</code></td>
+                <td>
+                    <button class="button small download-file-btn" data-path="\${path|attr}" data-type="\${fileType|attr}">Download</button>
+                </td>
             </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
+        `, file);
+    }).join('');
+    
+    // Render the table with download all button
+    container.innerHTML = UIUtils.safeTemplate(`
+        <table class="cert-files-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Path</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                \${rows|noEscape}
+            </tbody>
         </table>
         <div class="file-actions">
-          <button id="download-all-files-btn" class="button">Download All Files</button>
+            <button id="download-all-files-btn" class="button">Download All Files</button>
         </div>
-      `, {});
-      
-      // Add event listeners to the download buttons
-      document.querySelectorAll('.download-file-btn').forEach(btn => {
+    `, { rows });
+    
+    // Add event listeners to the download buttons
+    document.querySelectorAll('.download-file-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-          const fileType = this.getAttribute('data-type');
-          const certFingerprint = this.getAttribute('data-fingerprint');
-          Logger.debug(`Downloading certificate file: ${fileType}`);
-          downloadCertificateFile(certFingerprint, fileType);
+            const filePath = this.getAttribute('data-path');
+            const fileType = this.getAttribute('data-type');
+            downloadCertificateFile(certificate.fingerprint, fileType);
         });
-      });
-      
-      // Add event listener to download all button
-      document.getElementById('download-all-files-btn')?.addEventListener('click', () => {
-        Logger.debug(`Downloading all certificate files for: ${certificate.name}`);
-        downloadAllCertificateFiles(certificate);
-      });
-      
-      Logger.info(`Certificate files loaded for: ${certificate.name}`);
-    })
-    .catch(error => {
-      Logger.error(`Error loading certificate files: ${error.message}`, error);
-      container.innerHTML = `<p class="error-message">Error loading files: ${UIUtils.sanitizeErrorMessage(error)}</p>`;
     });
+
+    // Add event listener to download all button
+    const downloadAllBtn = document.getElementById('download-all-files-btn');
+    if (downloadAllBtn) {
+        downloadAllBtn.addEventListener('click', () => {
+            downloadAllCertificateFiles(certificate);
+        });
+    }
+}
+
+/**
+ * Download a specific certificate file
+ * @param {string} certId - Certificate fingerprint
+ * @param {string} fileType - Type of file to download
+ */
+function downloadCertificateFile(certId, fileType) {
+    // Encode fingerprint for API use
+    const encodedId = encodeAPIFingerprint(certId);
+    
+    Logger.debug(`Downloading certificate file: ${fileType} for ${certId}`);
+    
+    // Create a download link and trigger it
+    const downloadLink = document.createElement('a');
+    downloadLink.href = `/api/certificates/${encodedId}/download/${fileType}`;
+    downloadLink.download = ''; // Let the server determine filename
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
 }
 
 /**
@@ -2535,6 +2921,608 @@ function showCertificateDownloadOptions(certificate) {
     }
   `;
   document.head.appendChild(style);
+}
+
+/**
+ * Initialize certificate conversion functionality
+ */
+function initializeCertificateConversion() {
+  const convertFormatSelect = document.getElementById('convert-format');
+  const convertBtn = document.getElementById('convert-cert-btn');
+  const passwordGroupInline = document.getElementById('convert-password-group-inline');
+  const passwordGroupStandalone = document.getElementById('convert-password-group');
+  
+  if (!convertFormatSelect || !convertBtn) {
+    return; // Elements not found
+  }
+  
+  // Function to check if we're on a small screen
+  const isSmallScreen = () => window.innerWidth <= 600;
+  
+  // Function to update password field visibility
+  const updatePasswordFields = (selectedFormat) => {
+    // Define formats that require password
+    const formatsRequiringPassword = ['p12', 'pfx'];
+    const needsPassword = formatsRequiringPassword.includes(selectedFormat);
+    
+    // Update inline password field
+    if (passwordGroupInline) {
+      if (needsPassword && !isSmallScreen()) {
+        passwordGroupInline.classList.remove('hidden');
+      } else {
+        passwordGroupInline.classList.add('hidden');
+      }
+    }
+    
+    // Update standalone password field
+    if (passwordGroupStandalone) {
+      if (needsPassword && isSmallScreen()) {
+        passwordGroupStandalone.classList.remove('hidden');
+      } else {
+        passwordGroupStandalone.classList.add('hidden');
+      }
+    }
+    
+    // Clear password when not needed
+    const inlinePasswordField = document.getElementById('convert-password-inline');
+    if (inlinePasswordField) {
+      inlinePasswordField.value = '';
+    }
+    
+    const passwordField = document.getElementById('convert-password');
+    if (passwordField) {
+      passwordField.value = '';
+    }
+  };
+  
+  // Enable/disable convert button based on selection
+  convertFormatSelect.addEventListener('change', function() {
+    const selectedFormat = this.value;
+    convertBtn.disabled = !selectedFormat;
+    
+    // Update password fields visibility
+    updatePasswordFields(selectedFormat);
+  });
+  
+  // Handle window resize to update layout
+  window.addEventListener('resize', () => {
+    updatePasswordFields(convertFormatSelect.value);
+  });
+  
+  // Handle the convert button click
+  convertBtn.addEventListener('click', function() {
+    const format = convertFormatSelect.value;
+    if (!format) return;
+    
+    // Get password from either the inline or standalone input
+    let password = '';
+    if (isSmallScreen()) {
+      password = document.getElementById('convert-password')?.value || '';
+    } else {
+      password = document.getElementById('convert-password-inline')?.value || '';
+    }
+    
+    const formatsRequiringPassword = ['p12', 'pfx'];
+    
+    // Validate password for formats that require it
+    if (formatsRequiringPassword.includes(format) && !password) {
+      if (isSmallScreen()) {
+        UIUtils.showInputError(
+          document.getElementById('convert-password'),
+          'Password is required for this format'
+        );
+      } else {
+        UIUtils.showInputError(
+          document.getElementById('convert-password-inline'),
+          'Password is required for this format'
+        );
+      }
+      return;
+    }
+    
+    // Get the current certificate fingerprint
+    const certId = document.getElementById('cert-details-modal').getAttribute('data-cert-id');
+    if (!certId) {
+      UIUtils.showToast('Certificate ID not found', 'error');
+      return;
+    }
+    
+    // Call the conversion function
+    convertCertificate(certId, format, password);
+  });
+  
+  // Initialize state based on current screen size
+  updatePasswordFields(convertFormatSelect.value);
+}
+
+/**
+ * Convert certificate to a different format
+ * @param {string} certId - Certificate fingerprint
+ * @param {string} format - Target format (pem, der, p12, etc.)
+ * @param {string} password - Password for protected formats (optional)
+ */
+async function convertCertificate(certId, format, password = '') {
+  try {
+    // Show loading state
+    const convertBtn = document.getElementById('convert-cert-btn');
+    if (convertBtn) {
+      const originalText = convertBtn.textContent;
+      convertBtn.textContent = 'Converting...';
+      convertBtn.disabled = true;
+    }
+    
+    // Prepare request body
+    const body = { 
+      format,
+      options: {}
+    };
+    
+    // Add password if provided
+    if (password) {
+      body.options.password = password;
+    }
+    
+    // Call API
+    const response = await fetch(`/api/certificates/${encodeAPIFingerprint(certId)}/convert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to convert certificate: ${response.status}`);
+    }
+    
+    // Check if it's a direct file download or a JSON response
+    const contentType = response.headers.get('Content-Type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      // It's a JSON response, likely with a URL or message
+      const result = await response.json();
+      
+      if (result.url) {
+        // Trigger download using the URL
+        const a = document.createElement('a');
+        a.href = result.url;
+        a.download = result.filename || `certificate.${format}`;
+        a.click();
+      } else {
+        // Show success message
+        UIUtils.showToast(result.message || 'Certificate converted successfully', 'success');
+      }
+    } else {
+      // Direct file download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      
+      // Get filename from Content-Disposition header if available
+      let filename = `certificate.${format}`;
+      const disposition = response.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+        const matches = filenameRegex.exec(disposition);
+        if (matches && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
+      
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+    
+    UIUtils.showToast('Certificate converted successfully', 'success');
+  } catch (error) {
+    console.error('Error converting certificate:', error);
+    UIUtils.showToast(`Failed to convert certificate: ${error.message}`, 'error');
+  } finally {
+    // Reset button state
+    const convertBtn = document.getElementById('convert-cert-btn');
+    if (convertBtn) {
+      convertBtn.textContent = 'Convert';
+      convertBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Initialize certificate group management
+ */
+function initializeGroupManagement() {
+  const groupSelect = document.getElementById('edit-cert-group');
+  const newGroupContainer = document.getElementById('new-group-input-container');
+  const newGroupInput = document.getElementById('new-group-name');
+  const cancelNewGroupBtn = document.getElementById('cancel-new-group-btn');
+  const confirmNewGroupBtn = document.getElementById('confirm-new-group-btn');
+  
+  if (!groupSelect) return;
+  
+  // Show new group input when "Create new group" is selected
+  groupSelect.addEventListener('change', function() {
+    if (this.value === '__new__') {
+      newGroupContainer.classList.remove('hidden');
+      newGroupInput.focus();
+      this.classList.add('hidden'); // Hide the select while creating a new group
+    }
+  });
+  
+  // Cancel creating new group
+  if (cancelNewGroupBtn) {
+    cancelNewGroupBtn.addEventListener('click', function() {
+      newGroupContainer.classList.add('hidden');
+      groupSelect.classList.remove('hidden');
+      groupSelect.value = ''; // Reset to "None"
+      newGroupInput.value = ''; // Clear input
+    });
+  }
+  
+  // Confirm new group
+  if (confirmNewGroupBtn) {
+    confirmNewGroupBtn.addEventListener('click', function() {
+      const newGroupName = newGroupInput.value.trim();
+      
+      if (!newGroupName) {
+        UIUtils.showInputError(newGroupInput, 'Group name cannot be empty');
+        return;
+      }
+      
+      // Check if this group already exists
+      const existingOption = Array.from(groupSelect.options)
+        .find(option => option.text.toLowerCase() === newGroupName.toLowerCase() && option.value !== '__new__');
+      
+      if (existingOption) {
+        // Group already exists, just select it
+        groupSelect.value = existingOption.value;
+      } else {
+        // Add new group to dropdown
+        const newOption = document.createElement('option');
+        newOption.value = newGroupName;
+        newOption.text = newGroupName;
+        
+        // Insert before the "Create new group" option
+        const newGroupOption = groupSelect.querySelector('option[value="__new__"]');
+        groupSelect.insertBefore(newOption, newGroupOption);
+        
+        // Select the new group
+        groupSelect.value = newGroupName;
+        
+        // Add to global state if we're tracking all groups
+        if (state.certificateGroups && Array.isArray(state.certificateGroups)) {
+          if (!state.certificateGroups.includes(newGroupName)) {
+            state.certificateGroups.push(newGroupName);
+            state.certificateGroups.sort();
+          }
+        }
+      }
+      
+      // Hide the new group input
+      newGroupContainer.classList.add('hidden');
+      groupSelect.classList.remove('hidden');
+      newGroupInput.value = '';
+    });
+  }
+  
+  // Allow pressing Enter to confirm new group
+  if (newGroupInput) {
+    newGroupInput.addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        confirmNewGroupBtn.click();
+      } else if (event.key === 'Escape') {
+        cancelNewGroupBtn.click();
+      }
+    });
+  }
+}
+
+/**
+ * Load certificate groups from server and update state
+ * @returns {Promise<string[]>} Array of group names
+ */
+async function loadCertificateGroups() {
+  try {
+    const response = await fetch('/api/certificate-groups');
+    if (!response.ok) {
+      throw new Error(`Failed to load certificate groups: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    state.certificateGroups = data.groups || [];
+    return state.certificateGroups;
+  } catch (error) {
+    console.error('Error loading certificate groups:', error);
+    // In case of error, extract groups from existing certificates
+    const groups = new Set();
+    
+    if (state.certificates && Array.isArray(state.certificates)) {
+      state.certificates.forEach(cert => {
+        if (cert.group) {
+          groups.add(cert.group);
+        }
+      });
+    }
+    
+    state.certificateGroups = Array.from(groups).sort();
+    return state.certificateGroups;
+  }
+}
+
+/**
+ * Populate the group select dropdown with available groups
+ * @param {HTMLSelectElement} selectElement - Select element to populate
+ * @param {string} [currentGroup=''] - Currently selected group 
+ */
+function populateGroupSelect(selectElement, currentGroup = '') {
+  if (!selectElement) return;
+  
+  // Clear existing options but keep the default and "create new" option
+  const defaultOption = selectElement.querySelector('option[value=""]');
+  const newGroupOption = selectElement.querySelector('option[value="__new__"]');
+  
+  selectElement.innerHTML = '';
+  
+  if (defaultOption) {
+    selectElement.appendChild(defaultOption);
+  } else {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'None';
+    selectElement.appendChild(option);
+  }
+  
+  // Add all groups
+  if (state.certificateGroups && Array.isArray(state.certificateGroups)) {
+    state.certificateGroups.forEach(group => {
+      const option = document.createElement('option');
+      option.value = group;
+      option.textContent = group;
+      
+      if (group === currentGroup) {
+        option.selected = true;
+      }
+      
+      selectElement.appendChild(option);
+    });
+  }
+  
+  // Add "Create new group" option
+  if (newGroupOption) {
+    selectElement.appendChild(newGroupOption);
+  } else {
+    const option = document.createElement('option');
+    option.value = '__new__';
+    option.textContent = '+ Create new group';
+    selectElement.appendChild(option);
+  }
+}
+
+/**
+ * Load certificates from the server
+ * @param {boolean} forceRefresh - Force refresh even if cached data exists
+ * @returns {Promise<Array>} - Array of certificates
+ */
+async function loadCertificates(forceRefresh = false) {
+  try {
+    // Use cached data if available and not forcing refresh
+    if (!forceRefresh && state.certificates && state.certificates.length > 0) {
+      return state.certificates;
+    }
+    
+    // Show loading state if certificates list exists
+    const certListElement = document.getElementById('certificates-list');
+    if (certListElement) {
+      certListElement.innerHTML = '<div class="loading-spinner"></div>';
+    }
+
+    const response = await fetch('/api/certificates');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load certificates: ${response.status}`);
+    }
+    
+    const certificates = await response.json();
+    
+    // Store certificates in state
+    state.certificates = certificates;
+    
+    // Extract all unique groups
+    const groups = new Set();
+    certificates.forEach(cert => {
+      if (cert.group && cert.group.trim() !== '') {
+        groups.add(cert.group.trim());
+      }
+    });
+    
+    // Store groups in state
+    state.certificateGroups = Array.from(groups).sort();
+    
+    return certificates;
+  } catch (error) {
+    console.error('Error loading certificates:', error);
+    
+    // Show error in certificates list if it exists
+    const certListElement = document.getElementById('certificates-list');
+    if (certListElement) {
+      certListElement.innerHTML = `
+        <div class="error-state">
+          <h3>Failed to Load Certificates</h3>
+          <p>${UIUtils.sanitizeErrorMessage(error)}</p>
+          <button class="button" onclick="loadAndRenderCertificates(true)">Retry</button>
+        </div>
+      `;
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Check if a domain/IP is already in the current certificate
+ * @param {string} value - Domain or IP to check
+ * @param {Object} certificate - Certificate object
+ * @returns {Object} Result indicating if it exists and where
+ */
+function checkDuplicateInCertificate(value, certificate) {
+    if (!value || !certificate) return { exists: false };
+    
+    const domains = certificate.domains || [];
+    const idleDomains = certificate.idleDomains || [];
+    const ips = certificate.ips || [];
+    const idleIps = certificate.idleIps || [];
+    
+    // Normalize value for comparison
+    const normalizedValue = value.trim().toLowerCase();
+    
+    if (domains.some(d => d.toLowerCase() === normalizedValue)) {
+        return { exists: true, where: 'active domains' };
+    }
+    
+    if (idleDomains.some(d => d.toLowerCase() === normalizedValue)) {
+        return { exists: true, where: 'pending domains' };
+    }
+    
+    if (ips.some(ip => ip.toLowerCase() === normalizedValue)) {
+        return { exists: true, where: 'active IPs' };
+    }
+    
+    if (idleIps.some(ip => ip.toLowerCase() === normalizedValue)) {
+        return { exists: true, where: 'pending IPs' };
+    }
+    
+    return { exists: false };
+}
+
+/**
+ * Validate domain input and show feedback, including duplicate checking
+ * @param {string} value - The input value to validate
+ * @returns {boolean} True if valid, false otherwise
+ */
+function validateDomainInput(value) {
+    if (!value) {
+        clearDomainValidationFeedback();
+        return false;
+    }
+    
+    const inputElement = document.getElementById('domain-value');
+    const feedbackElement = document.getElementById('domain-input-feedback');
+    
+    // Create feedback element if it doesn't exist
+    if (!feedbackElement && inputElement) {
+        const feedback = document.createElement('div');
+        feedback.id = 'domain-input-feedback';
+        feedback.className = 'input-feedback';
+        inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
+    }
+    
+    // Check if the current certificate is loaded
+    const currentCert = getCurrentCertificate();
+    
+    // Check for duplicates in the current certificate
+    if (currentCert) {
+        const duplicate = checkDuplicateInCertificate(value, currentCert);
+        if (duplicate.exists) {
+            // Show duplicate warning
+            if (feedbackElement) {
+                feedbackElement.textContent = `Already exists in ${duplicate.where}`;
+                feedbackElement.className = 'input-feedback duplicate-feedback';
+            }
+            
+            if (inputElement) {
+                inputElement.classList.remove('is-valid', 'is-invalid');
+                inputElement.classList.add('is-duplicate');
+            }
+            
+            return false;
+        }
+    }
+    
+    // Regular validation logic
+    let isValid = false;
+    let type = '';
+    let feedbackMessage = '';
+    let feedbackClass = '';
+    
+    // Special case for localhost
+    if (value.toLowerCase() === 'localhost') {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: localhost';
+        feedbackClass = 'valid-feedback';
+    } 
+    // Check if it's an IPv4 or IPv6 address
+    else if (DomainValidator.isValidIPv4(value)) {
+        isValid = true;
+        type = 'ip';
+        feedbackMessage = 'Valid: IPv4 Address';
+        feedbackClass = 'valid-feedback';
+    }
+    else if (DomainValidator.isValidIPv6(value)) {
+        isValid = true;
+        type = 'ip';
+        feedbackMessage = 'Valid: IPv6 Address';
+        feedbackClass = 'valid-feedback';
+    }
+    // Check if it's a wildcard domain
+    else if (DomainValidator.isValidWildcardDomain(value)) {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: Wildcard Domain';
+        feedbackClass = 'valid-feedback';
+    }
+    // Check if it's a regular domain
+    else if (DomainValidator.isValidDomain(value)) {
+        isValid = true;
+        type = 'domain';
+        feedbackMessage = 'Valid: Domain Name';
+        feedbackClass = 'valid-feedback';
+    }
+    // Invalid input
+    else {
+        isValid = false;
+        feedbackMessage = 'Invalid domain name or IP address format';
+        feedbackClass = 'invalid-feedback';
+    }
+    
+    // Update the feedback element
+    const updatedFeedback = document.getElementById('domain-input-feedback');
+    if (updatedFeedback) {
+        updatedFeedback.textContent = feedbackMessage;
+        updatedFeedback.className = `input-feedback ${feedbackClass}`;
+    }
+    
+    // Update input field styling
+    if (inputElement) {
+        inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
+        inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
+    }
+    
+    return isValid;
+}
+
+/**
+ * Helper function to get the current certificate from state or modal
+ */
+function getCurrentCertificate() {
+    if (window.state && window.state.currentCertificate) {
+        return window.state.currentCertificate;
+    }
+    
+    // If state isn't available, try to get the fingerprint from the modal
+    const modal = document.getElementById("cert-details-modal");
+    if (modal) {
+        const fingerprint = modal.getAttribute("data-cert-id");
+        if (fingerprint && window.state && window.state.certificates) {
+            return window.state.certificates.find(cert => cert.fingerprint === fingerprint);
+        }
+    }
+    
+    return null;
 }
 
 // Export functions for global scope

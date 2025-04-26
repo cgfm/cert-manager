@@ -9,7 +9,7 @@
 
 <div class="cert-content-wrapper">
 <!-- DETAILS TAB -->
-<div class="cert-tab-content" id="details-tab">
+<div class="cert-tab-content active" id="details-tab">
   <div class="tab-header">
     <h4>Certificate Information</h4>
     <button id="edit-cert-details-btn" class="button small">Edit Details</button>
@@ -78,10 +78,25 @@
       
       <div class="form-group">
         <label for="edit-cert-group">Certificate Group:</label>
-        <select id="edit-cert-group" class="form-control">
-          <option value="">None</option>
-          <!-- Groups will be loaded dynamically -->
-        </select>
+        <div class="group-select-container">
+          <select id="edit-cert-group" class="form-control">
+            <option value="">None</option>
+            <!-- Existing groups will be loaded here -->
+            {{#if certificate.allGroups.length}}
+              {{#each certificate.allGroups}}
+                <option value="{{this}}" {{#if (eq this ../certificate.group)}}selected{{/if}}>{{this}}</option>
+              {{/each}}
+            {{/if}}
+            <option value="__new__">+ Create new group</option>
+          </select>
+          <div id="new-group-input-container" class="new-group-input-container hidden">
+            <input type="text" id="new-group-name" class="form-control" placeholder="Enter new group name">
+            <div class="new-group-actions">
+              <button type="button" id="cancel-new-group-btn" class="button small">Cancel</button>
+              <button type="button" id="confirm-new-group-btn" class="button small primary">Add</button>
+            </div>
+          </div>
+        </div>
       </div>
       
       <div class="form-actions">
@@ -94,38 +109,58 @@
 
 <!-- DOMAINS TAB -->
 <div class="cert-tab-content" id="domains-tab">
-  <div class="domains-list-container">
-    <h4>Certificate Domains</h4>
-    <div class="domains-list">
-      ${certificate.domains && certificate.domains.length ? 
-      `<table class="data-table">
+  <div class="domains-section">
+    <div class="section-header">
+      <h4>Certificate Domains</h4>
+      <div class="section-actions">
+        <button id="add-domain-btn" class="button small">Add Domain</button>
+      </div>
+    </div>
+    
+    <div class="domains-table-container">
+      <table class="domains-table">
         <thead>
           <tr>
-            <th>Domain</th>
+            <th>Domain/IP</th>
             <th>Type</th>
+            <th class="text-center">Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="domains-table-body">
-          <!-- Will be filled dynamically -->
-          <tr><td colspan="3" class="loading-cell"><div class="loading-spinner small"></div></td></tr>
+          <!-- Domain entries will be loaded here -->
+          <tr>
+            <td colspan="4" class="loading-cell">
+              <div class="loading-spinner small"></div>
+            </td>
+          </tr>
         </tbody>
-      </table>` : 
-      `<p class="empty-message">No domains configured for this certificate.</p>`}
+      </table>
     </div>
     
-    <div class="domain-add-section">
-      <h4>Add Domain or IP</h4>
+    <div id="add-domain-form" class="add-domain-form hidden">
       <div class="form-row">
         <div class="form-group">
           <label for="domain-value">Domain or IP Address:</label>
-          <input type="text" id="domain-value" placeholder="example.com or 192.168.1.1" class="form-control">
-          <small class="help-text">Enter a domain name or IP address. Type will be auto-detected.</small>
+          <input type="text" id="domain-value" class="form-control" placeholder="e.g., example.com or 192.168.1.1">
+        </div>
+        <div class="form-group">
+          <label for="apply-immediately">
+            <input type="checkbox" id="apply-immediately"> Apply immediately (renew now)
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-add-domain-btn" class="button">Cancel</button>
+          <button type="button" id="save-domain-btn" class="button primary">Add</button>
         </div>
       </div>
-      <div class="form-actions">
-        <button id="add-domain-btn" class="button">Add Domain</button>
-        <button id="add-renew-domain-btn" class="button primary">Add & Renew</button>
+    </div>
+    
+    <div class="pending-renewal-banner hidden" id="pending-renewal-banner">
+      <div class="banner-content">
+        <i class="fas fa-hourglass-half"></i>
+        <span>This certificate has pending domains/IPs that require renewal to take effect.</span>
+        <button id="apply-and-renew-btn" class="button accent">Apply Changes & Renew</button>
       </div>
     </div>
   </div>
@@ -141,8 +176,9 @@
     
     <div class="file-format-section">
       <h4>Convert Certificate</h4>
-      <div class="form-row">
-        <div class="form-group">
+      
+      <div class="convert-form-row">
+        <div class="format-selection-group">
           <label for="convert-format">Target Format:</label>
           <select id="convert-format" class="form-control">
             <option value="">Select format...</option>
@@ -156,14 +192,23 @@
           </select>
         </div>
         
-        <div class="form-group password-field hidden" id="convert-password-group">
-          <label for="convert-password">Password:</label>
-          <input type="password" id="convert-password" class="form-control" placeholder="Required for PKCS#12/PFX">
+        <!-- Password field inline (shown/hidden based on format) -->
+        <div class="password-field-group inline hidden" id="convert-password-group-inline">
+          <label for="convert-password-inline">Password:</label>
+          <input type="password" id="convert-password-inline" class="form-control" placeholder="Required for PKCS#12/PFX">
+        </div>
+        
+        <div class="convert-button-group">
+          <button id="convert-cert-btn" class="button" disabled>Convert</button>
         </div>
       </div>
       
-      <div class="form-actions">
-        <button id="convert-cert-btn" class="button" disabled>Convert</button>
+      <!-- Password field as its own row for small screens -->
+      <div class="form-row password-row standalone hidden" id="convert-password-group">
+        <div class="form-group">
+          <label for="convert-password">Password:</label>
+          <input type="password" id="convert-password" class="form-control" placeholder="Required for PKCS#12/PFX">
+        </div>
       </div>
     </div>
   </div>

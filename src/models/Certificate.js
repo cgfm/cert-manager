@@ -84,7 +84,12 @@ class Certificate {
             certType: this._certType,
             "acme-settings": this._acmeSettings,
             pathes: this._pathes,
-            san: this._san,
+            san: {
+                domains: this._san.domains,
+                ips: this._san.ips,
+                idleDomains: this._san.idleDomains,
+                idleIps: this._san.idleIps
+            },
             config: this._config,
             previousVersions: this._previousVersions,
             modificationTime: this._modificationTime
@@ -113,23 +118,63 @@ class Certificate {
         if (data.pathes) {
             this._pathes = {
                 crtPath: data.pathes.crtpath || data.pathes.crtPath || null,
+                cerPath: data.pathes.cerpath || data.pathes.cerPath || null,
                 pemPath: data.pathes.pempath || data.pathes.pemPath || null,
                 p12Path: data.pathes.p12path || data.pathes.p12Path || null,
                 csrPath: data.pathes.csrPath || null,
                 extPath: data.pathes.extPath || null,
-                keyPath: data.pathes.keyPath || null
+                keyPath: data.pathes.keyPath || null,
+                pfxPath: data.pathes.pfxPath || null,
+                derPath: data.pathes.derPath || null,
+                p7bPath: data.pathes.p7bPath || null,
+                chainPath: data.pathes.chainPath || null,
+                fullchainPath: data.pathes.fullchainPath || null 
             };
         }
         
         // SAN entries
         if (data.san) {
             this._san = {
-                domains: Array.isArray(data.san.domains) ? [...data.san.domains] : [],
-                ips: Array.isArray(data.san.ips) ? [...data.san.ips] : []
+                domains: [],
+                ips: [],
+                idleDomains: [], // New array for domains waiting for renewal
+                idleIps: []      // New array for IPs waiting for renewal
             };
+            
+            // Load active domains
+            if (Array.isArray(data.san.domains)) {
+                this._san.domains = [...data.san.domains];
+            }
+            
+            // Load active IPs
+            if (Array.isArray(data.san.ips)) {
+                this._san.ips = [...data.san.ips];
+            }
+            
+            // Load idle domains waiting for renewal
+            if (Array.isArray(data.san.idleDomains)) {
+                this._san.idleDomains = [...data.san.idleDomains];
+            }
+            
+            // Load idle IPs waiting for renewal
+            if (Array.isArray(data.san.idleIps)) {
+                this._san.idleIps = [...data.san.idleIps];
+            }
         } else if (data.domains) {
             // Handle the simplified format where domains is at the top level
-            this._san.domains = Array.isArray(data.domains) ? [...data.domains] : [];
+            this._san = {
+                domains: Array.isArray(data.domains) ? [...data.domains] : [],
+                ips: [],
+                idleDomains: [],
+                idleIps: []
+            };
+        } else {
+            this._san = {
+                domains: [],
+                ips: [],
+                idleDomains: [],
+                idleIps: []
+            };
         }
         
         // Configuration
@@ -182,6 +227,7 @@ class Certificate {
         // Define potential paths based on naming convention
         const potentialPaths = {
             crtPath: `${certsDir}/${baseName}.crt`,
+            cerPath: `${certsDir}/${baseName}.cer`,
             pemPath: `${certsDir}/${baseName}.pem`,
             p12Path: `${certsDir}/${baseName}.p12`,
             pfxPath: `${certsDir}/${baseName}.pfx`,
@@ -517,7 +563,9 @@ class Certificate {
             validTo: this._validTo,
             certType: this._certType,
             domains: [...this._san.domains],
-            ips: [...this._san.ips], 
+            idleDomains: [...this._san.idleDomains],
+            ips: [...this._san.ips],
+            idleIps: [...this._san.idleIps],
             paths: apiPaths,
             autoRenew: this._config.autoRenew,
             renewDaysBeforeExpiry: this._config.renewDaysBeforeExpiry,
@@ -527,7 +575,8 @@ class Certificate {
             isExpired: this.isExpired(),
             isExpiringSoon: this.isExpiringSoon(),
             daysUntilExpiry: this.daysUntilExpiry(),
-            modificationTime: this._modificationTime
+            modificationTime: this._modificationTime,
+            needsRenewal: this._san.idleDomains.length > 0 || this._san.idleIps.length > 0
         };
         
         // Add passphrase information if a passphrase manager is provided
@@ -890,6 +939,195 @@ class Certificate {
      */
     get paths() {
         return { ...this._pathes };
+    }
+
+    /**
+     * Add a domain to the certificate
+     * @param {string} domain - Domain to add
+     * @param {boolean} [idle=true] - Whether the domain is idle (waiting for renewal)
+     * @returns {object} Result with success status and message
+     */
+    addDomain(domain, idle = true) {
+        if (!domain || typeof domain !== 'string') {
+            return { success: false, message: 'Invalid domain' };
+        }
+        
+        const sanitizedDomain = domain.trim().toLowerCase();
+        
+        // Check if domain already exists in active domains
+        if (this._san.domains.includes(sanitizedDomain)) {
+            return { 
+                success: false, 
+                message: `Domain ${domain} already exists as an active domain in this certificate`,
+                existsIn: 'active'
+            };
+        }
+        
+        // Check if domain is in idle list
+        if (this._san.idleDomains.includes(sanitizedDomain)) {
+            return { 
+                success: false, 
+                message: `Domain ${domain} already exists as a pending domain in this certificate`,
+                existsIn: 'idle'
+            };
+        }
+        
+        // Add to appropriate list
+        if (idle) {
+            this._san.idleDomains.push(sanitizedDomain);
+        } else {
+            this._san.domains.push(sanitizedDomain);
+        }
+        
+        this._modificationTime = Date.now();
+        return { success: true };
+    }
+
+    /**
+     * Remove a domain from the certificate
+     * @param {string} domain - Domain to remove
+     * @param {boolean} [fromIdle=false] - Whether to remove from idle domains
+     * @returns {boolean} True if domain was removed
+     */
+    removeDomain(domain, fromIdle = false) {
+        if (!domain || typeof domain !== 'string') {
+            return false;
+        }
+        
+        const sanitizedDomain = domain.trim().toLowerCase();
+        let removed = false;
+        
+        if (fromIdle) {
+            // Remove from idle domains
+            const idleIndex = this._san.idleDomains.indexOf(sanitizedDomain);
+            if (idleIndex !== -1) {
+                this._san.idleDomains.splice(idleIndex, 1);
+                removed = true;
+            }
+        } else {
+            // Remove from active domains
+            const activeIndex = this._san.domains.indexOf(sanitizedDomain);
+            if (activeIndex !== -1) {
+                this._san.domains.splice(activeIndex, 1);
+                removed = true;
+            }
+        }
+        
+        if (removed) {
+            this._modificationTime = Date.now();
+        }
+        
+        return removed;
+    }
+
+    /**
+     * Add an IP to the certificate
+     * @param {string} ip - IP address to add
+     * @param {boolean} [idle=true] - Whether the IP is idle (waiting for renewal)
+     * @returns {object} Result with success status and message
+     */
+    addIp(ip, idle = true) {
+        if (!ip || typeof ip !== 'string') {
+            return { success: false, message: 'Invalid IP address' };
+        }
+        
+        const sanitizedIp = ip.trim();
+        
+        // Check if IP already exists in active IPs
+        if (this._san.ips.includes(sanitizedIp)) {
+            return { 
+                success: false, 
+                message: `IP ${ip} already exists as an active IP address in this certificate`,
+                existsIn: 'active'
+            };
+        }
+        
+        // Check if IP is in idle list
+        if (this._san.idleIps.includes(sanitizedIp)) {
+            return { 
+                success: false, 
+                message: `IP ${ip} already exists as a pending IP address in this certificate`,
+                existsIn: 'idle'
+            };
+        }
+        
+        // Add to appropriate list
+        if (idle) {
+            this._san.idleIps.push(sanitizedIp);
+        } else {
+            this._san.ips.push(sanitizedIp);
+        }
+        
+        this._modificationTime = Date.now();
+        return { success: true };
+    }
+
+    /**
+     * Remove an IP from the certificate
+     * @param {string} ip - IP address to remove
+     * @param {boolean} [fromIdle=false] - Whether to remove from idle IPs
+     * @returns {boolean} True if IP was removed
+     */
+    removeIp(ip, fromIdle = false) {
+        if (!ip || typeof ip !== 'string') {
+            return false;
+        }
+        
+        const sanitizedIp = ip.trim();
+        let removed = false;
+        
+        if (fromIdle) {
+            // Remove from idle IPs
+            const idleIndex = this._san.idleIps.indexOf(sanitizedIp);
+            if (idleIndex !== -1) {
+                this._san.idleIps.splice(idleIndex, 1);
+                removed = true;
+            }
+        } else {
+            // Remove from active IPs
+            const activeIndex = this._san.ips.indexOf(sanitizedIp);
+            if (activeIndex !== -1) {
+                this._san.ips.splice(activeIndex, 1);
+                removed = true;
+            }
+        }
+        
+        if (removed) {
+            this._modificationTime = Date.now();
+        }
+        
+        return removed;
+    }
+
+    /**
+     * Apply all idle domains and IPs by moving them to active lists
+     * @returns {boolean} True if any domains or IPs were applied
+     */
+    applyIdleSubjects() {
+        const hadChanges = this._san.idleDomains.length > 0 || this._san.idleIps.length > 0;
+        
+        // Move idle domains to active domains
+        this._san.domains.push(...this._san.idleDomains);
+        this._san.idleDomains = [];
+        
+        // Move idle IPs to active IPs
+        this._san.ips.push(...this._san.idleIps);
+        this._san.idleIps = [];
+        
+        if (hadChanges) {
+            this._modificationTime = Date.now();
+        }
+        
+        return hadChanges;
+    }
+
+    // Add these getters
+    get idleDomains() {
+        return [...this._san.idleDomains];
+    }
+
+    get idleIps() {
+        return [...this._san.idleIps];
     }
 }
 

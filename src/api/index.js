@@ -123,6 +123,37 @@ function setupApi(deps) {
     });
   });
 
+  apiRouter.put('/config/log-level', (req, res) => {
+    try {
+      const { level } = req.body;
+      
+      // Validate level
+      const validLevels = ['trace', 'debug', 'info', 'warn', 'error'];
+      if (!level || !validLevels.includes(level.toLowerCase())) {
+        return res.status(400).json({
+          message: `Invalid log level. Must be one of: ${validLevels.join(', ')}`,
+          statusCode: 400
+        });
+      }
+      
+      // Set log level
+      logger.setLevel(level.toLowerCase());
+      
+      // Return success
+      res.json({
+        message: `Log level updated to ${level}`,
+        level: logger.getLevel().toLowerCase(),
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error updating log level:', error);
+      res.status(500).json({
+        message: `Failed to update log level: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
   // Set up OpenAPI validation if available
   if (swaggerUi && OpenApiValidator && yaml) {
     try {
