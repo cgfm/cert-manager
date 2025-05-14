@@ -25,7 +25,628 @@ tags:
     description: System activity operations
   - name: logs
     description: System logs operations
+  - name: auth
+    description: Authentication operations
+  - name: setup
+    description: First-time setup operations
 paths:
+
+  /auth/login:
+    post:
+      summary: Login with username and password
+      operationId: login
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: User's username
+                password:
+                  type: string
+                  description: User's password
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      summary: Logout current user
+      operationId: logout
+      tags:
+        - auth
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  
+  /auth/user:
+    get:
+      summary: Get current user information
+      operationId: getCurrentUser
+      tags:
+        - auth
+      responses:
+        "200":
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  
+  /auth/change-password:
+    post:
+      summary: Change user's password
+      operationId: changePassword
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                  description: Current password
+                newPassword:
+                  type: string
+                  format: password
+                  description: New password
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Current password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/users:
+    get:
+      summary: Get all users (admin only)
+      operationId: getAllUsers
+      tags:
+        - auth
+      responses:
+        "200":
+          description: List of all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not authorized (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    
+    post:
+      summary: Create a new user (admin only)
+      operationId: createUser
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username
+                password:
+                  type: string
+                  format: password
+                  description: Password
+                name:
+                  type: string
+                  description: Display name
+                role:
+                  type: string
+                  enum: [user, admin]
+                  default: user
+                  description: User role
+                disabled:
+                  type: boolean
+                  default: false
+                  description: Whether the user account is disabled
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not authorized (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/users/{username}:
+    put:
+      summary: Update a user (admin only)
+      operationId: updateUser
+      tags:
+        - auth
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Username to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Display name
+                password:
+                  type: string
+                  format: password
+                  description: New password (optional)
+                role:
+                  type: string
+                  enum: [user, admin]
+                  description: User role
+                disabled:
+                  type: boolean
+                  description: Whether the user account is disabled
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not authorized (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    
+    delete:
+      summary: Delete a user (admin only)
+      operationId: deleteUser
+      tags:
+        - auth
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Username to delete
+      responses:
+        "200":
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Invalid request (cannot delete self or last admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not authorized (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /setup/status:
+    get:
+      summary: Check if setup is needed
+      operationId: checkSetupStatus
+      tags:
+        - setup
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  setupNeeded:
+                    type: boolean
+                    description: Whether setup is needed or has already been completed
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  
+  /setup/complete:
+    post:
+      summary: Complete the first-time setup
+      operationId: completeSetup
+      tags:
+        - setup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admin
+                - config
+              properties:
+                admin:
+                  type: object
+                  required:
+                    - username
+                    - password
+                  properties:
+                    username:
+                      type: string
+                      description: Admin username
+                    password:
+                      type: string
+                      format: password
+                      description: Admin password
+                    name:
+                      type: string
+                      description: Admin display name
+                config:
+                  type: object
+                  required:
+                    - certPath
+                  properties:
+                    certPath:
+                      type: string
+                      description: Path to store certificates
+                    port:
+                      type: integer
+                      description: Server port
+                      default: 3000
+                    enableHttps:
+                      type: boolean
+                      description: Enable HTTPS for the web interface
+                      default: false
+                    httpsPort:
+                      type: integer
+                      description: HTTPS port
+                      default: 9443
+                    httpsCert:
+                      type: string
+                      description: Path to HTTPS certificate
+                    httpsKey:
+                      type: string
+                      description: Path to HTTPS private key
+      responses:
+        "200":
+          description: Setup completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Invalid request or setup already completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /activity:
+    get:
+      summary: Get recent activities
+      operationId: getActivities
+      tags:
+        - activity
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of activities to return
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [certificate, user, system]
+          description: Filter activities by type
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search term to filter activities
+      responses:
+        "200":
+          description: List of activities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  activities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Activity"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: Add a new activity
+      operationId: addActivity
+      tags:
+        - activity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityCreate"
+      responses:
+        "201":
+          description: Activity added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Clear all activities
+      operationId: clearActivities
+      tags:
+        - activity
+      responses:
+        "200":
+          description: Activities cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /ca:
     get:
       summary: Get all CA certificates
@@ -505,12 +1126,7 @@ paths:
               schema:
                 type: array
                 items:
-                  oneOf:
-                    - $ref: "#/components/schemas/CopyAction"
-                    - $ref: "#/components/schemas/SshCopyAction"
-                    - $ref: "#/components/schemas/CommandAction"
-                    - $ref: "#/components/schemas/DockerRestartAction"
-                    - $ref: "#/components/schemas/WebhookAction"
+                  $ref: "#/components/schemas/DeploymentAction"
         "404":
           description: Certificate not found
           content:
@@ -535,17 +1151,7 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-                - $ref: "#/components/schemas/CopyAction"
-                - $ref: "#/components/schemas/SshCopyAction"
-                - $ref: "#/components/schemas/CommandAction"
-                - $ref: "#/components/schemas/DockerRestartAction"
-                - $ref: "#/components/schemas/WebhookAction"
-                - $ref: "#/components/schemas/NginxProxyManagerAction"
-                - $ref: "#/components/schemas/SmbCopyAction"
-                - $ref: "#/components/schemas/FtpCopyAction"
-                - $ref: "#/components/schemas/ApiCallAction"
-                - $ref: "#/components/schemas/EmailAction"
+              $ref: "#/components/schemas/DeploymentAction"
       responses:
         "201":
           description: Deployment action added
@@ -554,12 +1160,7 @@ paths:
               schema:
                 type: array
                 items:
-                  oneOf:
-                    - $ref: "#/components/schemas/CopyAction"
-                    - $ref: "#/components/schemas/SshCopyAction"
-                    - $ref: "#/components/schemas/CommandAction"
-                    - $ref: "#/components/schemas/DockerRestartAction"
-                    - $ref: "#/components/schemas/WebhookAction"
+                  $ref: "#/components/schemas/DeploymentAction"
         "400":
           description: Invalid request
           content:
@@ -748,6 +1349,62 @@ paths:
                     type: object
         "404":
           description: Certificate or action not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/deploy-actions/reorder:
+    post:
+      summary: Reorder deployment actions
+      operationId: reorderDeploymentActions
+      tags:
+        - certificates
+        - deployment
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: integer
+                  description: New order of action indices
+              required:
+                - order
+      responses:
+        "200":
+          description: Deployment actions reordered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  actions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DeploymentAction"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Certificate not found
           content:
             application/json:
               schema:
@@ -1265,30 +1922,6 @@ paths:
                       type: string
                     description: List of certificate group names
 
-  /config/log-level:
-    get:
-      summary: Get current log level
-      description: Returns the current log level of the application
-      operationId: getLogLevel
-      tags:
-        - Configuration
-      responses:
-        "200":
-          description: Log level information
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  level:
-                    type: string
-                    description: Current log level
-                    enum: [trace, debug, info, warn, error]
-                  timestamp:
-                    type: string
-                    format: date-time
-                    description: Timestamp of when the log level was queried
-
   /docker/containers:
     get:
       summary: Get all Docker containers
@@ -1356,306 +1989,6 @@ paths:
                 properties:
                   error:
                     type: string
-
-  /security/rotate-encryption-key:
-    post:
-      summary: Rotate passphrase encryption key
-      operationId: rotateEncryptionKey
-      tags:
-        - passphrases
-      responses:
-        "200":
-          description: Encryption key rotated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-
-  /renewal/check:
-    post:
-      summary: Check for certificates that need renewal
-      operationId: checkRenewals
-      tags:
-        - renewal
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                forceAll:
-                  type: boolean
-                  description: Force check all certificates regardless of auto-renew setting
-      responses:
-        "200":
-          description: Renewal check results
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  checkTime:
-                    type: string
-                    format: date-time
-                  total:
-                    type: integer
-                  checked:
-                    type: integer
-                  renewalNeeded:
-                    type: integer
-                  renewedCount:
-                    type: integer
-                  renewalErrors:
-                    type: integer
-                  renewed:
-                    type: array
-                    items:
-                      type: object
-                  failed:
-                    type: array
-                    items:
-                      type: object
-
-  /renewal/status:
-    get:
-      summary: Get renewal service status
-      operationId: getRenewalStatus
-      tags:
-        - renewal
-      responses:
-        "200":
-          description: Renewal service status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  active:
-                    type: boolean
-                  cronActive:
-                    type: boolean
-                  watcherActive:
-                    type: boolean
-                  lastCheckTime:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  nextScheduledCheck:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  renewalSchedule:
-                    type: string
-                  renewalCheckInterval:
-                    type: integer
-                  enableWatcher:
-                    type: boolean
-                  recentRenewals:
-                    type: array
-                    items:
-                      type: object
-                  runningTasks:
-                    type: object
-
-  /renewal/schedule:
-    post:
-      summary: Update renewal schedule
-      operationId: updateRenewalSchedule
-      tags:
-        - renewal
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                schedule:
-                  type: string
-                  description: Cron schedule pattern (e.g., '0 0 * * *')
-      responses:
-        "200":
-          description: Schedule update result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-                  nextScheduledCheck:
-                    type: string
-                    format: date-time
-
-  /renewal/watcher/restart:
-    post:
-      summary: Restart the certificate file watcher
-      operationId: restartFileWatcher
-      tags:
-        - renewal
-      responses:
-        "200":
-          description: File watcher restart result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-
-  /settings:
-    get:
-      summary: Get all settings
-      operationId: getSettings
-      tags:
-        - settings
-      responses:
-        "200":
-          description: Current settings
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Settings"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    patch:
-      summary: Update settings
-      operationId: updateSettings
-      tags:
-        - settings
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SettingsUpdate"
-      responses:
-        "200":
-          description: Settings updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-                  settings:
-                    $ref: "#/components/schemas/Settings"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /settings/certificates:
-    get:
-      summary: Get certificate-specific settings
-      operationId: getCertificateSettings
-      tags:
-        - settings
-      responses:
-        "200":
-          description: Certificate settings
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  validity:
-                    type: integer
-                    description: Default certificate validity period in days
-                  renewBefore:
-                    type: integer
-                    description: Default days before expiry to trigger renewal
-                  keySize:
-                    type: integer
-                    description: Default key size for certificates (2048, 4096)
-                  preferredChallenge:
-                    type: string
-                    description: Default challenge type for ACME validation
-                  autoRenew:
-                    type: boolean
-                    description: Default auto-renewal setting
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    patch:
-      summary: Update certificate-specific settings
-      operationId: updateCertificateSettings
-      tags:
-        - settings
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                validity:
-                  type: integer
-                  description: Default certificate validity period in days
-                renewBefore:
-                  type: integer
-                  description: Default days before expiry to trigger renewal
-                keySize:
-                  type: integer
-                  description: Default key size for certificates (2048, 4096)
-                preferredChallenge:
-                  type: string
-                  description: Default challenge type for ACME validation
-                autoRenew:
-                  type: boolean
-                  description: Default auto-renewal setting
-      responses:
-        "200":
-          description: Certificate settings updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-                  settings:
-                    type: object
-                    properties:
-                      validity:
-                        type: integer
-                      renewBefore:
-                        type: integer
-                      keySize:
-                        type: integer
-                      preferredChallenge:
-                        type: string
-                      autoRenew:
-                        type: boolean
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
 
   /filesystem/check:
     get:
@@ -1912,98 +2245,55 @@ paths:
                       documents:
                         type: string
 
-  /activity:
+  /logs:
     get:
-      summary: Get recent activities
-      operationId: getRecentActivities
+      summary: Get logs from the default log file
+      operationId: getLogs
       tags:
-        - activity
+        - logs
       parameters:
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [error, warn, info, debug, fine, finest, all]
+            default: all
+          description: Filter logs by level
+        - in: query
+          name: file
+          schema:
+            type: string
+          description: Filter logs by source filename
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search text in log messages
         - in: query
           name: limit
           schema:
             type: integer
-            default: 20
-          description: Maximum number of activities to return
-        - in: query
-          name: type
-          schema:
-            type: string
-          description: Filter by activity type
+            default: 1000
+          description: Maximum number of log entries to return
       responses:
         "200":
-          description: List of activities
+          description: Log entries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Activity"
+                  $ref: "#/components/schemas/LogEntry"
         "500":
           description: Server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-    post:
-      summary: Add a new activity
-      operationId: addActivity
-      tags:
-        - activity
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ActivityCreate"
-      responses:
-        "201":
-          description: Activity added successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activity"
-        "400":
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    delete:
-      summary: Clear all activities
-      operationId: clearActivities
-      tags:
-        - activity
-      responses:
-        "200":
-          description: Activities cleared successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /logs:
+  
+  /logs/files:
     get:
-      summary: Get available log files
+      summary: Get list of available log files
       operationId: getLogFiles
       tags:
         - logs
@@ -2022,59 +2312,76 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  /logs/{filename}:
+  
+  /logs/file/{filename}:
     get:
-      summary: Get log file content
-      operationId: getLogContent
+      summary: Get content of a specific log file
+      operationId: getLogFileContent
       tags:
         - logs
       parameters:
         - in: path
           name: filename
+          required: true
           schema:
             type: string
-          required: true
           description: Log filename
         - in: query
           name: limit
           schema:
             type: integer
             default: 1000
-          description: Maximum number of log lines to return
+          description: Maximum number of log entries to return
         - in: query
-          name: filter
+          name: level
           schema:
             type: string
-          description: Text to filter logs by
+            enum: [error, warn, info, debug, fine, finest, all]
+          description: Filter logs by level
+        - in: query
+          name: file
+          schema:
+            type: string
+          description: Filter logs by source filename
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search text in log messages
       responses:
         "200":
-          description: Log content
+          description: Log entries
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/LogEntry"
+        "404":
+          description: Log file not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           description: Server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
+              
     delete:
       summary: Clear a log file
-      operationId: clearLog
+      operationId: clearLogFile
       tags:
         - logs
       parameters:
         - in: path
           name: filename
+          required: true
           schema:
             type: string
-          required: true
-          description: Log filename to clear
+          description: Log filename
       responses:
         "200":
           description: Log file cleared
@@ -2100,8 +2407,742 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /renewal/check:
+    post:
+      summary: Check for certificates that need renewal
+      operationId: checkRenewals
+      tags:
+        - renewal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forceAll:
+                  type: boolean
+                  description: Force check all certificates regardless of auto-renew setting
+      responses:
+        "200":
+          description: Renewal check results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  checkTime:
+                    type: string
+                    format: date-time
+                  total:
+                    type: integer
+                  checked:
+                    type: integer
+                  renewalNeeded:
+                    type: integer
+                  renewedCount:
+                    type: integer
+                  renewalErrors:
+                    type: integer
+                  renewed:
+                    type: array
+                    items:
+                      type: object
+                  failed:
+                    type: array
+                    items:
+                      type: object
+
+  /renewal/status:
+    get:
+      summary: Get renewal service status
+      operationId: getRenewalStatus
+      tags:
+        - renewal
+      responses:
+        "200":
+          description: Renewal service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                  cronActive:
+                    type: boolean
+                  watcherActive:
+                    type: boolean
+                  lastCheckTime:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  nextScheduledCheck:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  renewalSchedule:
+                    type: string
+                  renewalCheckInterval:
+                    type: integer
+                  enableWatcher:
+                    type: boolean
+                  recentRenewals:
+                    type: array
+                    items:
+                      type: object
+                  runningTasks:
+                    type: object
+
+  /renewal/schedule:
+    post:
+      summary: Update renewal schedule
+      operationId: updateRenewalSchedule
+      tags:
+        - renewal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                schedule:
+                  type: string
+                  description: Cron schedule pattern (e.g., '0 0 * * *')
+      responses:
+        "200":
+          description: Schedule update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  nextScheduledCheck:
+                    type: string
+                    format: date-time
+
+  /renewal/watcher/restart:
+    post:
+      summary: Restart the certificate file watcher
+      operationId: restartFileWatcher
+      tags:
+        - renewal
+      responses:
+        "200":
+          description: File watcher restart result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /security/rotate-encryption-key:
+    post:
+      summary: Rotate passphrase encryption key
+      operationId: rotateEncryptionKey
+      tags:
+        - passphrases
+      responses:
+        "200":
+          description: Encryption key rotated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /settings:
+    get:
+      summary: Get all settings
+      operationId: getSettings
+      tags:
+        - settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: Update settings
+      operationId: updateSettings
+      tags:
+        - settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  settings:
+                    $ref: "#/components/schemas/Settings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/certificates:
+    get:
+      summary: Get certificate-specific settings
+      operationId: getCertificateSettings
+      tags:
+        - settings
+      responses:
+        "200":
+          description: Certificate settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  validity:
+                    type: integer
+                    description: Default certificate validity period in days
+                  renewBefore:
+                    type: integer
+                    description: Default days before expiry to trigger renewal
+                  keySize:
+                    type: integer
+                    description: Default key size for certificates (2048, 4096)
+                  preferredChallenge:
+                    type: string
+                    description: Default challenge type for ACME validation
+                  autoRenew:
+                    type: boolean
+                    description: Default auto-renewal setting
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: Update certificate-specific settings
+      operationId: updateCertificateSettings
+      tags:
+        - settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                validity:
+                  type: integer
+                  description: Default certificate validity period in days
+                renewBefore:
+                  type: integer
+                  description: Default days before expiry to trigger renewal
+                keySize:
+                  type: integer
+                  description: Default key size for certificates (2048, 4096)
+                preferredChallenge:
+                  type: string
+                  description: Default challenge type for ACME validation
+                autoRenew:
+                  type: boolean
+                  description: Default auto-renewal setting
+      responses:
+        "200":
+          description: Certificate settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  settings:
+                    type: object
+                    properties:
+                      validity:
+                        type: integer
+                      renewBefore:
+                        type: integer
+                      keySize:
+                        type: integer
+                      preferredChallenge:
+                        type: string
+                      autoRenew:
+                        type: boolean
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/logging:
+    get:
+      summary: Get logging settings
+      operationId: getLoggingSettings
+      tags:
+        - settings
+        - logs
+      responses:
+        "200":
+          description: Current logging settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoggingSettings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+                
+    post:
+      summary: Update logging settings
+      operationId: updateLoggingSettings
+      tags:
+        - settings
+        - logs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoggingSettingsUpdate"
+      responses:
+        "200":
+          description: Logging settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  settings:
+                    $ref: "#/components/schemas/LoggingSettings"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/logging/debug:
+    get:
+      summary: Debug information for logging settings
+      operationId: debugLoggingSettings
+      tags:
+        - settings
+        - logs
+        - debug
+      responses:
+        "200":
+          description: Debugging information about log settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  defaultLevel:
+                    type: string
+                  fileLogLevels:
+                    type: object
+                  testResults:
+                    type: array
+                    items:
+                      type: object
+                  levelsHierarchy:
+                    type: object
+
+  /public/logLevel:
+    get:
+      tags:
+        - Public
+      summary: Get current log level
+      description: Returns the current log level without requiring authentication
+      operationId: getLogLevel
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  logLevel:
+                    type: string
+                    enum: [error, warn, info, debug]
+                    example: info
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      x-controller: public
+      x-operation: getLogLevel
+      
+  /public/ping:
+    get:
+      tags:
+        - Public
+      summary: API ping
+      description: Simple endpoint to check if API is operational
+      operationId: ping
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-05-04T12:22:00Z"
+                  message:
+                    type: string
+                    example: "API is operational"
+      x-controller: public
+      x-operation: ping
+
+  /certificates/{fingerprint}/check-renewal-passphrases:
+    get:
+      summary: Check if certificate or signing CA need passphrases for renewal
+      operationId: checkRenewalPassphrases
+      tags:
+        - certificates
+        - passphrases
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate fingerprint
+      responses:
+        "200":
+          description: Passphrase requirements for renewal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  certificate:
+                    type: object
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  signingCA:
+                    type: object
+                    nullable: true
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  passphraseNeeded:
+                    type: boolean
+                    description: Whether any passphrase is needed for renewal
+        "404":
+          description: Certificate not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history:
+    get:
+      summary: Get certificate version history
+      operationId: getCertificateHistory
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate fingerprint
+      responses:
+        "200":
+          description: Certificate version history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  fingerprint:
+                    type: string
+                  certificate:
+                    type: string
+                    description: Certificate name
+                  previousVersions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CertificateVersion"
+        "404":
+          description: Certificate not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
+    get:
+      summary: Download a specific file from a previous certificate version
+      operationId: downloadPreviousVersionFile
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate fingerprint
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Previous version fingerprint
+        - name: fileType
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Type of file to download (crt, key, etc.)
+      responses:
+        "200":
+          description: The requested file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Certificate, version, or file not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/download:
+    get:
+      summary: Download all files from a previous certificate version as ZIP
+      operationId: downloadPreviousVersionZip
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate fingerprint
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Previous version fingerprint
+      responses:
+        "200":
+          description: ZIP archive containing all files from the previous version
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Certificate or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/deploy-actions/{actionIndex}/toggle:
+    post:
+      summary: Toggle a deployment action enabled/disabled state
+      operationId: toggleDeploymentAction
+      tags:
+        - certificates
+        - deployment
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate fingerprint
+        - name: actionIndex
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Index of the deployment action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  description: Whether the action should be enabled
+      responses:
+        "200":
+          description: Deployment action toggled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  action:
+                    $ref: "#/components/schemas/DeploymentAction"
+        "404":
+          description: Certificate or deployment action not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
+    UserProfile:
+      type: object
+      properties:
+        username:
+          type: string
+          description: User's username
+        name:
+          type: string
+          description: User's display name
+        role:
+          type: string
+          enum: [user, admin]
+          description: User's role
+    
+    User:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          properties:
+            created:
+              type: string
+              format: date-time
+              description: When the user was created
+            lastLogin:
+              type: string
+              format: date-time
+              description: Last login timestamp
+            lastLoginIp:
+              type: string
+              description: IP address of last login
+            loginCount:
+              type: integer
+              description: Number of times the user has logged in
+            disabled:
+              type: boolean
+              description: Whether the user account is disabled
+
     Backup:
       type: object
       properties:
@@ -2174,6 +3215,22 @@ components:
           type: boolean
         daysUntilExpiry:
           type: integer
+        keyType:
+          type: string
+          description: Type of key (RSA, EC, etc.)
+          example: "RSA"
+        keySize:
+          type: integer
+          description: Size of key in bits
+          example: 2048
+        sigAlg:
+          type: string
+          description: Signature algorithm
+          example: "sha256WithRSAEncryption"
+        caName:
+          type: string
+          description: Name of the CA certificate that signed this certificate
+          example: "My Root CA"
 
     CreateCertificateRequest:
       type: object
@@ -2218,6 +3275,21 @@ components:
           default: false
           description: Whether to store the passphrase securely
 
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        statusCode:
+          type: integer
+
+    RenewCertificateRequest:
+      type: object
+      properties:
+        passphrase:
+          type: string
+          description: Passphrase for the certificate's private key if encrypted
+
     UpdateCertificateRequest:
       type: object
       properties:
@@ -2236,75 +3308,46 @@ components:
         deployActions:
           type: array
           items:
-            oneOf:
-              - $ref: "#/components/schemas/CopyAction"
-              - $ref: "#/components/schemas/CommandAction"
-              - $ref: "#/components/schemas/DockerRestartAction"
-              - $ref: "#/components/schemas/NginxProxyManagerAction"
-              - $ref: "#/components/schemas/SshCopyAction"
-              - $ref: "#/components/schemas/SmbCopyAction"
-              - $ref: "#/components/schemas/FtpCopyAction"
-              - $ref: "#/components/schemas/ApiCallAction"
-              - $ref: "#/components/schemas/WebhookAction"
-              - $ref: "#/components/schemas/EmailAction"
+            $ref: "#/components/schemas/DeploymentAction"
           description: Actions to execute after certificate renewal
 
-    RenewCertificateRequest:
-      type: object
-      properties:
-        passphrase:
-          type: string
-          description: Passphrase for the certificate's private key if encrypted
-
-    Error:
-      type: object
-      properties:
-        message:
-          type: string
-        statusCode:
-          type: integer
+    CommandAction:
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          required:
+            - command
+          properties:
+            command:
+              type: string
+              description: Command to execute
+            cwd:
+              type: string
+              description: Working directory for command
+            env:
+              type: object
+              description: Environment variables
+            verbose:
+              type: boolean
+              description: Whether to log command output
 
     CopyAction:
-      type: object
-      required:
-        - type
-        - source
-        - destination
-      properties:
-        type:
-          type: string
-          enum: [copy]
-        source:
-          type: string
-          description: Source file or certificate component (cert, key, chain, fullchain, p12, pem)
-        destination:
-          type: string
-          description: Destination path on local system
-        permissions:
-          type: integer
-          description: File permissions to set (octal, Unix/Linux only)
-
-    CommandAction:
-      type: object
-      required:
-        - type
-        - command
-      properties:
-        type:
-          type: string
-          enum: [command]
-        command:
-          type: string
-          description: Command to execute
-        cwd:
-          type: string
-          description: Working directory for command
-        env:
-          type: object
-          description: Environment variables
-        verbose:
-          type: boolean
-          description: Whether to log command output
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          required:
+            - source
+            - destination
+          properties:
+            source:
+              type: string
+              description: Source file or certificate component (cert, key, chain, fullchain, p12, pem)
+            destination:
+              type: string
+              description: Destination path on local system
+            permissions:
+              type: integer
+              description: File permissions to set (octal, Unix/Linux only)
 
     DockerContainer:
       type: object
@@ -2329,19 +3372,16 @@ components:
           description: Creation timestamp
 
     DockerRestartAction:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum: [docker-restart]
-        containerId:
-          type: string
-          description: Docker container ID
-        containerName:
-          type: string
-          description: Docker container name
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          properties:
+            containerId:
+              type: string
+              description: Docker container ID
+            containerName:
+              type: string
+              description: Docker container name
 
     NginxProxyManagerAction:
       type: object
@@ -2359,50 +3399,48 @@ components:
           description: Nginx Proxy Manager docker container name
 
     SshCopyAction:
-      type: object
-      required:
-        - type
-        - host
-        - source
-        - destination
-      properties:
-        type:
-          type: string
-          enum: [ssh-copy]
-        host:
-          type: string
-          description: SSH host
-        port:
-          type: integer
-          default: 22
-          description: SSH port
-        username:
-          type: string
-          description: SSH username
-        password:
-          type: string
-          description: SSH password
-        privateKey:
-          type: string
-          description: Path to SSH private key file
-        passphrase:
-          type: string
-          description: Passphrase for the private key if encrypted
-        source:
-          type: string
-          description: Source file or certificate component (cert, key, chain, fullchain, p12, pem)
-        destination:
-          type: string
-          description: Destination path on remote server
-        permissions:
-          type: integer
-          description: File permissions to set (octal)
-        command:
-          type: string
-          description: Command to execute after copy
-        verbose:
-          type: boolean
-          description: Whether to log detailed information
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          required:
+            - host
+            - source
+            - destination
+          properties:
+            host:
+              type: string
+              description: SSH host
+            port:
+              type: integer
+              default: 22
+              description: SSH port
+            username:
+              type: string
+              description: SSH username
+            password:
+              type: string
+              description: SSH password
+            privateKey:
+              type: string
+              description: Path to SSH private key file
+            passphrase:
+              type: string
+              description: Passphrase for the private key if encrypted
+            source:
+              type: string
+              description: Source file or certificate component (cert, key, chain, fullchain, p12, pem)
+            destination:
+              type: string
+              description: Destination path on remote server
+            permissions:
+              type: integer
+              description: File permissions to set (octal)
+            command:
+              type: string
+              description: Command to execute after copy
+            verbose:
+              type: boolean
+              description: Whether to log detailed information
 
     SmbCopyAction:
       type: object
@@ -2535,57 +3573,55 @@ components:
           description: Whether to log detailed information
 
     WebhookAction:
-      type: object
-      required:
-        - type
-        - url
-      properties:
-        type:
-          type: string
-          enum: [webhook]
-        url:
-          type: string
-          description: Webhook endpoint URL
-        method:
-          type: string
-          enum: [GET, POST, PUT, PATCH]
-          default: POST
-          description: HTTP method
-        event:
-          type: string
-          default: certificate.deployed
-          description: Event name to include in webhook payload
-        headers:
-          type: object
-          description: HTTP headers
-        auth:
-          type: object
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          required:
+            - url
           properties:
-            bearer:
+            url:
               type: string
-              description: Bearer token
-            type:
+              description: Webhook endpoint URL
+            method:
               type: string
-              enum: [basic]
-              description: Authentication type
-            username:
+              enum: [GET, POST, PUT, PATCH]
+              default: POST
+              description: HTTP method
+            event:
               type: string
-              description: Basic auth username
-            password:
-              type: string
-              description: Basic auth password
-        includeFiles:
-          type: array
-          items:
-            type: string
-            enum: [cert, key, chain, fullchain]
-          description: Certificate files to include in webhook payload
-        includeCustomData:
-          type: boolean
-          description: Whether to include custom data in the webhook payload
-        customData:
-          type: object
-          description: Custom data to include in webhook payload
+              default: certificate.deployed
+              description: Event name to include in webhook payload
+            headers:
+              type: object
+              description: HTTP headers
+            auth:
+              type: object
+              properties:
+                bearer:
+                  type: string
+                  description: Bearer token
+                type:
+                  type: string
+                  enum: [basic]
+                  description: Authentication type
+                username:
+                  type: string
+                  description: Basic auth username
+                password:
+                  type: string
+                  description: Basic auth password
+            includeFiles:
+              type: array
+              items:
+                type: string
+                enum: [cert, key, chain, fullchain]
+              description: Certificate files to include in webhook payload
+            includeCustomData:
+              type: boolean
+              description: Whether to include custom data in the webhook payload
+            customData:
+              type: object
+              description: Custom data to include in webhook payload
 
     EmailAction:
       type: object
@@ -2827,15 +3863,48 @@ components:
         timestamp:
           type: string
           format: date-time
-          nullable: true
           description: Log entry timestamp
         level:
           type: string
-          nullable: true
-          description: Log level (info, error, etc.)
+          enum: [error, warn, info, debug, fine, finest]
+          description: Log level
         message:
           type: string
           description: Log message
+        filename:
+          type: string
+          description: Source file that generated the log
+        meta:
+          type: object
+          description: Additional metadata for the log entry
+
+    LoggingSettings:
+      type: object
+      properties:
+        defaultLevel:
+          type: string
+          enum: [error, warn, info, debug, fine, finest]
+          description: Default log level
+        fileLogLevels:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [error, warn, info, debug, fine, finest]
+          description: File-specific log levels
+
+    LoggingSettingsUpdate:
+      type: object
+      properties:
+        defaultLevel:
+          type: string
+          enum: [error, warn, info, debug, fine, finest]
+          description: Default log level
+        fileLogLevels:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [error, warn, info, debug, fine, finest]
+          description: File-specific log levels
 
     FileSystemItem:
       type: object
@@ -2864,3 +3933,97 @@ components:
           type: string
           format: date-time
           description: Creation time
+
+    DeploymentAction:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Action type identifier
+        name:
+          type: string
+          description: Optional display name for the action
+        description:
+          type: string
+          description: Optional description for the action
+        enabled:
+          type: boolean
+          default: true
+          description: Whether this action is enabled
+      discriminator:
+        propertyName: type
+        mapping:
+          copy: "#/components/schemas/CopyAction"
+          command: "#/components/schemas/CommandAction"
+          "docker-restart": "#/components/schemas/DockerRestartAction"
+          "nginx-proxy-manager": "#/components/schemas/NginxProxyManagerAction"
+          "ssh-copy": "#/components/schemas/SshCopyAction"
+          "smb-copy": "#/components/schemas/SmbCopyAction"
+          "ftp-copy": "#/components/schemas/FtpCopyAction"
+          "api-call": "#/components/schemas/ApiCallAction"
+          webhook: "#/components/schemas/WebhookAction"
+          email: "#/components/schemas/EmailAction"
+
+    CertificateVersion:
+      type: object
+      properties:
+        fingerprint:
+          type: string
+          description: Fingerprint of the previous version
+        version:
+          type: integer
+          description: Version number
+        subject:
+          type: string
+          description: Certificate subject
+        issuer:
+          type: string
+          description: Certificate issuer
+        validFrom:
+          type: string
+          format: date-time
+          description: Validity start date
+        validTo:
+          type: string
+          format: date-time
+          description: Validity end date
+        domains:
+          type: array
+          items:
+            type: string
+          description: Domain names included in the certificate
+        ips:
+          type: array
+          items:
+            type: string
+          description: IP addresses included in the certificate
+        keyType:
+          type: string
+          description: Key type (RSA, EC, etc.)
+        keySize:
+          type: integer
+          description: Key size in bits
+        sigAlg:
+          type: string
+          description: Signature algorithm
+        archivedAt:
+          type: string
+          format: date-time
+          description: When this version was archived
+        archivedFiles:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                description: File type (crt, key, etc.)
+              path:
+                type: string
+                description: Path to the archived file
+              relativePath:
+                type: string
+                description: Relative path from certificate directory
+
