@@ -1,0 +1,180 @@
+/* User Management Styles */
+
+.users-list-container,
+.tokens-list-container {
+  margin-top: 20px;
+  background-color: var(--panel-bg);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Data tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  text-transform: uppercase;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover td {
+  background-color: var(--hover-bg);
+}
+
+.data-table .actions-column {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.status-active {
+  background-color: var(--success-light);
+  color: var(--success-dark);
+}
+
+.status-inactive {
+  background-color: var(--danger-light);
+  color: var(--danger-dark);
+}
+
+/* Token scopes */
+.token-scopes {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 10px;
+  background-color: var(--bg-light);
+}
+
+.token-scopes h4 {
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-size: 0.95em;
+  color: var(--text-dark);
+}
+
+.token-scopes h4:first-child {
+  margin-top: 0;
+}
+
+.scope-group {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.scope-checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.scope-checkbox input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+/* Scope badges */
+.scope-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+
+.scope-read {
+  background-color: var(--info-light);
+  color: var(--info-dark);
+}
+
+.scope-write {
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
+}
+
+.scopes-column {
+  max-width: 250px;
+}
+
+.token-scopes-list {
+  margin-top: 5px;
+}
+
+/* Token value container */
+.token-value-container {
+  display: flex;
+  align-items: center;
+}
+
+.token-value-container input {
+  flex-grow: 1;
+  margin-right: 10px;
+  font-family: monospace;
+}
+
+.token-created-info {
+  padding: 10px;
+}
+
+.token-created-info .warning {
+  color: var(--warning-dark);
+  background-color: var(--warning-light);
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.token-metadata {
+  margin-top: 20px;
+  background-color: var(--bg-light);
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.token-metadata div {
+  margin-bottom: 8px;
+}
+
+.token-metadata div:last-child {
+  margin-bottom: 0;
+}
+
+.token-filters {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: var(--bg-light);
+  border-radius: 4px;
+}
+
+/* Panel actions */
+.panel-actions {
+  margin-bottom: 20px;
+}
+
+/* Add this to your HTML <head> tag */

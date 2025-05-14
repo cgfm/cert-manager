@@ -7,6 +7,8 @@
 const express = require("express");
 const path = require("path");
 
+const FILENAME = 'api/routes/filesystem.js';
+
 /**
  * Filesystem routes
  * @param {Object} deps - Dependencies
@@ -18,7 +20,7 @@ function filesystemRoutes(deps) {
 
   // Debug middleware to log all requests to filesystem routes
   router.use((req, res, next) => {
-    logger.debug(`Filesystem API request: ${req.method} ${req.path}`);
+    logger.debug(`Filesystem API request: ${req.method} ${req.path}`, null, FILENAME);
     next();
   });
 
@@ -91,7 +93,7 @@ function filesystemRoutes(deps) {
         ...locations,
       });
     } catch (error) {
-      logger.error("Error getting filesystem locations:", error);
+      logger.error("Error getting filesystem locations:", error, FILENAME);
       res.status(500).json({
         success: false,
         message: "Failed to get filesystem locations",
@@ -126,7 +128,7 @@ function filesystemRoutes(deps) {
         ...result,
       });
     } catch (error) {
-      logger.error(`Error listing directory:`, error);
+      logger.error(`Error listing directory:`, error, FILENAME);
 
       // Return appropriate error based on the error type
       if (error.code === "ENOENT") {
@@ -162,7 +164,7 @@ function filesystemRoutes(deps) {
         ...result,
       });
     } catch (error) {
-      logger.error(`Error checking path:`, error);
+      logger.error(`Error checking path:`, error, FILENAME);
 
       if (error.code === "EACCES") {
         res.status(403).json({
@@ -224,7 +226,7 @@ function filesystemRoutes(deps) {
         ...result,
       });
     } catch (error) {
-      logger.error(`Error creating directory:`, error);
+      logger.error(`Error creating directory:`, error, FILENAME);
 
       if (error.code === "EACCES") {
         res.status(403).json({

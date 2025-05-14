@@ -19,8 +19,53 @@ class CertificateManager {
      * @param {string} configDir - Directory for configuration files
           */
     constructor(certsDir, configPath, configDir, openSSL, activityService = null) {
-        this.certsDir = certsDir;
-        this.configPath = configPath;
+        const DEFAULT_CERTS_DIR = path.join(process.cwd(), 'certs');
+        const DEFAULT_CONFIG_DIR = path.join(process.cwd(), 'config');
+
+        // Initialization state flag
+        this.isInitialized = false;
+
+        // Ensure certsDir is an absolute path
+        this.certsDir = certsDir ? path.resolve(certsDir) : DEFAULT_CERTS_DIR;
+        logger.debug(`Using certificates directory: ${this.certsDir}`, null, FILENAME);
+
+        // Set up config directory and paths
+        this.configDir = configDir ? path.resolve(configDir) : DEFAULT_CONFIG_DIR;
+        logger.debug(`Using configuration directory: ${this.configDir}`, null, FILENAME);
+
+        // If configPath is provided, use it directly; otherwise construct the path
+        if (configPath) {
+            // If configPath is relative, make it absolute based on configDir
+            this.configPath = path.isAbsolute(configPath) ?
+                configPath : path.join(this.configDir, configPath);
+        } else {
+            this.configPath = path.join(this.configDir, 'certificates.json');
+        }
+
+        logger.debug(`Certificate configuration path: ${this.configPath}`, null, FILENAME);
+
+        // Create directories if they don't exist
+        try {
+            if (!fs.existsSync(this.certsDir)) {
+                fs.mkdirSync(this.certsDir, { recursive: true });
+                logger.info(`Created certificates directory: ${this.certsDir}`, null, FILENAME);
+            }
+
+            if (!fs.existsSync(this.configDir)) {
+                fs.mkdirSync(this.configDir, { recursive: true });
+                logger.info(`Created configuration directory: ${this.configDir}`, null, FILENAME);
+            }
+
+            // Make sure the parent directory of configPath exists
+            const configDir = path.dirname(this.configPath);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+                logger.info(`Created config parent directory: ${configDir}`, null, FILENAME);
+            }
+        } catch (error) {
+            logger.error(`Error creating directory structure: ${error.message}`, null, FILENAME);
+        }
+
         this.certificates = new Map();
 
         // Cache-related properties
@@ -39,7 +84,14 @@ class CertificateManager {
         // Initialize activity service
         this.activityService = activityService;
 
-        this.loadCertificates();
+        this.loadCertificates().then(() => {
+            this.isInitialized = true;
+            logger.info('Certificate manager initialization complete', null, FILENAME);
+        }).catch(error => {
+            logger.error('Error during certificate manager initialization:', error, FILENAME);
+            // Still mark as initialized to prevent permanent loading state
+            this.isInitialized = true;
+        });
 
         // Load the configuration file's last modified time
         try {
@@ -175,222 +227,402 @@ class CertificateManager {
     }
 
     /**
-     * Load certificates from the file system and configuration
-     * @param {boolean} forceRefresh - Force refresh even if cache is valid
-     * @param {string} [specificFilePath] - Only refresh certificate from this file path
-     * @returns {Promise<Map<string, Certificate>>} Loaded certificates
+     * Load all certificates from directory
+     * @param {boolean} reloadConfig - Whether to reload configuration
+     * @returns {Promise<boolean>}
      */
-    async loadCertificates(forceRefresh = false, specificFilePath = null) {
-        logger.debug(`Loading certificates (forceRefresh=${forceRefresh}, specificFile=${specificFilePath || 'none'})`, null, FILENAME);
-
+    async loadCertificates(reloadConfig = false) {
         try {
-            // Check if we need to refresh the cache
-            if (!forceRefresh && this.isCacheValid()) {
-                logger.finest('Using cached certificates data', null, FILENAME);
-                logger.debug(`Certificate cache contains ${this.certificates.size} certificates`, null, FILENAME);
+            logger.info(`Loading certificates from ${this.certsDir}`, null, FILENAME);
 
-                // If there are pending changes, refresh just those certificates
-                // But do it in a non-blocking way to improve API response times
-                if (this.pendingChanges.size > 0) {
-                    logger.fine(`Scheduling background refresh for ${this.pendingChanges.size} certificates with pending changes`, null, FILENAME);
-                    setTimeout(async () => {
-                        try {
-                            logger.fine(`Starting background refresh of ${this.pendingChanges.size} certificates with pending changes`, null, FILENAME);
-                            const refreshed = await this.refreshCachedCertificates([...this.pendingChanges]);
-                            logger.debug(`Background certificate refresh completed, updated ${refreshed} certificates`, null, FILENAME);
-                        } catch (error) {
-                            logger.error('Error in background certificate refresh:', error, FILENAME);
-                        }
-                    }, 0);
-                } else {
-                    logger.finest('No pending certificate changes to refresh', null, FILENAME);
-                }
-
-                // If a specific file path was provided, process that in a non-blocking way too
-                if (specificFilePath) {
-                    if (fs.existsSync(specificFilePath)) {
-                        logger.fine(`Scheduling background processing of specific certificate file: ${specificFilePath}`, null, FILENAME);
-                        setTimeout(async () => {
-                            try {
-                                logger.fine(`Processing specific certificate file: ${specificFilePath}`, null, FILENAME);
-                                const result = await this.processSingleCertificateFile(specificFilePath);
-                                logger.debug(`Processed certificate file ${specificFilePath}: ${result ? 'success' : 'failed'}`, null, FILENAME);
-                            } catch (error) {
-                                logger.error(`Error processing certificate file ${specificFilePath}:`, error, FILENAME);
-                            }
-                        }, 0);
-                    } else {
-                        logger.warn(`Specified certificate file does not exist: ${specificFilePath}`, null, FILENAME);
-                    }
-                }
-
-                return this.certificates;
+            // Only clear certificates if explicitly reloading
+            if (reloadConfig) {
+                logger.debug('Reloading requested, clearing current certificates', null, FILENAME);
+                this.certificates.clear();
             }
 
-            const now = Date.now();
-            logger.info(`Performing ${forceRefresh ? 'forced' : 'required'} refresh of certificates cache`, null, FILENAME);
-            logger.debug('Loading certificates from filesystem and config', null, FILENAME);
+            // Find all certificate files in the directory
+            const certFiles = await this.findCertificateFiles();
 
-            // Only do full reload if force refresh or cache is empty
-            if (forceRefresh || this.certificates.size === 0) {
-                try {
-                    // Only clear certificates on full refresh
-                    if (!specificFilePath) {
-                        logger.fine('Clearing existing certificates cache for full refresh', null, FILENAME);
-                        this.certificates.clear();
-                    } else {
-                        logger.fine('Keeping existing certificates cache for specific file refresh', null, FILENAME);
-                    }
+            // Process each certificate file
+            const results = await Promise.all(certFiles.map(file => this.processSingleCertificateFile(file)));
+            const successCount = results.filter(result => result).length;
 
-                    // Step 1: If we're processing a specific file, just do that one
-                    if (specificFilePath && fs.existsSync(specificFilePath)) {
-                        logger.info(`Processing specific certificate file: ${specificFilePath}`, null, FILENAME);
-                        await this.processSingleCertificateFile(specificFilePath);
-                    } else {
-                        // Find and process all certificate files
-                        logger.debug('Finding all certificate files...', null, FILENAME);
-                        const certFiles = await this.findCertificateFiles();
-                        logger.info(`Found ${certFiles.length} certificate files`, null, FILENAME);
+            logger.info(`Successfully loaded ${successCount} of ${certFiles.length} certificates`, null, FILENAME);
 
-                        if (certFiles.length === 0) {
-                            logger.warn('No certificate files found in configured directory', null, FILENAME);
-                        }
+            // Merge with existing config
+            const mergeResult = await this.mergeCertificateConfigs();
 
-                        // Limit concurrent processing to avoid overloading the system
-                        const concurrencyLimit = 5;
-                        logger.fine(`Processing certificate files with concurrency limit of ${concurrencyLimit}`, null, FILENAME);
-                        const chunks = [];
+            // Update CA relationships between certificates - using our new method
+            await this.updateCertificateCARelationships();
 
-                        // Split files into chunks for processing
-                        for (let i = 0; i < certFiles.length; i += concurrencyLimit) {
-                            chunks.push(certFiles.slice(i, i + concurrencyLimit));
-                        }
+            // Only save if we have new certificates that need to be added to config
+            const needsToSave = this._checkIfConfigNeedsSaving();
 
-                        logger.finest(`Split certificate files into ${chunks.length} processing chunks`, null, FILENAME);
-
-                        // Process each chunk of files
-                        let processedCount = 0;
-                        let successCount = 0;
-                        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-                            const chunk = chunks[chunkIndex];
-                            logger.finest(`Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} files`, null, FILENAME);
-
-                            const results = await Promise.all(chunk.map(file => this.processSingleCertificateFile(file)));
-
-                            // Count successes
-                            const chunkSuccesses = results.filter(result => result).length;
-                            processedCount += chunk.length;
-                            successCount += chunkSuccesses;
-
-                            logger.fine(`Processed chunk ${chunkIndex + 1}/${chunks.length}, success: ${chunkSuccesses}/${chunk.length} files`, null, FILENAME);
-                            logger.finest(`Total progress: ${processedCount}/${certFiles.length} files (${successCount} successful)`, null, FILENAME);
-                        }
-
-                        logger.info(`Certificate processing complete: ${successCount}/${certFiles.length} successfully loaded`, null, FILENAME);
-                    }
-
-                    // Step 3: Load additional data from configuration
-                    logger.debug('Merging certificate configurations from config file', null, FILENAME);
-                    const configExists = await this.mergeCertificateConfigs();
-                    logger.fine(`Configuration ${configExists ? 'loaded' : 'not found'}, merged with loaded certificates`, null, FILENAME);
-
-                    // Create config file if it doesn't exist and we have certificates
-                    if (!configExists && this.certificates.size > 0) {
-                        logger.info('Creating new certificate configuration file', null, FILENAME);
-                        await this.saveCertificateConfigs();
-                    }
-
-                    // Update cache metadata
-                    logger.finest(`Updating cache metadata, setting lastRefreshTime to ${now}`, null, FILENAME);
-                    this.lastRefreshTime = now;
-                    this.pendingChanges.clear();
-
-                    // Update config file last modified time
-                    try {
-                        const stats = fs.statSync(this.configPath);
-                        this.configLastModified = stats.mtimeMs;
-                        logger.finest(`Updated config file last modified time: ${new Date(this.configLastModified).toISOString()}`, null, FILENAME);
-                    } catch (error) {
-                        logger.fine(`Couldn't get stats for config file:`, error, FILENAME);
-                    }
-
-                    logger.info(`Loaded ${this.certificates.size} certificates`, null, FILENAME);
-
-                    // After loading all certificates, scan for CA relationships
-                    logger.debug(`Scanning certificates for CA relationships...`, null, FILENAME);
-                    let caRelationshipsUpdated = 0;
-
-                    // Go through non-CA certificates to identify their signing CAs
-                    for (const cert of this.certificates.values()) {
-                        // Skip CA certificates and self-signed certificates
-                        if (cert.isCA() || (cert.subject === cert.issuer)) {
-                            logger.finest(`Skipping CA relationship check for CA or self-signed cert: ${cert.name}`, null, FILENAME);
-                            continue;
-                        }
-
-                        // Check if certificate is missing caFingerprint but has signWithCA=true
-                        if (cert.signWithCA === true && !cert.caFingerprint) {
-                            logger.fine(`Certificate ${cert.name} is marked for CA signing but missing CA fingerprint, attempting to update`, null, FILENAME);
-                            const wasUpdated = await this.updateCertificateCAFingerprint(cert);
-                            if (wasUpdated) {
-                                caRelationshipsUpdated++;
-                                logger.debug(`Updated CA fingerprint for certificate: ${cert.name}`, null, FILENAME);
-                            } else {
-                                logger.fine(`Could not determine CA fingerprint for certificate: ${cert.name}`, null, FILENAME);
-                            }
-                        } else if (cert.signWithCA === true) {
-                            logger.finest(`Certificate ${cert.name} already has CA fingerprint: ${cert.caFingerprint}`, null, FILENAME);
-                        }
-                    }
-
-                    if (caRelationshipsUpdated > 0) {
-                        logger.info(`Updated CA fingerprints for ${caRelationshipsUpdated} certificates`, null, FILENAME);
-                    } else {
-                        logger.debug('No CA relationships needed updating', null, FILENAME);
-                    }
-
-                    const loadDuration = Date.now() - now;
-                    logger.debug(`Certificate loading completed in ${loadDuration}ms`, null, FILENAME);
-                    return this.certificates;
-                } catch (error) {
-                    logger.error('Error loading certificates:', error, FILENAME);
-                    throw error;
-                }
+            if (needsToSave) {
+                logger.info('Detected changes that need to be saved to configuration', null, FILENAME);
+                await this.saveCertificateConfigs();
             } else {
-                logger.debug('Performing partial refresh of certificates cache', null, FILENAME);
-
-                // For non-forced refreshes with a populated cache, just process pending changes
-                if (this.pendingChanges.size > 0) {
-                    logger.info(`Refreshing ${this.pendingChanges.size} certificates with pending changes`, null, FILENAME);
-                    const refreshed = await this.refreshCachedCertificates([...this.pendingChanges]);
-                    logger.debug(`Refreshed ${refreshed}/${this.pendingChanges.size} certificates with pending changes`, null, FILENAME);
-                } else {
-                    logger.fine('No pending changes to refresh', null, FILENAME);
-                }
-
-                // And handle any specific file path
-                if (specificFilePath && fs.existsSync(specificFilePath)) {
-                    logger.info(`Processing specific certificate file: ${specificFilePath}`, null, FILENAME);
-                    const result = await this.processSingleCertificateFile(specificFilePath);
-                    logger.debug(`Processed specific certificate file: ${result ? 'success' : 'failed'}`, null, FILENAME);
-                } else if (specificFilePath) {
-                    logger.warn(`Specified certificate file does not exist: ${specificFilePath}`, null, FILENAME);
-                }
-
-                logger.debug(`Partial refresh complete, cache contains ${this.certificates.size} certificates`, null, FILENAME);
-                return this.certificates;
+                logger.debug('No changes detected in certificate configuration, skipping save', null, FILENAME);
             }
+
+            return successCount > 0;
         } catch (error) {
-            logger.error('Unhandled error in loadCertificates method:', error, FILENAME);
-            logger.error(`Stack trace: ${error.stack}`, null, FILENAME);
-            throw error;
+            logger.error('Error loading certificates:', error, FILENAME);
+            return false;
         }
     }
 
     /**
-     * Process a certificate file, extract its information and add it to the manager
+     * Load certificate from the filesystem
+     * @param {string} fingerprint - Certificate fingerprint
+     * @returns {Certificate} Certificate object
+     */
+    loadCertificate(fingerprint) {
+        try {
+            // First, make sure we have loaded the config file
+            if (!this.certificatesConfig) {
+                // Load certificates config once
+                try {
+                    const configContent = fs.readFileSync(this.configPath, 'utf8');
+                    this.certificatesConfig = JSON.parse(configContent);
+                } catch (error) {
+                    logger.warn(`No certificates config found at ${this.configPath}`, null, FILENAME);
+                    this.certificatesConfig = { certificates: {} };
+                }
+            }
+
+            // Exit if certificate not found in config
+            if (!this.certificatesConfig.certificates?.[fingerprint]) {
+                return null;
+            }
+
+            const certConfig = this.certificatesConfig.certificates[fingerprint];
+
+            // Create certificate with constructor and let it handle the data properly
+            const Certificate = require('./Certificate');
+            const cert = new Certificate(certConfig);
+
+            return cert;
+        } catch (error) {
+            logger.error(`Failed to load certificate ${fingerprint}:`, error, FILENAME);
+            return null;
+        }
+    }
+
+    /**
+     * Merge certificate configurations from loaded files with existing configuration
+     * @returns {Promise<boolean>} Whether the config was successfully merged
+     */
+    async mergeCertificateConfigs() {
+        try {
+            const absoluteConfigPath = path.resolve(this.configPath);
+            logger.debug(`Attempting to load certificate config from: ${absoluteConfigPath}`, null, FILENAME);
+
+            // If config file doesn't exist, we'll need to create it but only after loading certificates
+            if (!fs.existsSync(absoluteConfigPath)) {
+                logger.info(`Certificate config file not found at ${absoluteConfigPath}, will create after loading certificates`, null, FILENAME);
+                return true;
+            }
+
+            // Check file stats and read the config file
+            let config;
+            try {
+                // Check file stats
+                const stats = fs.statSync(absoluteConfigPath);
+                logger.debug(`Certificate config file stats: size=${stats.size}, mode=${stats.mode.toString(8)}, uid=${stats.uid}, gid=${stats.gid}`, null, FILENAME);
+
+                if (stats.size === 0) {
+                    logger.warn(`Certificate config file exists but is empty: ${absoluteConfigPath}`, null, FILENAME);
+                    return true;
+                }
+
+                // Read and parse the config file
+                const configContent = fs.readFileSync(absoluteConfigPath, 'utf8');
+                logger.debug(`Read ${configContent.length} bytes from certificate config file`, null, FILENAME);
+
+                if (!configContent || configContent.trim() === '') {
+                    logger.warn(`Certificate config file is empty, will maintain existing certificates before updating`, null, FILENAME);
+                    return true;
+                }
+
+                config = JSON.parse(configContent);
+                logger.debug(`Successfully parsed certificate config with ${Object.keys(config.certificates || {}).length} certificates`, null, FILENAME);
+
+                // Store the loaded configuration
+                this.certificatesConfig = config;
+            } catch (error) {
+                logger.error(`Error reading or parsing certificate config file: ${error.message}`, null, FILENAME);
+
+                // Make a backup of the problematic file before replacing
+                try {
+                    if (error instanceof SyntaxError) {
+                        const backupPath = `${absoluteConfigPath}.corrupt-${Date.now()}`;
+                        fs.writeFileSync(backupPath, fs.readFileSync(absoluteConfigPath), 'utf8');
+                        logger.info(`Created backup of corrupt configuration: ${backupPath}`, null, FILENAME);
+                    }
+                } catch (backupError) {
+                    logger.error(`Failed to back up corrupt config: ${backupError.message}`, null, FILENAME);
+                }
+
+                // Initialize with empty config but don't write yet
+                this.certificatesConfig = {
+                    version: 1,
+                    lastUpdate: new Date().toISOString(),
+                    certificates: {}
+                };
+
+                return true;
+            }
+
+            // Process certificate-specific configurations
+            if (config.certificates && typeof config.certificates === 'object') {
+                for (const [fingerprint, certConfig] of Object.entries(config.certificates)) {
+                    // Find the certificate in our loaded set
+                    if (this.certificates.has(fingerprint)) {
+                        // Update existing certificate using its own updateFromData method
+                        const cert = this.certificates.get(fingerprint);
+                        cert.updateFromData(certConfig, { preserveConfig: true });
+                        logger.fine(`Updated certificate ${cert.name} (${fingerprint}) from config`, null, FILENAME);
+                    } else {
+                        // Create a new Certificate instance from the config using Certificate's constructor
+                        try {
+                            const Certificate = require('./Certificate');
+                            const newCert = new Certificate(certConfig); // Use existing _fromData via constructor
+
+                            // Add the certificate to our collection
+                            this.certificates.set(fingerprint, newCert);
+                            logger.info(`Added certificate ${newCert.name} from config (not found on disk)`, null, FILENAME);
+                        } catch (error) {
+                            logger.error(`Error creating certificate from config: ${error.message}`, null, FILENAME);
+                        }
+                    }
+                }
+            }
+
+            return true;
+        } catch (error) {
+            logger.error(`Error merging certificate configs: ${error.message}`, error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Save all certificate configurations to JSON file
+     * @returns {Promise<boolean>} Whether the save was successful
+     */
+    async saveCertificateConfigs() {
+        try {
+            // Create configDir if it doesn't exist yet
+            const configDir = path.dirname(this.configPath);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+                logger.info(`Created config directory: ${configDir}`, null, FILENAME);
+            }
+
+            // Create initial config object if it doesn't exist yet
+            if (!this.certificatesConfig) {
+                this.certificatesConfig = {
+                    version: 1,
+                    lastUpdate: new Date().toISOString(),
+                    certificates: {}
+                };
+            }
+
+            // Update lastUpdate timestamp
+            this.certificatesConfig.lastUpdate = new Date().toISOString();
+
+            // Create a copy of the current certificates in an object structure
+            for (const [fingerprint, certificate] of this.certificates.entries()) {
+                // Skip if certificate has no fingerprint
+                if (!fingerprint) {
+                    continue;
+                }
+
+                // Store the complete JSON representation directly from the certificate
+                this.certificatesConfig.certificates[fingerprint] = certificate.toJSON();
+            }
+
+            // Write the config to file with proper error handling
+            try {
+                const jsonConfig = JSON.stringify(this.certificatesConfig, null, 2);
+                logger.debug(`Writing ${jsonConfig.length} bytes to certificate config file: ${this.configPath}`, null, FILENAME);
+
+                // First write to a temporary file to avoid corruption
+                const tempPath = `${this.configPath}.tmp`;
+                await fs.promises.writeFile(tempPath, jsonConfig, 'utf8');
+
+                // Then rename to the actual config file
+                await fs.promises.rename(tempPath, this.configPath);
+
+                logger.info(`Saved certificate configurations to ${this.configPath}`, null, FILENAME);
+                return true;
+            } catch (writeError) {
+                logger.error(`Failed to write certificate config file: ${writeError.message}`, writeError, FILENAME);
+
+                // Try direct write as a fallback
+                try {
+                    await fs.promises.writeFile(this.configPath, JSON.stringify(this.certificatesConfig, null, 2), 'utf8');
+                    logger.info(`Saved certificate configurations with direct write to ${this.configPath}`, null, FILENAME);
+                    return true;
+                } catch (directWriteError) {
+                    logger.error(`Final attempt to write config failed: ${directWriteError.message}`, null, FILENAME);
+                    throw directWriteError;
+                }
+            }
+        } catch (error) {
+            logger.error(`Error saving certificate configurations: ${error.message}`, error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Update a certificate's configuration and notify about changes
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {Object} config - Updated configuration
+     * @returns {Promise<boolean>} Success status
+     */
+    async updateCertificateConfig(fingerprint, config) {
+        logger.fine(`Updating certificate config for ${fingerprint}`, config, FILENAME);
+        try {
+            if (!fingerprint) {
+                throw new Error('Fingerprint is required');
+            }
+
+            // Find the certificate
+            if (!this.certificates.has(fingerprint)) {
+                throw new Error(`Certificate not found with fingerprint: ${fingerprint}`);
+            }
+
+            const cert = this.certificates.get(fingerprint);
+
+            // Use the Certificate's updateFromData method to handle updates with the proper structure
+            cert.updateFromData({
+                name: config.name,
+                description: config.description,
+                keySize: config.keySize,
+                validity: config.validity,
+
+                // Configuration properties mapped directly to the consistent structure
+                config: {
+                    autoRenew: config.autoRenew,
+                    renewDaysBeforeExpiry: config.renewDaysBeforeExpiry,
+                    renewBefore: config.renewBefore,
+                    signWithCA: config.signWithCA,
+                    caFingerprint: config.caFingerprint,
+                    deployActions: config.deployActions
+                },
+
+                // Additional metadata
+                group: config.group,
+                tags: config.tags,
+                notifications: config.notifications,
+                metadata: config.metadata
+            }, { preserveConfig: true });
+
+            // Save all configurations
+            await this.saveCertificateConfigs();
+
+            // Add notification about the change
+            this.notifyCertificateChanged(fingerprint, 'update');
+
+            return true;
+        } catch (error) {
+            logger.error(`Error updating certificate config for ${fingerprint}:`, error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Update a certificate's configuration and sync in-memory properties
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {Object} config - Updated configuration
+     * @returns {Promise<boolean>} Success status
+     */
+    async updateCertificateConfigAndSync(fingerprint, config) {
+        logger.fine(`Updating certificate config and syncing for ${fingerprint}`, config, FILENAME);
+        try {
+            if (!fingerprint) {
+                throw new Error('Fingerprint is required');
+            }
+
+            // Find the certificate
+            if (!this.certificates.has(fingerprint)) {
+                throw new Error(`Certificate not found with fingerprint: ${fingerprint}`);
+            }
+
+            const cert = this.certificates.get(fingerprint);
+
+            // First use updateCertificateConfig to handle the configuration update
+            const updateResult = await this.updateCertificateConfig(fingerprint, config);
+            if (!updateResult) {
+                throw new Error('Failed to update certificate configuration');
+            }
+
+            // The certificate already has updated data internally via updateFromData
+            // But to ensure full synchronization across potential public properties
+            // or any properties that might be accessed directly, update these explicitly
+
+            // Log synchronization for clarity
+            logger.debug(`Synchronized certificate properties for ${cert.name} (${fingerprint})`, null, FILENAME);
+
+            // Ensure the certificate in our map is up to date
+            this.certificates.set(fingerprint, cert);
+
+            return true;
+        } catch (error) {
+            logger.error(`Error updating and syncing certificate config for ${fingerprint}:`, error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Check if there are changes that need to be saved to the configuration
+     * @returns {boolean} True if config needs to be saved
+     * @private
+     */
+    _checkIfConfigNeedsSaving() {
+        // If we don't have a config object at all, we need to save
+        if (!this.certificatesConfig) {
+            return true;
+        }
+
+        // If certificates object doesn't exist in config, we need to save
+        if (!this.certificatesConfig.certificates) {
+            return true;
+        }
+
+        // Check for new certificates that don't exist in config
+        const configFingerprints = new Set(Object.keys(this.certificatesConfig.certificates));
+        for (const fingerprint of this.certificates.keys()) {
+            if (!configFingerprints.has(fingerprint)) {
+                return true;
+            }
+        }
+
+        // Check if any certificates have been updated since config was last saved
+        for (const [fingerprint, cert] of this.certificates.entries()) {
+            const configCert = this.certificatesConfig.certificates[fingerprint];
+            if (!configCert) continue;
+
+            // Check if properties have changed - using the proper structure
+            if (cert._name !== configCert.name ||
+                cert._subject !== configCert.subject ||
+                cert._validTo !== configCert.validTo ||
+                cert._validFrom !== configCert.validFrom ||
+                cert._certType !== configCert.certType ||
+                cert._needsPassphrase !== configCert.needsPassphrase) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Process a single certificate file
      * @param {string} certPath - Path to certificate file
-     * @returns {Promise<boolean>} True if processing was successful 
+     * @returns {Promise<boolean>} Whether the certificate was successfully processed
      */
     async processSingleCertificateFile(certPath) {
         try {
@@ -410,133 +642,52 @@ class CertificateManager {
                 certificate = this.certificates.get(certInfo.fingerprint);
 
                 // Update certificate with new information
-                certificate.subject = certInfo.subject;
-                certificate.issuer = certInfo.issuer;
-                certificate.validFrom = certInfo.validFrom;
-                certificate.validTo = certInfo.validTo;
-                certificate.keyType = certInfo.keyType;
-                certificate.keySize = certInfo.keySize;
-                certificate.sigAlg = certInfo.sigAlg;
-
-                // Add paths
-                certificate.addPath('crt', certPath);
+                certificate.updateFromData(certInfo);
             } else {
-                // Create new certificate
-                certificate = new Certificate({
-                    name: certInfo.commonName || path.basename(certPath, '.crt'),
-                    fingerprint: certInfo.fingerprint,
-                    subject: certInfo.subject,
-                    issuer: certInfo.issuer,
-                    validFrom: certInfo.validFrom,
-                    validTo: certInfo.validTo,
-                    keyType: certInfo.keyType,
-                    keySize: certInfo.keySize,
-                    sigAlg: certInfo.sigAlg,
-                    domains: certInfo.domains || [],
-                    ips: certInfo.ips || []
-                });
-
-                // Add paths
-                certificate.addPath('crt', certPath);
-
-                // Add other paths that might exist
-                this.addRelatedPaths(certificate, certPath);
+                // Create new certificate with the consistent structure
+                const Certificate = require('./Certificate');
+                certificate = new Certificate(certInfo);
 
                 // Add to certificates map
                 this.certificates.set(certificate.fingerprint, certificate);
                 logger.fine(`Added certificate ${certificate.name} (${certificate.fingerprint})`, null, FILENAME);
             }
 
-            // Check if certificate is a CA
-            if (certInfo.isCA) {
-                certificate.certType = certInfo.isRootCA ? 'rootCA' : 'intermediateCA';
-                logger.fine(`Certificate ${certificate.name} identified as ${certificate.certType}`, null, FILENAME);
-            }
-
-            // Check passphrase requirement if openssl is available - this is key to our optimization
+            // Check passphrase requirement if openssl is available
             if (this.openssl) {
                 try {
-                    const needsPassphrase = await certificate.checkNeedsPassphrase(this.openssl);
-                    logger.fine(`Passphrase requirement checked for ${certificate.name}: ${needsPassphrase ? 'Needs passphrase' : 'No passphrase required'}`, null, FILENAME);
+                    // Get key path from the certificate
+                    const keyPath = certificate.paths?.keyPath || certificate.paths?.key;
+
+                    if (keyPath && fs.existsSync(keyPath)) {
+                        // Use isKeyEncrypted directly to check if the key needs a passphrase
+                        const needsPassphrase = await this.openssl.isKeyEncrypted(keyPath);
+                        logger.info(`Passphrase requirement checked for ${certificate.name}: ${needsPassphrase ? 'Needs passphrase' : 'No passphrase required'}`, null, FILENAME);
+
+                        // Update the certificate using its own method
+                        certificate.needsPassphrase = needsPassphrase;
+
+                        // Check if certificate has a stored passphrase if we have a passphrase manager
+                        if (this.passphraseManager && needsPassphrase) {
+                            certificate.updatePassphraseStatus(this.passphraseManager);
+                        }
+                    } else {
+                        logger.debug(`No key file found to check passphrase requirement for ${certificate.name}`, null, FILENAME);
+                    }
                 } catch (passphraseError) {
                     logger.warn(`Error checking passphrase requirement for ${certificate.name}: ${passphraseError.message}`, null, FILENAME);
+                    // Set needsPassphrase to true if we can't check, to be safe
+                    certificate.needsPassphrase = true;
                 }
-            } else {
-                logger.fine(`OpenSSL not available, skipping passphrase check for ${certificate.name}`, null, FILENAME);
             }
+
+            // Make sure to save the updated certificate with the correct passphrase setting
+            this.certificates.set(certificate.fingerprint, certificate);
 
             return true;
         } catch (error) {
             logger.error(`Error processing certificate file ${certPath}:`, error, FILENAME);
             return false;
-        }
-    }
-
-    /**
-     * Add related certificate files to the certificate paths
-     * @param {Certificate} certificate - Certificate to add paths to
-     * @param {string} certPath - Path to the certificate file
-     * @private
-     */
-    addRelatedPaths(certificate, certPath) {
-        logger.finest(`Finding related paths for certificate: ${certificate.name}`, null, FILENAME);
-
-        try {
-            if (!certPath || !fs.existsSync(certPath)) {
-                logger.warn(`Cannot find related paths: invalid certificate path ${certPath}`, null, FILENAME);
-                return;
-            }
-
-            // Extract base name and directory
-            const baseName = path.basename(certPath, path.extname(certPath));
-            const certDir = path.dirname(certPath);
-
-            logger.finest(`Looking for related files in ${certDir} with base name ${baseName}`, null, FILENAME);
-
-            // Define possible related files with their types
-            const relatedFiles = [
-                { suffix: '.key', pathKey: 'keyPath' },
-                { suffix: '.pem', pathKey: 'pemPath' },
-                { suffix: '.p12', pathKey: 'p12Path' },
-                { suffix: '.pfx', pathKey: 'pfxPath' },
-                { suffix: '.csr', pathKey: 'csrPath' },
-                { suffix: '.fullchain', pathKey: 'fullchainPath' },
-                { suffix: '.chain', pathKey: 'chainPath' },
-                { suffix: '.ext', pathKey: 'extPath' }
-            ];
-
-            // Check for each possible file
-            for (const { suffix, pathKey } of relatedFiles) {
-                const possiblePath = path.join(certDir, `${baseName}${suffix}`);
-
-                if (fs.existsSync(possiblePath)) {
-                    logger.finest(`Found related file: ${possiblePath}`, null, FILENAME);
-                    certificate.addPath(pathKey.replace(/Path$/, ''), possiblePath);
-                } else {
-                    // Try alternate names for common patterns (e.g., privkey.pem)
-                    if (suffix === '.key') {
-                        // Common alternative key filenames
-                        const alternateKeyFiles = [
-                            'privkey.pem',
-                            'private.key',
-                            `${certificate.name}.key`
-                        ];
-
-                        for (const keyFile of alternateKeyFiles) {
-                            const altPath = path.join(certDir, keyFile);
-                            if (fs.existsSync(altPath)) {
-                                logger.finest(`Found alternate key file: ${altPath}`, null, FILENAME);
-                                certificate.addPath('key', altPath);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            logger.debug(`Found ${Object.keys(certificate.paths).length - 1} related files for ${certificate.name}`, null, FILENAME);
-        } catch (error) {
-            logger.error(`Error finding related paths for certificate ${certificate.name || 'unknown'}:`, error, FILENAME);
         }
     }
 
@@ -547,17 +698,24 @@ class CertificateManager {
     async findCertificateFiles() {
         try {
             const certFiles = [];
+            logger.debug(`Scanning certificates directory: ${this.certsDir}`, null, FILENAME);
 
             // Helper function to recursively scan directories
             const scanDirectory = (dir) => {
                 try {
+                    if (!fs.existsSync(dir)) {
+                        logger.warn(`Directory does not exist: ${dir}`, null, FILENAME);
+                        return;
+                    }
+
                     const items = fs.readdirSync(dir);
+                    logger.finest(`Found ${items.length} items in directory ${dir}`, null, FILENAME);
 
                     for (const item of items) {
                         const fullPath = path.join(dir, item);
 
-                        // Skip special directories
-                        if (item === 'backups' || item === 'archive') {
+                        // Skip special directories and hidden files
+                        if (item === 'backups' || item === 'archive' || item.startsWith('.')) {
                             continue;
                         }
 
@@ -570,6 +728,7 @@ class CertificateManager {
                             } else if (this.isCertificateFile(item)) {
                                 // Found a certificate file
                                 certFiles.push(fullPath);
+                                logger.finest(`Found certificate file: ${fullPath}`, null, FILENAME);
                             }
                         } catch (error) {
                             logger.warn(`Error accessing ${fullPath}:`, error, FILENAME);
@@ -582,6 +741,7 @@ class CertificateManager {
 
             // Start scanning from the certificates directory
             scanDirectory(this.certsDir);
+            logger.info(`Found ${certFiles.length} certificate files in total`, null, FILENAME);
 
             return certFiles;
         } catch (error) {
@@ -621,8 +781,8 @@ class CertificateManager {
             logger.finest(`- Name: ${certInfo.name}`, null, FILENAME);
             logger.finest(`- Subject: ${certInfo.subject}`, null, FILENAME);
             logger.finest(`- Issuer: ${certInfo.issuer}`, null, FILENAME);
-            logger.finest(`- Domains: ${JSON.stringify(certInfo.domains || [])}`, null, FILENAME);
-            logger.finest(`- IPs: ${JSON.stringify(certInfo.ips || [])}`, null, FILENAME);
+            logger.finest(`- Domains: ${JSON.stringify(certInfo.sans?.domains || [])}`, null, FILENAME);
+            logger.finest(`- IPs: ${JSON.stringify(certInfo.sans?.ips || [])}`, null, FILENAME);
 
             // Find related key file
             const keyPath = this.findKeyFile(filePath);
@@ -667,7 +827,12 @@ class CertificateManager {
                 csrPath: path.join(dirName, `${baseName}.csr`),
                 p12Path: path.join(dirName, `${baseName}.p12`),
                 pfxPath: path.join(dirName, `${baseName}.pfx`),
-                extPath: path.join(dirName, `${baseName}.ext`)
+                extPath: path.join(dirName, `${baseName}.ext`),
+                derPath: path.join(dirName, `${baseName}.der`),
+                cerPath: path.join(dirName, `${baseName}.cer`),
+                p7bPath: path.join(dirName, `${baseName}.p7b`),
+                chainPath: path.join(dirName, `${baseName}.chain`),
+                fullchainPath: path.join(dirName, `${baseName}.fullchain`)
             };
 
             // Add each path only if the file exists
@@ -679,10 +844,13 @@ class CertificateManager {
 
             logger.fine(`Generated paths for certificate: ${JSON.stringify(paths)}`, null, FILENAME);
 
-            // Ensure we have domains array
-            const domains = Array.isArray(certInfo.domains) ? certInfo.domains : [];
-            // Ensure we have IPs array
-            const ips = Array.isArray(certInfo.ips) ? certInfo.ips : [];
+            // Get domains and IPs from the new SANS structure
+            const domains = certInfo.sans?.domains || [];
+            const ips = certInfo.sans?.ips || [];
+
+            // Set CA fingerprint when available
+            const caFingerprint = certInfo.authorityKeyId && !certInfo.selfSigned ?
+                certInfo.authorityKeyId.toUpperCase() : null;
 
             // Create result object with all necessary fields
             const result = {
@@ -690,24 +858,32 @@ class CertificateManager {
                 fingerprint: certInfo.fingerprint,
                 subject: certInfo.subject,
                 issuer: certInfo.issuer,
+                issuerCN: certInfo.issuerCN,
                 validFrom: certInfo.validFrom,
                 validTo: certInfo.validTo,
                 certType: certInfo.certType,
                 paths,
-                signWithCA: certInfo.subject !== certInfo.issuer && certInfo.certType !== 'rootCA',
-                domains: domains,
-                ips: ips
+                sans: {
+                    domains,
+                    ips,
+                    idleDomains: [],
+                    idleIps: []
+                },
+                isCA: certInfo.isCA,
+                isRootCA: certInfo.isRootCA,
+                pathLenConstraint: certInfo.pathLenConstraint,
+                serialNumber: certInfo.serialNumber,
+                keyId: certInfo.keyId,
+                authorityKeyId: certInfo.authorityKeyId,
+                keyType: certInfo.keyType,
+                keySize: certInfo.keySize,
+                sigAlg: certInfo.sigAlg,
+                selfSigned: certInfo.selfSigned,
+                signWithCA: !certInfo.selfSigned && certInfo.certType !== 'rootCA',
+                caFingerprint: caFingerprint
             };
 
-            logger.debug(`Extracted certificate data: ${JSON.stringify({
-                name: result.name,
-                fingerprint: result.fingerprint,
-                subject: result.subject,
-                issuer: result.issuer,
-                domains: result.domains.length,
-                paths: Object.keys(result.paths).length,
-                certType: result.certType
-            })}`, null, FILENAME);
+            logger.fine(`Extracted certificate data:`, result, FILENAME);
 
             return result;
         } catch (error) {
@@ -745,332 +921,6 @@ class CertificateManager {
     }
 
     /**
-     * Merge certificate configuration data from config file with certificates
-     * @returns {Promise<boolean>} Whether the config file exists
-     */
-    async mergeCertificateConfigs() {
-        try {
-            // Skip if config file doesn't exist
-            if (!fs.existsSync(this.configPath)) {
-                logger.info(`Certificate config file not found at ${this.configPath}, using defaults`, null, FILENAME);
-                return false;
-            }
-
-            // Read and parse the config file
-            const configContent = fs.readFileSync(this.configPath, 'utf8');
-            const config = JSON.parse(configContent);
-
-            // Process certificate-specific configurations
-            if (config.certificates && typeof config.certificates === 'object') {
-                for (const [fingerprint, certConfig] of Object.entries(config.certificates)) {
-                    // Find the certificate in our loaded set
-                    if (this.certificates.has(fingerprint)) {
-                        const cert = this.certificates.get(fingerprint);
-
-                        // Update configuration
-                        if (certConfig.autoRenew !== undefined) {
-                            cert.autoRenew = certConfig.autoRenew;
-                        }
-
-                        if (certConfig.renewDaysBeforeExpiry) {
-                            cert.renewDaysBeforeExpiry = certConfig.renewDaysBeforeExpiry;
-                        }
-
-                        if (certConfig.signWithCA !== undefined) {
-                            cert.signWithCA = certConfig.signWithCA;
-                            cert.caFingerprint = certConfig.caFingerprint || null;
-                        } else if (certConfig.config && certConfig.config.signWithCA !== undefined) {
-                            cert.signWithCA = certConfig.config.signWithCA;
-                            cert.caFingerprint = certConfig.config.caFingerprint || null;
-                        }
-
-                        if (certConfig.deployActions) {
-                            cert.deployActions = certConfig.deployActions;
-                        }
-
-                        // Update previous versions
-                        if (certConfig.previousVersions) {
-                            for (const [prevFingerprint, prevVersion] of Object.entries(certConfig.previousVersions)) {
-                                cert.addPreviousVersion(prevFingerprint, prevVersion);
-                            }
-                        }
-
-                        // Make sure to load the needsPassphrase property from config
-                        if (certConfig.needsPassphrase !== undefined) {
-                            certificate.needsPassphrase(certConfig.needsPassphrase);
-                        }
-
-                        // Load paths from config if available
-                        if (certConfig.paths) {
-                            // Add the paths to the certificate
-                            cert.loadPaths(certConfig.paths);
-                        }
-
-                        if (certConfig.metadata) {
-                            if (certConfig.metadata.subject) {
-                                cert._subject = certConfig.metadata.subject;
-                            }
-                            if (certConfig.metadata.issuer) {
-                                cert._issuer = certConfig.metadata.issuer;
-                            }
-                            if (certConfig.metadata.name) {
-                                cert._name = certConfig.metadata.name;
-                            }
-                            if (certConfig.metadata.certType) {
-                                cert._certType = certConfig.metadata.certType;
-                            }
-                            if (certConfig.metadata.domains) {
-                                cert._domains = [...certConfig.metadata.domains];
-                            }
-                            if (certConfig.metadata.ips) {
-                                cert._ips = [...certConfig.metadata.ips];
-                            }
-                        }
-
-                        
-                    }
-                }
-            }
-            return true;
-        } catch (error) {
-            logger.error('Error merging certificate configs:', error, FILENAME);
-            return false;
-        }
-    }
-
-    /**
-     * Save certificate configurations to file
-     * @returns {Promise<boolean>} Success status
-     */
-    async saveCertificateConfigs() {
-        try {
-            logger.debug(`Saving certificate configurations to ${this.configPath}`, null, FILENAME);
-
-            // Create config object
-            const config = {
-                version: this.CONFIG_VERSION,
-                lastUpdate: new Date().toISOString(),
-                certificates: {}
-            };
-
-            // Add each certificate configuration
-            this.certificates.forEach((cert, fingerprint) => {
-                config.certificates[fingerprint] = {
-                    name: cert.name,
-                    fingerprint: cert.fingerprint,
-                    certType: cert.certType,
-                    keyType: cert.keyType,
-                    keySize: cert.keySize,
-                    sigAlg: cert.sigAlg,
-                    needsPassphrase: cert.needsPassphrase, // Store this cached value
-                    domains: [...cert.domains],
-                    ips: [...cert.ips],
-                    idleDomains: [...cert.idleDomains],
-                    idleIps: [...cert.idleIps],
-                    paths: { ...cert.paths },
-                    config: {
-                        autoRenew: cert.autoRenew,
-                        renewDaysBeforeExpiry: cert.renewDaysBeforeExpiry,
-                        signWithCA: cert.signWithCA,
-                        caFingerprint: cert.caFingerprint,
-                        deployActions: [...cert.deployActions]
-                    },
-                    previousVersions: cert._previousVersions || {},
-                    modificationTime: cert.modificationTime
-                };
-            });
-
-            // Write to file
-            await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2), 'utf8');
-            logger.info(`Saved configuration for ${this.certificates.size} certificates`, null, FILENAME);
-
-            // Update config file last modified time
-            const stats = fs.statSync(this.configPath);
-            this.configLastModified = stats.mtimeMs;
-
-            return true;
-        } catch (error) {
-            logger.error('Failed to save certificate configurations:', error, FILENAME);
-            return false;
-        }
-    }
-
-    /**
-     * Update a certificate's configuration and notify about changes
-     * @param {string} fingerprint - Certificate fingerprint
-     * @param {Object} config - Updated configuration
-     * @returns {Promise<boolean>} Success status
-     */
-    async updateCertificateConfig(fingerprint, config) {
-        logger.fine(`Updating certificate config for ${fingerprint}`, config, FILENAME);
-        try {
-            if (!fingerprint) {
-                throw new Error('Fingerprint is required');
-            }
-
-            // Find the certificate
-            if (!this.certificates.has(fingerprint)) {
-                throw new Error(`Certificate not found with fingerprint: ${fingerprint}`);
-            }
-
-            const cert = this.certificates.get(fingerprint);
-
-            // Update basic metadata
-            if (config.name !== undefined) {
-                cert.name = config.name;
-            }
-
-            if (config.description !== undefined) {
-                cert.description = config.description;
-            }
-
-            if (config.group !== undefined) {
-                cert.group = config.group;
-            }
-
-            if (config.tags !== undefined) {
-                cert.tags = config.tags;
-            }
-
-            // Update renewal settings
-            if (config.autoRenew !== undefined) {
-                cert.autoRenew = config.autoRenew;
-            }
-
-            if (config.renewDaysBeforeExpiry !== undefined) {
-                cert.renewDaysBeforeExpiry = config.renewDaysBeforeExpiry;
-            }
-
-            if (config.validity !== undefined) {
-                cert.validity = config.validity;
-            }
-
-            if (config.renewBefore !== undefined) {
-                cert.renewBefore = config.renewBefore;
-            }
-
-            if (config.keySize !== undefined) {
-                cert.keySize = config.keySize;
-            }
-
-            // Update CA settings
-            if (config.signWithCA !== undefined) {
-                cert.signWithCA = config.signWithCA;
-                cert.caFingerprint = config.caFingerprint || null;
-            }
-
-            // Update deployment settings
-            if (config.deployActions !== undefined) {
-                cert.deployActions = config.deployActions;
-            }
-
-            // Update notification settings
-            if (config.notifications !== undefined) {
-                cert.notifications = {
-                    ...cert.notifications || {},
-                    ...config.notifications
-                };
-            }
-
-            // Update custom metadata
-            if (config.metadata !== undefined) {
-                cert.metadata = {
-                    ...cert.metadata || {},
-                    ...config.metadata
-                };
-            }
-
-            // Save all configurations
-            await this.saveCertificateConfigs();
-
-            // Add notification about the change
-            this.notifyCertificateChanged(fingerprint, 'update');
-
-            return true;
-        } catch (error) {
-            logger.error(`Error updating certificate config for ${fingerprint}:`, error, FILENAME);
-            return false;
-        }
-    }
-
-    /**
-     * Update a certificate's configuration and sync in-memory properties
-     * @param {string} fingerprint - Certificate fingerprint
-     * @param {Object} config - Updated configuration
-     * @returns {Promise<boolean>} Success status
-     */
-    async updateCertificateConfigAndSync(fingerprint, config) {
-        logger.fine(`Updating certificate config and syncing for ${fingerprint}`, config, FILENAME);
-        try {
-            if (!fingerprint) {
-                throw new Error('Fingerprint is required');
-            }
-
-            // Find the certificate
-            if (!this.certificates.has(fingerprint)) {
-                throw new Error(`Certificate not found with fingerprint: ${fingerprint}`);
-            }
-
-            const cert = this.certificates.get(fingerprint);
-
-            // Update configuration first
-            const updateResult = await this.updateCertificateConfig(fingerprint, config);
-            if (!updateResult) {
-                throw new Error('Failed to update certificate configuration');
-            }
-
-            // Handle deployment actions specifically since that's where we're having issues
-            if (config.deployActions !== undefined) {
-                cert.deployActions = [...config.deployActions]; // Use spread operator to clone the array
-                logger.debug(`Synchronized deployActions, now has ${cert.deployActions.length} actions`, null, FILENAME);
-            }
-
-            // Sync other properties as needed
-            if (config.name !== undefined) {
-                cert.name = config.name;
-            }
-
-            if (config.description !== undefined) {
-                cert.description = config.description;
-            }
-
-            if (config.autoRenew !== undefined) {
-                cert.autoRenew = config.autoRenew;
-            }
-
-            if (config.renewDaysBeforeExpiry !== undefined) {
-                cert.renewDaysBeforeExpiry = config.renewDaysBeforeExpiry;
-            }
-
-            if (config.signWithCA !== undefined) {
-                cert.signWithCA = config.signWithCA;
-                if (config.caFingerprint !== undefined) {
-                    cert.caFingerprint = config.caFingerprint;
-                }
-            }
-
-            if (config.group !== undefined) {
-                cert.group = config.group;
-            }
-
-            if (config.tags !== undefined) {
-                cert.tags = config.tags;
-            }
-
-            // Ensure the certificate in our map is updated
-            this.certificates.set(fingerprint, cert);
-
-            // Add notification about the change
-            this.notifyCertificateChanged(fingerprint, 'update');
-
-            return true;
-        } catch (error) {
-            logger.error(`Error updating and syncing certificate config for ${fingerprint}:`, error, FILENAME);
-            return false;
-        }
-    }
-
-    /**
      * Get a certificate by fingerprint
      * @param {string} fingerprint - Certificate fingerprint
      * @returns {Certificate} - Certificate object or null if not found
@@ -1091,14 +941,12 @@ class CertificateManager {
 
         if (this.certificates.has(cleanedFingerprint)) {
             const cert = this.certificates.get(cleanedFingerprint);
-            cert.verifyPaths();
             return cert;
         }
 
         // For backward compatibility, try with original fingerprint
         if (this.certificates.has(fingerprint)) {
             const cert = this.certificates.get(fingerprint);
-            cert.verifyPaths();
             return cert;
         }
 
@@ -1114,6 +962,7 @@ class CertificateManager {
 
         return null;
     }
+
     /**
      * Get all certificates - with caching optimizations
      * @returns {Certificate[]} Array of all certificates
@@ -1125,14 +974,13 @@ class CertificateManager {
 
     /**
      * Get all certificates with metadata - frontend optimized
-     * Avoids unnecessary filesystem checks when the cache is valid
      * @returns {Array} Array of certificate objects with metadata
      */
     getAllCertificatesWithMetadata() {
-        // If there are pending changes, only refresh those specific certificates
+        // If there are pending changes, refresh those specific certificates
         if (this.pendingChanges.size > 0) {
             logger.fine(`Refreshing ${this.pendingChanges.size} certificates with pending changes`, null, FILENAME);
-            // Use a non-blocking refresh approach to avoid delaying response
+            // Use a non-blocking refresh approach
             setTimeout(() => {
                 this.refreshCachedCertificates([...this.pendingChanges])
                     .then(count => {
@@ -1144,14 +992,42 @@ class CertificateManager {
             }, 0);
         }
 
-        // Use existing cache data immediately to improve response time    
+        // Return certificates with consistent structure using toJSON()
         return Array.from(this.certificates.values())
             .map(cert => {
-                const response = cert.toApiResponse(this.passphraseManager);
+                // Use toJSON directly for a consistent representation
+                const response = cert.toJSON();
 
                 // Add CA name if available
-                if (response.signWithCA && response.caFingerprint) {
-                    response.caName = this.getCAName(response.caFingerprint);
+                if (response.config.signWithCA && response.config.caFingerprint) {
+                    response.config.caName = this.getCAName(response.config.caFingerprint);
+                }
+
+                // Add passphrase information
+                if (this.passphraseManager) {
+                    response.hasPassphrase = this.passphraseManager.hasPassphrase(response.fingerprint);
+                }
+
+                // Add days until expiry calculation
+                if (response.validTo) {
+                    try {
+                        const validToDate = new Date(response.validTo);
+                        const now = new Date();
+                        response.daysUntilExpiry = Math.ceil((validToDate - now) / (1000 * 60 * 60 * 24));
+                    } catch (e) {
+                        logger.fine(`Error calculating days until expiry for ${response.name}: ${e.message}`, null, FILENAME);
+                    }
+                }
+
+                // Add CA passphrase information if needed
+                if (response.config.signWithCA && response.config.caFingerprint) {
+                    const signingCA = this.getCertificate(response.config.caFingerprint);
+                    if (signingCA) {
+                        response.signingCANeedsPassphrase = signingCA.needsPassphrase;
+                        response.signingCAHasPassphrase =
+                            this.passphraseManager && signingCA.fingerprint ?
+                                this.passphraseManager.hasPassphrase(signingCA.fingerprint) : false;
+                    }
                 }
 
                 return response;
@@ -1163,7 +1039,7 @@ class CertificateManager {
      * @returns {Certificate[]} Array of CA certificates
      */
     getCAcertificates() {
-        return this.getAllCertificates().filter(cert => cert.isCA());
+        return this.getAllCertificates().filter(cert => cert.isCA);
     }
 
     /**
@@ -1299,6 +1175,7 @@ class CertificateManager {
         if (!fingerprint) return null;
 
         const caCert = this.getCertificate(fingerprint);
+        logger.debug(`CA certificate name for ${fingerprint}: ${caCert ? caCert.name : 'not found'}`, null, FILENAME);
         return caCert ? caCert.name : null;
     }
 
@@ -1362,15 +1239,10 @@ class CertificateManager {
                 certPassphrase = cert.getPassphrase(this.passphraseManager);
             }
 
-            // Renew the certificate
-            const OpenSSLWrapper = require('../services/openssl-wrapper');
-            const openSSL = new OpenSSLWrapper();
-
-            const renewalResult = await cert.createOrRenew(openSSL, {
-                certsDir: this.certsDir,
-                signingCA,
+            const renewalResult = await openssl.renewWithFormatPreservation(certificate, {
+                days: 365,
                 passphrase: certPassphrase,
-                ...options
+                signingCA: parentCA
             });
 
             // Save certificate configuration
@@ -1405,6 +1277,29 @@ class CertificateManager {
             logger.error(`Error renewing and deploying certificate ${fingerprint}`, error, FILENAME);
             throw error;
         }
+    }
+
+    /**
+     * Get deployment actions for a certificate
+     * @param {string} fingerprint - Certificate fingerprint
+     * @returns {Array} Array of deployment actions or empty array if none found
+     */
+    getDeploymentActions(fingerprint) {
+        const cert = this.getCertificate(fingerprint);
+        if (!cert) {
+            logger.warn(`Cannot get deployment actions: Certificate not found: ${fingerprint}`, null, FILENAME);
+            return [];
+        }
+
+        // Access the deployment actions directly from _config.deployActions
+        if (cert._config && Array.isArray(cert._config.deployActions)) {
+            logger.debug(`Found ${cert._config.deployActions.length} deployment actions`, null, FILENAME);
+            return [...cert._config.deployActions];
+        }
+
+        // If no deployment actions found, return empty array
+        logger.debug(`No deployment actions found for certificate ${fingerprint}`, null, FILENAME);
+        return [];
     }
 
     /**
@@ -1481,6 +1376,220 @@ class CertificateManager {
     }
 
     /**
+     * Create or renew a certificate
+     * @param {string} fingerprint - Certificate fingerprint (for renewal)
+     * @param {Object} options - Creation/renewal options
+     * @returns {Promise<Object>} Result of the operation
+     */
+    async createOrRenewCertificate(fingerprint, options = {}) {
+        // If fingerprint is provided, it's a renewal
+        const isRenewal = !!fingerprint;
+
+        let certificate;
+
+        if (isRenewal) {
+            certificate = this.getCertificate(fingerprint);
+            if (!certificate) {
+                return { success: false, error: 'Certificate not found' };
+            }
+        } else {
+            // Creating new certificate
+            certificate = new Certificate(options.name || 'New Certificate');
+            // Initialize certificate properties
+            this._initializeNewCertificate(certificate, options);
+        }
+
+        // Perform the actual creation/renewal logic
+        const result = await this._performCertificateCreation(certificate, options);
+
+        // If successful, add to certificates and save config
+        if (result.success) {
+            this.certificates.set(certificate.fingerprint, certificate);
+            await this.saveCertificateConfigs();
+            this.notifyCertificateChanged(certificate.fingerprint, isRenewal ? 'update' : 'create');
+        }
+
+        return result;
+    }
+
+    /**
+     * Initialize a new certificate with the provided options
+     * @param {Certificate} certificate - Certificate object to initialize
+     * @param {Object} options - Certificate options from request
+     * @private
+     */
+    _initializeNewCertificate(certificate, options) {
+        // Extract certificate info from options
+        const certInfo = options.certificate || {};
+
+        // Set certificate properties from options
+        if (certInfo.name) certificate.name = certInfo.name;
+        if (certInfo.subject) certificate.subject = certInfo.subject;
+        if (certInfo.description) certificate.description = certInfo.description;
+
+        // Set certificate type
+        certificate.certType = certInfo.certType || 'standard';
+
+        // Set key properties
+        certificate.keyType = certInfo.keyType || 'RSA';
+        certificate.keySize = certInfo.keySize || 2048;
+
+        // Initialize domains and IPs
+        if (Array.isArray(certInfo.domains)) {
+            certificate.sans.domains = [...certInfo.domains];
+        } else if (certInfo.commonName) {
+            certificate.sans.domains = [certInfo.commonName];
+        }
+
+        if (Array.isArray(certInfo.ips)) {
+            certificate.sans.ips = [...certInfo.ips];
+        }
+
+        // Set configuration
+        if (certInfo.autoRenew !== undefined) certificate.config.autoRenew = certInfo.autoRenew;
+        if (certInfo.renewDaysBeforeExpiry) certificate.config.renewDaysBeforeExpiry = certInfo.renewDaysBeforeExpiry;
+
+        // Set CA signing information
+        certificate.config.signWithCA = certInfo.signWithCA || false;
+        certificate.config.caFingerprint = certInfo.caFingerprint || null;
+
+        // Generate paths in a proper location
+        certificate.generatePaths(path.join(this.certsDir, certificate.name.replace(/[^a-zA-Z0-9-_]/g, '_')));
+
+        logger.debug(`Initialized new certificate: ${certificate.name}`, null, FILENAME);
+    }
+
+    /**
+     * Perform the actual certificate creation or renewal using OpenSSL
+     * @param {Certificate} certificate - Certificate to create or renew
+     * @param {Object} options - Creation/renewal options
+     * @returns {Promise<Object>} Result object with creation/renewal results
+     * @private
+     */
+    async _performCertificateCreation(certificate, options) {
+        try {
+            // Get options
+            const days = options.days || 365;
+            const passphrase = options.passphrase;
+
+            // Get signing CA if provided
+            let signingCA = null;
+            let signingCAPassphrase = null;
+
+            if (certificate.config.signWithCA && certificate.config.caFingerprint) {
+                // If specific CA is provided in options, use that
+                if (options.signingCA) {
+                    signingCA = options.signingCA;
+                    signingCAPassphrase = options.signingCAPassphrase;
+                } else {
+                    // Otherwise, look up the CA by fingerprint
+                    signingCA = this.getCertificate(certificate.config.caFingerprint);
+                    if (signingCA && signingCA.needsPassphrase && this.passphraseManager) {
+                        signingCAPassphrase = this.passphraseManager.getPassphrase(signingCA.fingerprint);
+                    }
+                }
+
+                if (!signingCA) {
+                    logger.warn(`Signing CA not found: ${certificate.config.caFingerprint}`, null, FILENAME);
+                    return { success: false, error: 'Signing CA certificate not found' };
+                }
+            }
+
+            // Make sure certificate has valid paths
+            if (!certificate.paths || !certificate.paths.crtPath || !certificate.paths.keyPath) {
+                certificate.generatePaths(path.join(this.certsDir, certificate.name.replace(/[^a-zA-Z0-9-_]/g, '_')));
+            }
+
+            // Create directory if it doesn't exist
+            const certDir = path.dirname(certificate.paths.crtPath);
+            if (!fs.existsSync(certDir)) {
+                fs.mkdirSync(certDir, { recursive: true });
+                logger.debug(`Created certificate directory: ${certDir}`, null, FILENAME);
+            }
+
+            // Prepare OpenSSL configuration
+            const config = {
+                certPath: certificate.paths.crtPath,
+                keyPath: certificate.paths.keyPath,
+                subject: certificate.subject || `CN=${certificate.sans.domains[0] || certificate.name}`,
+                days: days,
+                keyType: certificate.keyType || 'RSA',
+                keySize: certificate.keySize || 2048,
+                passphrase: passphrase,
+                sans: {
+                    domains: certificate.sans.domains,
+                    ips: certificate.sans.ips
+                },
+                isCA: certificate.certType === 'rootCA' || certificate.certType === 'intermediateCA',
+                pathLengthConstraint: certificate.certType === 'rootCA' ? -1 : 0,
+            };
+
+            // If we have a signing CA, add it to the config
+            if (signingCA && signingCA.paths && signingCA.paths.crtPath && signingCA.paths.keyPath) {
+                // Add validation for CA paths
+                const absoluteCertPath = path.isAbsolute(signingCA.paths.crtPath) ?
+                    signingCA.paths.crtPath : path.resolve(this.certsDir, signingCA.paths.crtPath);
+
+                const absoluteKeyPath = path.isAbsolute(signingCA.paths.keyPath) ?
+                    signingCA.paths.keyPath : path.resolve(this.certsDir, signingCA.paths.keyPath);
+
+                // Check if files exist at the calculated absolute paths
+                if (!fs.existsSync(absoluteCertPath)) {
+                    logger.error(`CA certificate file not found: ${absoluteCertPath}`, null, FILENAME);
+                    return { success: false, error: `CA certificate file not found: ${absoluteCertPath}` };
+                }
+
+                if (!fs.existsSync(absoluteKeyPath)) {
+                    logger.error(`CA key file not found: ${absoluteKeyPath}`, null, FILENAME);
+                    return { success: false, error: `CA key file not found: ${absoluteKeyPath}` };
+                }
+
+                config.signingCA = {
+                    certPath: absoluteCertPath,
+                    keyPath: absoluteKeyPath,
+                    passphrase: signingCAPassphrase
+                };
+                logger.debug(`Using signing CA: ${signingCA.name} with absolute paths`, config.signingCA, FILENAME);
+            }
+
+            // Create or renew certificate with OpenSSL
+            logger.info(`${certificate.fingerprint ? 'Renewing' : 'Creating'} certificate: ${certificate.name}`, null, FILENAME);
+
+            const result = await this.openssl.createOrRenewCertificate(config);
+
+            if (result.success) {
+                // Update certificate with results from OpenSSL
+                if (result.fingerprint) certificate.fingerprint = result.fingerprint;
+                if (result.subject) certificate.subject = result.subject;
+                if (result.issuer) certificate.issuer = result.issuer;
+                if (result.validFrom) certificate.validFrom = result.validFrom;
+                if (result.validTo) certificate.validTo = result.validTo;
+                if (result.serialNumber) certificate.serialNumber = result.serialNumber;
+                if (result.keyType) certificate.keyType = result.keyType;
+                if (result.keySize) certificate.keySize = result.keySize;
+                if (result.sigAlg) certificate.sigAlg = result.sigAlg;
+
+                // Store passphrase if provided and not empty
+                if (passphrase && this.passphraseManager) {
+                    this.passphraseManager.storePassphrase(certificate.fingerprint, passphrase);
+                    certificate.needsPassphrase = true;
+                    certificate.updatePassphraseStatus(this.passphraseManager);
+                    logger.debug(`Stored passphrase for certificate: ${certificate.name}`, null, FILENAME);
+                }
+
+                logger.info(`Certificate ${certificate.fingerprint ? 'renewed' : 'created'} successfully: ${certificate.name} (${certificate.fingerprint})`, null, FILENAME);
+            } else {
+                logger.error(`Failed to ${certificate.fingerprint ? 'renew' : 'create'} certificate: ${result.error}`, null, FILENAME);
+            }
+
+            return result;
+        } catch (error) {
+            logger.error(`Error ${certificate.fingerprint ? 'renewing' : 'creating'} certificate ${certificate.name}:`, error, FILENAME);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Create a backup of a certificate
      * @param {string} fingerprint - Certificate fingerprint
      * @returns {Promise<Object>} Created backup object
@@ -1492,10 +1601,10 @@ class CertificateManager {
                 throw new Error(`Certificate with fingerprint ${fingerprint} not found`);
             }
 
-            // Define backup directory
-            // Fix: Use this.certsDir instead of this.certPath
-            const certDir = path.join(this.certsDir, fingerprint);
-            const backupsDir = path.join(certDir, 'backups');
+            // Define backup directory - Don't use fingerprint as a directory name
+            const certName = certificate.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+            const certDir = path.join(this.certsDir, 'backups', certName);
+            const backupsDir = path.join(certDir, new Date().toISOString().replace(/:/g, '-'));
 
             // Create directory if it doesn't exist
             if (!fs.existsSync(backupsDir)) {
@@ -1632,148 +1741,6 @@ class CertificateManager {
     }
 
     /**
-     * Save certificate config to JSON file
-     * @param {string} fingerprint - Certificate fingerprint
-     * @param {Certificate} certificate - Certificate object
-     * @returns {Promise<void>}
-     */
-    async saveCertificateConfig(fingerprint, certificate) {
-        try {
-            const config = await this.loadCertificatesConfig();
-
-            // Make sure the certificate exists in config
-            if (!config.certificates[fingerprint]) {
-                config.certificates[fingerprint] = {
-                    autoRenew: false,
-                    renewDaysBeforeExpiry: 30,
-                    signWithCA: false,
-                    caFingerprint: null,
-                    keyType: certificate.keyType,
-                    keySize: certificate.keySize,
-                    sigAlg: certificate.sigAlg,
-                    deployActions: [],
-                    previousVersions: {},
-                    metadata: {}
-                };
-            }
-
-            // Update metadata
-            config.certificates[fingerprint].metadata = {
-                name: certificate.name,
-                subject: certificate.subject,
-                issuer: certificate.issuer,
-                validFrom: certificate.validFrom,
-                validTo: certificate.validTo,
-                certType: certificate.certType,
-                domains: certificate.domains,
-                ips: certificate.ips || []
-            };
-
-            // Add paths object if it doesn't exist
-            if (!config.certificates[fingerprint].paths) {
-                config.certificates[fingerprint].paths = {};
-            }
-
-            // Save only paths for files that actually exist
-            const fs = require('fs');
-            const paths = {};
-
-            if (certificate._pathes) {
-                Object.entries(certificate._pathes).forEach(([key, path]) => {
-                    if (path && fs.existsSync(path)) {
-                        // Save path without the key suffix "Path"
-                        const cleanKey = key.endsWith('Path') ? key.slice(0, -4) : key;
-                        paths[cleanKey] = path;
-                    }
-                });
-            }
-
-            // Update paths in config
-            config.certificates[fingerprint].paths = paths;
-
-            // Save the config
-            await fs.promises.writeFile(
-                this.configPath,
-                JSON.stringify(config, null, 2),
-                'utf8'
-            );
-        } catch (error) {
-            this.logger.error(`Failed to save certificate config for ${fingerprint}:`, error, FILENAME);
-            throw error;
-        }
-    }
-
-    /**
-     * Load certificate from the filesystem
-     * @param {string} fingerprint - Certificate fingerprint
-     * @returns {Certificate} Certificate object
-     */
-    loadCertificate(fingerprint) {
-        try {
-            // First, make sure we have loaded the config file
-            if (!this.certificatesConfig) {
-                // Load certificates config once
-                try {
-                    const configContent = fs.readFileSync(this.configPath, 'utf8');
-                    this.certificatesConfig = JSON.parse(configContent);
-                } catch (error) {
-                    logger.warn(`No certificates config found at ${this.configPath}`, null, FILENAME);
-                    this.certificatesConfig = { certificates: {} };
-                }
-            }
-
-            // Exit if certificate not found in config
-            if (!this.certificatesConfig.certificates?.[fingerprint]) {
-                return null;
-            }
-
-            const certConfig = this.certificatesConfig.certificates[fingerprint];
-            const certMetadata = certConfig.metadata || {};
-
-            // Create certificate with basic details
-            const Certificate = require('./Certificate');
-            const cert = new Certificate();
-            cert.name = certMetadata.name || '';
-            cert.fingerprint = fingerprint;
-            cert.subject = certMetadata.subject || '';
-            cert.issuer = certMetadata.issuer || '';
-
-            cert.validFrom = certMetadata.validFrom || '';
-            cert.validTo = certMetadata.validTo || '';
-            cert.certType = certMetadata.certType || 'standard';
-            cert.domains = certMetadata.domains || [];
-            cert.ips = certMetadata.ips || [];
-
-            // Set certificate configuration
-            cert.autoRenew = certConfig.autoRenew || false;
-            cert.renewDaysBeforeExpiry = certConfig.renewDaysBeforeExpiry || 30;
-            cert.signWithCA = certConfig.signWithCA || false;
-            cert.caFingerprint = certConfig.caFingerprint || null;
-
-            // Load paths from config if available
-            if (certConfig.paths) {
-                // Need to convert the paths from certConfig format to _pathes format
-                const paths = {};
-                Object.entries(certConfig.paths).forEach(([key, path]) => {
-                    // For each key, add "Path" suffix if missing
-                    const pathKey = key.endsWith('Path') ? key : `${key}Path`;
-                    paths[pathKey] = path;
-                });
-                cert.loadPaths(paths);
-            } else {
-                // Fall back to generating paths
-                const certDir = path.join(this.certsDir, fingerprint);
-                cert.generatePaths(certDir);
-            }
-
-            return cert;
-        } catch (error) {
-            logger.error(`Failed to load certificate ${fingerprint}:`, error, FILENAME);
-            return null;
-        }
-    }
-
-    /**
      * Get certificate config from certificates.json
      * @param {string} fingerprint - Certificate fingerprint
      * @returns {Object} Certificate configuration
@@ -1801,6 +1768,48 @@ class CertificateManager {
         } catch (error) {
             logger.error(`Error getting certificate config for ${fingerprint}:`, error, FILENAME);
             return {};
+        }
+    }
+
+    /**
+     * Save certificate config to JSON file
+     * @param {string} fingerprint - Certificate fingerprint
+     * @param {Certificate} certificate - Certificate object
+     * @returns {Promise<void>}
+     */
+    async saveCertificateConfig(fingerprint, certificate) {
+        try {
+            // Create default config structure if it doesn't exist yet
+            if (!this.certificatesConfig) {
+                this.certificatesConfig = {
+                    version: 1,
+                    lastUpdate: new Date().toISOString(),
+                    certificates: {}
+                };
+            }
+
+            // Ensure certificates object exists
+            if (!this.certificatesConfig.certificates) {
+                this.certificatesConfig.certificates = {};
+            }
+
+            // Get the complete JSON representation directly from the certificate
+            const certJson = certificate.toJSON();
+
+            // Store the entire certificate data as returned by toJSON()
+            this.certificatesConfig.certificates[fingerprint] = certJson;
+
+            // Save the config
+            await fs.promises.writeFile(
+                this.configPath,
+                JSON.stringify(this.certificatesConfig, null, 2),
+                'utf8'
+            );
+
+            logger.debug(`Saved certificate config for ${certificate.name} (${fingerprint})`, null, FILENAME);
+        } catch (error) {
+            logger.error(`Failed to save certificate config for ${fingerprint}:`, error, FILENAME);
+            // Don't throw the error to prevent cascading failures
         }
     }
 
@@ -1884,6 +1893,203 @@ class CertificateManager {
         } catch (error) {
             logger.error(`Error updating certificate paths for ${fingerprint}:`, error, FILENAME);
             return false;
+        }
+    }
+
+    /**
+     * Update certificates metadata in config
+     * @returns {Promise<boolean>} Success status
+     */
+    async updateCertificatesMetadata() {
+        try {
+            // Load config
+            await this.loadConfig();
+
+            // Update metadata for each certificate in config
+            const certificatesConfig = this.certificatesConfig.certificates || {};
+
+            for (const [fingerprint, certificate] of this.certificates.entries()) {
+                if (!certificatesConfig[fingerprint]) {
+                    certificatesConfig[fingerprint] = {};
+                }
+
+                // Ensure metadata object exists
+                if (!certificatesConfig[fingerprint].metadata) {
+                    certificatesConfig[fingerprint].metadata = {};
+                }
+
+                // Update metadata fields
+                certificatesConfig[fingerprint].metadata = {
+                    name: certificate.name,
+                    subject: certificate.subject,
+                    issuer: certificate.issuer,
+                    validFrom: certificate.validFrom,
+                    validTo: certificate.validTo,
+                    certType: certificate.certType,
+                    domains: [...certificate.domains],
+                    ips: [...certificate.ips]
+                };
+
+                // Update paths
+                if (!certificatesConfig[fingerprint].paths) {
+                    certificatesConfig[fingerprint].paths = {};
+                }
+
+                // Convert paths from certificate (removing Path suffix)
+                const paths = certificate.paths;
+                if (paths) {
+                    Object.entries(paths).forEach(([key, value]) => {
+                        if (value) {
+                            const cleanKey = key.endsWith('Path') ? key.slice(0, -4) : key;
+                            certificatesConfig[fingerprint].paths[cleanKey] = value;
+                        }
+                    });
+                }
+            }
+
+            // Save the updated config
+            await this.saveConfig();
+
+            return true;
+        } catch (error) {
+            logger.error('Failed to update certificate metadata:', error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Update a certificate with its issuer CA fingerprint
+     * @param {Certificate} certificate - Certificate to update
+     * @returns {Promise<boolean>} - Whether the certificate was updated
+     */
+    async updateCertificateCAFingerprint(certificate) {
+        try {
+            if (!certificate || !certificate.issuer) {
+                return false;
+            }
+
+            // Skip self-signed certificates
+            if (this._isSelfSigned(certificate.subject, certificate.issuer)) {
+                logger.debug(`${certificate.name} is self-signed, not updating caFingerprint`, null, FILENAME);
+                return false;
+            }
+
+            // Get all CA certificates
+            const caCerts = this.getAllCertificates().filter(cert => cert.isCA());
+
+            if (caCerts.length === 0) {
+                logger.debug(`No CA certificates found to match as issuer`, null, FILENAME);
+                return false;
+            }
+
+            // Find CA where subject matches this certificate's issuer
+            const issuerCA = caCerts.find(ca => {
+                // Compare normalized subjects to handle format variations
+                const normalizeString = str => {
+                    const components = [];
+                    const regex = /(C|ST|L|O|OU|CN)\s*=\s*([^,/]+)/gi;
+                    let match;
+                    while (match = regex.exec(str)) {
+                        components.push({ key: match[1].toUpperCase(), value: match[2].trim() });
+                    }
+                    components.sort((a, b) => a.key.localeCompare(b.key));
+                    return components.map(c => `${c.key}=${c.value}`).join(', ');
+                };
+
+                return normalizeString(ca.subject) === normalizeString(certificate.issuer);
+            });
+
+            if (issuerCA) {
+                logger.debug(`Found signing CA for ${certificate.name}: ${issuerCA.name} (${issuerCA.fingerprint})`, null, FILENAME);
+
+                // Only update if different
+                if (certificate.caFingerprint !== issuerCA.fingerprint) {
+                    certificate.caFingerprint = issuerCA.fingerprint;
+                    certificate.signWithCA = true;
+
+                    // Save the updated certificate configuration
+                    await this.saveCertificateConfigs();
+
+                    logger.debug(`Updated caFingerprint for ${certificate.name} to ${issuerCA.fingerprint}`, null, FILENAME);
+                    return true;
+                }
+            } else {
+                logger.info(`Could not find a matching CA for issuer: ${certificate.issuer}`, null, FILENAME);
+            }
+
+            return false;
+        } catch (error) {
+            logger.error(`Error updating CA fingerprint for ${certificate.name}:`, error, FILENAME);
+            return false;
+        }
+    }
+
+    /**
+     * Update certificate CA relationships using key identifiers
+     * @returns {Promise<void>}
+     */
+    async updateCertificateCARelationships() {
+        logger.info('Updating certificate CA relationships', null, FILENAME);
+
+        try {
+            // Get all certificates
+            const allCerts = Array.from(this.certificates.values());
+            const caCount = allCerts.filter(cert => cert.isRootCA || cert.certType === 'intermediateCA').length;
+
+            logger.debug(`Found ${allCerts.length} certificates, including ${caCount} CA certificates`, null, FILENAME);
+
+            // Track updates for logging
+            let updatedCount = 0;
+            let missingCACount = 0;
+
+            // Process each certificate that isn't self-signed
+            for (const cert of allCerts) {
+                // Skip self-signed certificates
+                if (cert.selfSigned || cert.isRootCA) {
+                    logger.finest(`Skipping self-signed certificate: ${cert.name}`, null, FILENAME);
+                    continue;
+                }
+
+                // For each certificate, try to find its signing CA
+                const signingCA = cert.findSigningCA(this);
+
+                if (signingCA) {
+                    logger.fine(`Found signing CA for ${cert.name}: ${signingCA.name} (${signingCA.fingerprint})`, null, FILENAME);
+
+                    // Update certificate config with CA info
+                    const previousCA = cert._config?.caFingerprint;
+                    cert._config.signWithCA = true;
+                    cert._config.caFingerprint = signingCA.fingerprint;
+                    cert._config.caName = signingCA.name;
+
+                    // Track if this was a change
+                    if (previousCA !== signingCA.fingerprint) {
+                        updatedCount++;
+                        logger.info(`Updated CA reference for ${cert.name}: ${signingCA.name}`, null, FILENAME);
+                    }
+                } else {
+                    missingCACount++;
+                    logger.warn(`Could not find signing CA for ${cert.name}`, null, FILENAME);
+
+                    // Clear CA info if we couldn't find a signing CA
+                    if (cert._config?.signWithCA) {
+                        cert._config.signWithCA = false;
+                        cert._config.caFingerprint = null;
+                        cert._config.caName = null;
+                        updatedCount++;
+                        logger.info(`Cleared invalid CA reference for ${cert.name}`, null, FILENAME);
+                    }
+                }
+            }
+
+            logger.info(`Certificate CA relationship update complete: updated ${updatedCount}, missing CAs: ${missingCACount}`, null, FILENAME);
+
+            if (updatedCount > 0) {
+                // Save updated configurations
+                await this.saveCertificateConfigs();
+            }
+        } catch (error) {
+            logger.error('Error updating certificate CA relationships:', error, FILENAME);
         }
     }
 
@@ -2179,7 +2385,7 @@ class CertificateManager {
     }
 
     /**
-     * Scan certificate directory and update metadata
+     * Rescan certificates directory and update certificates
      * @returns {Promise<Map<string, Certificate>>} Updated certificates map
      */
     async rescanCertificates() {
@@ -2187,12 +2393,12 @@ class CertificateManager {
 
         try {
             // Find all certificate files
-            const certFiles = await this.findCertificateFiles(this.certsDir);
+            const certFiles = await this.findCertificateFiles();
             logger.debug(`Found ${certFiles.length} certificate files`, null, FILENAME);
 
             // Process each certificate file
             const processedCerts = new Map();
-            const existingFingerprints = new Set(this.certs.keys());
+            const existingFingerprints = new Set(this.certificates.keys());
 
             // Process each certificate file
             for (const certFile of certFiles) {
@@ -2214,34 +2420,19 @@ class CertificateManager {
                         // Update existing certificate
                         cert = this.certificates.get(fingerprint);
 
-                        // Update certificate data with new parsed data
-                        cert.subject = certData.subject || cert.subject;
-                        cert.issuer = certData.issuer || cert.issuer;
-                        cert.validFrom = certData.validFrom || cert.validFrom;
-                        cert.validTo = certData.validTo || cert.validTo;
-                        cert.certType = certData.certType || cert.certType;
-
-                        // Update domains and IPs while preserving existing ones
-                        if (certData.san && certData.domains && certData.domains.length > 0) {
-                            // If certificate has domains in SAN, update them
-                            cert.domains = certData.domains;
-                        }
-
-                        if (certData.san && certData.ips && certData.ips.length > 0) {
-                            // If certificate has IPs in SAN, update them
-                            cert.ips = certData.ips;
-                        }
-
-                        // Update paths
-                        Object.entries(certData.paths).forEach(([key, value]) => {
-                            if (value) cert.paths[key] = value;
-                        });
-
+                        // Update certificate with new data using updateFromData method
+                        cert.updateFromData(certData, { preserveConfig: true });
                         logger.debug(`Updated existing certificate: ${cert.name} (${fingerprint})`, null, FILENAME);
                     } else {
-                        // Create new certificate object
+                        // Create new certificate object with Certificate constructor
                         const Certificate = require('./Certificate');
-                        cert = new Certificate(certData);
+                        cert = new Certificate({
+                            name: certData.name || path.basename(certFile, path.extname(certFile)),
+                            fingerprint: certData.fingerprint
+                        });
+
+                        // Initialize with all data
+                        cert.updateFromData(certData, { preserveConfig: false });
                         logger.debug(`Created new certificate: ${cert.name} (${fingerprint})`, null, FILENAME);
                     }
 
@@ -2275,67 +2466,6 @@ class CertificateManager {
         } catch (error) {
             logger.error('Error scanning certificates:', error, FILENAME);
             throw error;
-        }
-    }
-
-    /**
-     * Update certificates metadata in config
-     * @returns {Promise<boolean>} Success status
-     */
-    async updateCertificatesMetadata() {
-        try {
-            // Load config
-            await this.loadConfig();
-
-            // Update metadata for each certificate in config
-            const certificatesConfig = this.certificatesConfig.certificates || {};
-
-            for (const [fingerprint, certificate] of this.certificates.entries()) {
-                if (!certificatesConfig[fingerprint]) {
-                    certificatesConfig[fingerprint] = {};
-                }
-
-                // Ensure metadata object exists
-                if (!certificatesConfig[fingerprint].metadata) {
-                    certificatesConfig[fingerprint].metadata = {};
-                }
-
-                // Update metadata fields
-                certificatesConfig[fingerprint].metadata = {
-                    name: certificate.name,
-                    subject: certificate.subject,
-                    issuer: certificate.issuer,
-                    validFrom: certificate.validFrom,
-                    validTo: certificate.validTo,
-                    certType: certificate.certType,
-                    domains: [...certificate.domains],
-                    ips: [...certificate.ips]
-                };
-
-                // Update paths
-                if (!certificatesConfig[fingerprint].paths) {
-                    certificatesConfig[fingerprint].paths = {};
-                }
-
-                // Convert paths from certificate (removing Path suffix)
-                const paths = certificate.paths;
-                if (paths) {
-                    Object.entries(paths).forEach(([key, value]) => {
-                        if (value) {
-                            const cleanKey = key.endsWith('Path') ? key.slice(0, -4) : key;
-                            certificatesConfig[fingerprint].paths[cleanKey] = value;
-                        }
-                    });
-                }
-            }
-
-            // Save the updated config
-            await this.saveConfig();
-
-            return true;
-        } catch (error) {
-            logger.error('Failed to update certificate metadata:', error, FILENAME);
-            return false;
         }
     }
 
@@ -2379,73 +2509,6 @@ class CertificateManager {
 
         // Always return the current cache state immediately
         return this.getAllCertificatesWithMetadata();
-    }
-
-    /**
-     * Update a certificate with its issuer CA fingerprint
-     * @param {Certificate} certificate - Certificate to update
-     * @returns {Promise<boolean>} - Whether the certificate was updated
-     */
-    async updateCertificateCAFingerprint(certificate) {
-        try {
-            if (!certificate || !certificate.issuer) {
-                return false;
-            }
-
-            // Skip self-signed certificates
-            if (this._isSelfSigned(certificate.subject, certificate.issuer)) {
-                logger.debug(`${certificate.name} is self-signed, not updating caFingerprint`, null, FILENAME);
-                return false;
-            }
-
-            // Get all CA certificates
-            const caCerts = this.getAllCertificates().filter(cert => cert.isCA());
-
-            if (caCerts.length === 0) {
-                logger.debug(`No CA certificates found to match as issuer`, null, FILENAME);
-                return false;
-            }
-
-            // Find CA where subject matches this certificate's issuer
-            const issuerCA = caCerts.find(ca => {
-                // Compare normalized subjects to handle format variations
-                const normalizeString = str => {
-                    const components = [];
-                    const regex = /(C|ST|L|O|OU|CN)\s*=\s*([^,/]+)/gi;
-                    let match;
-                    while (match = regex.exec(str)) {
-                        components.push({ key: match[1].toUpperCase(), value: match[2].trim() });
-                    }
-                    components.sort((a, b) => a.key.localeCompare(b.key));
-                    return components.map(c => `${c.key}=${c.value}`).join(', ');
-                };
-
-                return normalizeString(ca.subject) === normalizeString(certificate.issuer);
-            });
-
-            if (issuerCA) {
-                logger.info(`Found signing CA for ${certificate.name}: ${issuerCA.name} (${issuerCA.fingerprint})`, null, FILENAME);
-
-                // Only update if different
-                if (certificate.caFingerprint !== issuerCA.fingerprint) {
-                    certificate.caFingerprint = issuerCA.fingerprint;
-                    certificate.signWithCA = true;
-
-                    // Save the updated certificate configuration
-                    await this.saveCertificateConfigs();
-
-                    logger.debug(`Updated caFingerprint for ${certificate.name} to ${issuerCA.fingerprint}`, null, FILENAME);
-                    return true;
-                }
-            } else {
-                logger.debug(`Could not find a matching CA for issuer: ${certificate.issuer}`, null, FILENAME);
-            }
-
-            return false;
-        } catch (error) {
-            logger.error(`Error updating CA fingerprint for ${certificate.name}:`, error, FILENAME);
-            return false;
-        }
     }
 
     /**
@@ -2513,88 +2576,196 @@ class CertificateManager {
     }
 
     /**
-     * Get certificate API response without OpenSSL operations
+     * Get formatted certificate data for API response
      * @param {string} fingerprint - Certificate fingerprint
-     * @returns {Object} Enhanced certificate API response
+     * @param {object} [options={}] - Options for response generation
+     * @param {boolean} [options.includePaths=true] - Whether to include file paths
+     * @param {boolean} [options.includeConfig=true] - Whether to include configuration
+     * @param {boolean} [options.includeHistory=false] - Whether to include version history
+     * @returns {object|null} Certificate data or null if not found
      */
-    getCertificateApiResponse(fingerprint) {
-        logger.finest(`Getting API response for certificate fingerprint: ${fingerprint}`, null, FILENAME);
+    getCertificateApiResponse(fingerprint, options = {}) {
+        const includePaths = options.includePaths !== false;
+        const includeConfig = options.includeConfig !== false;
+        const includeHistory = options.includeHistory === true;
 
-        try {
-            // Validate input
-            if (!fingerprint) {
-                logger.warn(`Invalid fingerprint provided: ${fingerprint}`, null, FILENAME);
-                return null;
-            }
+        logger.fine(`Getting API response for certificate ${fingerprint}`, null, FILENAME);
 
-            // Find certificate
-            const certificate = this.getCertificate(fingerprint);
-            if (!certificate) {
-                logger.warn(`Certificate not found with fingerprint: ${fingerprint}`, null, FILENAME);
-                return null;
-            }
-
-            logger.fine(`Found certificate: ${certificate.name} (${certificate.fingerprint})`, null, FILENAME);
-
-            // Get basic API response - no OpenSSL operation here
-            logger.debug(`Building API response for certificate: ${certificate.name}`, null, FILENAME);
-            let response;
-            try {
-                response = certificate.toApiResponse(this.passphraseManager);
-                logger.finest(`Base response created with ${Object.keys(response).length} properties`, null, FILENAME);
-            } catch (apiError) {
-                logger.error(`Error creating base API response for certificate ${certificate.name}:`, apiError, FILENAME);
-                throw new Error(`Failed to create API response: ${apiError.message}`);
-            }
-
-            // Add CA name if available
-            if (response.signWithCA && response.caFingerprint) {
-                logger.debug(`Certificate is signed by CA with fingerprint: ${response.caFingerprint}`, null, FILENAME);
-                try {
-                    response.caName = this.getCAName(response.caFingerprint);
-                    logger.debug(`Found CA name: ${response.caName || 'Unknown CA'}`, null, FILENAME);
-                } catch (caError) {
-                    logger.warn(`Error getting CA name for fingerprint ${response.caFingerprint}:`, caError, FILENAME);
-                    response.caName = 'Unknown CA';
-                }
-            }
-
-            // All passphrase checks happen on certificate loading, not during API response
-            if (response.signWithCA && response.caFingerprint) {
-                const signingCA = this.getCertificate(response.caFingerprint);
-                if (signingCA) {
-                    response.signingCANeedsPassphrase = signingCA.needsPassphrase || false;
-                    response.signingCAHasPassphrase = signingCA.hasStoredPassphrase(this.passphraseManager);
-                }
-            }
-
-            // Add certificate deployment actions count
-            const deployActionsCount = Array.isArray(certificate.deployActions) ? certificate.deployActions.length : 0;
-            logger.finest(`Certificate has ${deployActionsCount} deployment actions configured`, null, FILENAME);
-
-            // Check if certificate has previous versions
-            const previousVersionsCount = certificate._previousVersions ? Object.keys(certificate._previousVersions).length : 0;
-            response.hasPreviousVersions = previousVersionsCount > 0;
-            logger.finest(`Certificate has ${previousVersionsCount} previous versions`, null, FILENAME);
-
-            // Calculate days until expiry for API response
-            try {
-                if (response.validTo) {
-                    const validToDate = new Date(response.validTo);
-                    const now = new Date();
-                    const daysUntilExpiry = Math.ceil((validToDate - now) / (1000 * 60 * 60 * 24));
-                    response.daysUntilExpiry = daysUntilExpiry;
-                    logger.finest(`Certificate expires in ${daysUntilExpiry} days`, null, FILENAME);
-                }
-            } catch (dateError) {
-                logger.warn(`Error calculating days until expiry:`, dateError, FILENAME);
-            }
-
-            logger.debug(`API response preparation complete for certificate: ${certificate.name}`, null, FILENAME);
-            return response;
-        } catch (error) {
-            logger.error(`Failed to generate API response for certificate ${fingerprint}:`, error, FILENAME);
+        // Get the certificate by fingerprint
+        const certificate = this.getCertificate(fingerprint);
+        if (!certificate) {
+            logger.warn(`Certificate not found with fingerprint: ${fingerprint}`, null, FILENAME);
             return null;
+        }
+
+        // Check if certificate has a stored passphrase if we have a passphrase manager
+        const hasPassphrase = certificate._hasPassphrase !== undefined ?
+            certificate._hasPassphrase :
+            certificate.hasStoredPassphrase(this.passphraseManager);
+
+        // Calculate days until expiry
+        const daysUntilExpiry = certificate.daysUntilExpiry();
+
+        // Determine if certificate is expiring soon or expired
+        const isExpired = certificate.isExpired();
+        const isExpiringSoon = certificate.isExpiringSoon(certificate.renewDaysBeforeExpiry);
+
+        // Get basic JSON representation from certificate
+        const baseData = certificate.toJSON();
+
+        // Create API response with all necessary fields
+        const response = {
+            name: baseData.name,
+            fingerprint: baseData.fingerprint,
+            subject: baseData.subject,
+            issuer: baseData.issuer,
+            validFrom: baseData.validFrom,
+            validTo: baseData.validTo,
+            description: baseData.description || '',
+            certType: baseData.certType,
+            keyType: baseData.keyType,
+            keySize: baseData.keySize,
+            sigAlg: baseData.sigAlg || '',
+            sans: baseData.sans,
+            isExpired,
+            isExpiringSoon,
+            daysUntilExpiry,
+            needsPassphrase: baseData.needsPassphrase,
+            hasPassphrase: hasPassphrase,
+            modificationTime: baseData.modificationTime
+        };
+
+        // Add paths if requested
+        if (includePaths) {
+            response.paths = baseData.paths || {};
+        }
+
+        // Add configuration if requested
+        if (includeConfig) {
+            response.config = {
+                autoRenew: baseData.config.autoRenew,
+                renewDaysBeforeExpiry: baseData.config.renewDaysBeforeExpiry,
+                signWithCA: baseData.config.signWithCA,
+                caFingerprint: baseData.config.caFingerprint,
+                deployActions: baseData.config.deployActions || []
+            };
+        }
+
+        // Add history if requested
+        if (includeHistory) {
+            const previousVersions = certificate.getPreviousVersions();
+            response.previousVersions = previousVersions.map(pv => ({
+                fingerprint: pv.fingerprint,
+                archivedAt: pv.archivedAt,
+                version: pv.version
+            }));
+        }
+
+        // Add ACME settings if they exist
+        if (baseData.acmeSettings) {
+            response.acmeSettings = baseData.acmeSettings;
+        }
+
+        // Add CA information if available
+        if (baseData.config.caFingerprint && this.certificates.has(baseData.config.caFingerprint)) {
+            response.config.caName = this.getCAName(baseData.config.caFingerprint);
+        }
+
+        logger.debug(`Generated API response for certificate ${baseData.name}`, null, FILENAME);
+        return response;
+    }
+
+    /**
+     * Find a CA certificate by subject
+     * @param {string} subject - Subject to match against CA certificates
+     * @returns {string|null} Fingerprint of matching CA certificate or null if none found
+     */
+    findCABySubject(subject) {
+        // Normalize the subject for comparison
+        const normalizedSubject = this.normalizeSubject(subject);
+
+        // Search for CA certificates
+        for (const [fingerprint, cert] of this.certificates.entries()) {
+            if (cert.isCA() && cert.subject) {
+                // Normalize CA's subject for comparison
+                const normalizedCASubject = this.normalizeSubject(cert.subject);
+
+                // Check if subjects match
+                if (normalizedSubject === normalizedCASubject) {
+                    logger.fine(`Found CA match: ${cert.name} subject ${normalizedCASubject} matches ${normalizedSubject}`, null, FILENAME);
+                    return fingerprint;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize a subject string for comparison
+     * @param {string} subject - Subject to normalize
+     * @returns {string} Normalized subject
+     */
+    normalizeSubject(subject) {
+        if (!subject) return '';
+
+        // Extract key-value pairs
+        const pairs = [];
+        const regex = /(C|ST|L|O|OU|CN)\s*=\s*([^,\/]+)/gi;
+        let match;
+
+        while (match = regex.exec(subject)) {
+            const key = match[1].toUpperCase();
+            const value = match[2].trim();
+            pairs.push(`${key}=${value}`);
+        }
+
+        // Sort pairs for consistent comparison
+        pairs.sort();
+
+        return pairs.join(',');
+    }
+
+    /**
+     * Create periodic backups of the certificate configuration
+     */
+    async createConfigBackup() {
+        try {
+            if (!fs.existsSync(this.configPath)) {
+                return false;
+            }
+
+            // Create backup directory if it doesn't exist
+            const backupDir = path.join(path.dirname(this.configPath), 'backups');
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
+            }
+
+            // Create a timestamped backup file
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const backupPath = path.join(backupDir, `certificates-${timestamp}.json`);
+
+            // Copy the current config file
+            fs.copyFileSync(this.configPath, backupPath);
+            logger.info(`Created backup of certificates configuration: ${backupPath}`, null, FILENAME);
+
+            // Clean up old backups (keep last 10)
+            const backups = fs.readdirSync(backupDir)
+                .filter(file => file.startsWith('certificates-'))
+                .map(file => path.join(backupDir, file))
+                .sort((a, b) => fs.statSync(b).mtime.getTime() - fs.statSync(a).mtime.getTime());
+
+            if (backups.length > 10) {
+                for (let i = 10; i < backups.length; i++) {
+                    fs.unlinkSync(backups[i]);
+                    logger.fine(`Removed old certificate config backup: ${backups[i]}`, null, FILENAME);
+                }
+            }
+
+            return true;
+        } catch (error) {
+            logger.error('Error creating certificate config backup:', error, FILENAME);
+            return false;
         }
     }
 }

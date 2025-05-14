@@ -1,86 +1,71 @@
 /**
  * Activity API Routes
- * @module activityRoutes
- * @requires express
  */
-
 const express = require('express');
+const router = express.Router();
+const logger = require('../../services/logger');
+
+const FILENAME = 'api/routes/activity.js';
 
 /**
- * Activity routes
+ * Initialize activity router
  * @param {Object} deps - Dependencies
- * @returns {express.Router} Router
+ * @returns {express.Router} Express router
  */
-function activityRoutes(deps) {
-  const router = express.Router();
-  const { activityService, logger } = deps;
+function initActivityRouter(deps) {
+  const { activityService } = deps;
   
   // Get recent activities
   router.get('/', (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 20;
-      const type = req.query.type;
+      const limit = parseInt(req.query.limit) || 50;
+      const type = req.query.type || null;
+      const search = req.query.search || null;
       
-      let activities;
-      if (type) {
-        activities = activityService.getActivitiesByType(type, limit);
-      } else {
-        activities = activityService.getRecentActivities(limit);
-      }
-      
-      res.json(activities);
-    } catch (error) {
-      logger.error('Error retrieving activities:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve activities',
-        message: error.message
-      });
-    }
-  });
-
-  // Add a new activity
-  router.post('/', (req, res) => {
-    try {
-      const { action, type, target, metadata } = req.body;
-      
-      if (!action || !type || !target) {
-        return res.status(400).json({
-          error: 'Invalid request',
-          message: 'Action, type, and target are required'
-        });
-      }
-      
-      const activity = activityService.addActivity(action, type, target, metadata);
-      
-      res.status(201).json(activity);
-    } catch (error) {
-      logger.error('Error adding activity:', error);
-      res.status(500).json({
-        error: 'Failed to add activity',
-        message: error.message
-      });
-    }
-  });
-
-  // Clear all activities
-  router.delete('/', (req, res) => {
-    try {
-      activityService.clearActivities();
+      const activities = activityService.getActivities(limit, type, search);
       
       res.json({
         success: true,
-        message: 'Activities cleared successfully'
+        activities: activities // Make sure activities is an array here
       });
     } catch (error) {
-      logger.error('Error clearing activities:', error);
+      logger.error('Error getting activities', { error: error.message }, FILENAME);
       res.status(500).json({
-        error: 'Failed to clear activities',
-        message: error.message
+        success: false,
+        message: 'Error retrieving activities',
+        error: error.message
       });
     }
   });
-
+  
+  // Clear all activities (admin only)
+  router.delete('/', (req, res) => {
+    try {
+      // Check if user is admin
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Admin privileges required'
+        });
+      }
+      
+      activityService.clearAllActivities();
+      
+      res.json({
+        success: true,
+        message: 'All activities cleared'
+      });
+    } catch (error) {
+      logger.error('Error clearing activities', { error: error.message }, FILENAME);
+      res.status(500).json({
+        success: false,
+        message: 'Error clearing activities',
+        error: error.message
+      });
+    }
+  });
+  
   return router;
 }
 
-module.exports = activityRoutes;
+module.exports = initActivityRouter;

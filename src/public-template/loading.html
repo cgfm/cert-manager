@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starting Certificate Manager</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body {
+            background-color: #f5f8fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .loading-container {
+            max-width: 600px;
+            padding: 40px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .logo-container {
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            max-width: 200px;
+            height: auto;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .loading-indicator {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            background-color: #3498db;
+            border-radius: 50%;
+            margin: 0 5px;
+            animation: bounce 1.5s infinite ease-in-out;
+        }
+        
+        .dot:nth-child(1) { animation-delay: 0s; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        .dot:nth-child(4) { animation-delay: 0.6s; }
+        .dot:nth-child(5) { animation-delay: 0.8s; }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        
+        .status {
+            margin-top: 10px;
+            color: #7f8c8d;
+            min-height: 20px;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #eee;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background-color: #3498db;
+            border-radius: 10px;
+            width: 5%;
+            transition: width 0.3s ease;
+        }
+        
+        .version {
+            margin-top: 20px;
+            color: #95a5a6;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <div class="logo-container">
+            <img src="/images/logo.png" alt="Certificate Manager Logo" class="logo">
+        </div>
+        
+        <h1>Starting Certificate Manager</h1>
+        <p>Please wait while the system initializes all components...</p>
+        
+        <div class="loading-indicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        
+        <div class="status" id="status-message">Initializing services...</div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        
+        <div class="version">Version <%= version %></div>
+    </div>
+
+    <script>
+        // Poll the API to check when the server is ready
+        const checkInterval = 1000; // Check every second
+        let attempts = 0;
+        const maxAttempts = 120; // Maximum 2 minutes of waiting
+        const progressBar = document.getElementById('progress-bar');
+        const statusMessage = document.getElementById('status-message');
+        
+        const statusMessages = [
+            "Loading configuration...",
+            "Initializing certificate manager...",
+            "Starting renewal service...",
+            "Loading certificate data...",
+            "Setting up security...",
+            "Almost ready..."
+        ];
+        
+        function updateStatusMessage(progress) {
+            // Choose message based on progress
+            let messageIndex;
+            if (progress < 20) messageIndex = 0;
+            else if (progress < 40) messageIndex = 1;
+            else if (progress < 60) messageIndex = 2;
+            else if (progress < 80) messageIndex = 3;
+            else if (progress < 95) messageIndex = 4;
+            else messageIndex = 5;
+            
+            statusMessage.innerText = statusMessages[messageIndex];
+        }
+        
+        function checkServerStatus() {
+            fetch('/api/public/status')
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Server not ready');
+                })
+                .then(data => {
+                    if (data.ready) {
+                        statusMessage.innerText = "System ready! Redirecting...";
+                        progressBar.style.width = '100%';
+                        
+                        // Redirect to the appropriate page
+                        setTimeout(() => {
+                            window.location.href = data.setupNeeded ? '/setup' : 
+                                                 data.authRequired ? '/login' : '/';
+                        }, 1000);
+                    } else {
+                        // Update progress based on server response
+                        attempts++;
+                        let progress = data.initializationProgress || 
+                                      Math.min(Math.floor((attempts / maxAttempts) * 100), 95);
+                        
+                        progressBar.style.width = progress + '%';
+                        updateStatusMessage(progress);
+                        
+                        if (attempts < maxAttempts) {
+                            setTimeout(checkServerStatus, checkInterval);
+                        } else {
+                            statusMessage.innerText = "Taking longer than expected. Refreshing...";
+                            setTimeout(() => window.location.reload(), 3000);
+                        }
+                    }
+                })
+                .catch(error => {
+                    attempts++;
+                    const progress = Math.min(Math.floor((attempts / maxAttempts) * 100), 95);
+                    progressBar.style.width = progress + '%';
+                    updateStatusMessage(progress);
+                    
+                    if (attempts < maxAttempts) {
+                        setTimeout(checkServerStatus, checkInterval);
+                    } else {
+                        statusMessage.innerText = "Server may be unresponsive. Refreshing...";
+                        setTimeout(() => window.location.reload(), 3000);
+                    }
+                });
+        }
+        
+        // Start checking as soon as the page loads
+        window.addEventListener('load', () => {
+            setTimeout(checkServerStatus, 500);
+        });
+    </script>
+</body>
+</html>

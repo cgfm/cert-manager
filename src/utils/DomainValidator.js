@@ -1,6 +1,8 @@
 /**
  * Domain Validator - Server-side utility for validating domain names and IP addresses
  */
+const FILENAME = 'utils/DomainValidator.js';
+
 class DomainValidator {
     /**
      * Validate a domain name

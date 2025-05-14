@@ -5,14 +5,15 @@ There will be the first functional release very soon.
 
 ## ToDos
 ### Authentication 
-⬜ Frontend 
-⬜ Middleware
-⬜ Implementation 
+✅ Frontend 
+✅ Middleware
+✅ Implementation 
 
 ### Styling ToDos
-⬜ Tabs in modal -> responsive order left or top
-⬜ order and view style in cert list
-⬜ stacking backdrops 
+✅ Tabs in modal -> responsive order left or top
+✅ order and view style in cert list
+✅ filtering in cert view
+⬜ stacking backdrops
 
 ### Certificate
 ✅ edit file meta
@@ -28,8 +29,8 @@ There will be the first functional release very soon.
 ✅ Logger
 ✅ Actionlog Service 
 ✅ api connect 
-⬜ frontend 
-⬜ testing
+✅ frontend 
+✅ testing
 
 
 

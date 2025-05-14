@@ -16,6 +16,8 @@ const Docker = require('dockerode');
 const fs = require('fs');
 const logger = require('./logger');
 
+const FILENAME = 'services/docker-service.js';
+
 class DockerService {
     constructor() {
         this.docker = null;
@@ -29,13 +31,13 @@ class DockerService {
                 // Windows-specific Docker socket path
                 this.docker = new Docker({ socketPath: '//./pipe/docker_engine' });
                 this.isAvailable = true;
-                logger.info('Docker integration initialized successfully (Windows)');
+                logger.info('Docker integration initialized successfully (Windows)', null, FILENAME);
             } 
             else if (fs.existsSync('/var/run/docker.sock')) {
                 // Linux/Mac Docker socket path
                 this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
                 this.isAvailable = true;
-                logger.info('Docker integration initialized successfully');
+                logger.info('Docker integration initialized successfully', null, FILENAME);
             } 
             else {
                 // Try to initialize Docker from environment variables as fallback
@@ -44,14 +46,14 @@ class DockerService {
                 // Test the connection
                 this.docker.ping().then(() => {
                     this.isAvailable = true;
-                    logger.info('Docker integration initialized from environment');
+                    logger.info('Docker integration initialized from environment', null, FILENAME);
                 }).catch(err => {
-                    logger.warn('Docker not available:', err.message);
+                    logger.warn('Docker not available:', err.message, FILENAME);
                     this.isAvailable = false;
                 });
             }
         } catch (error) {
-            logger.error('Error initializing Docker client:', error);
+            logger.error('Error initializing Docker client:', error, FILENAME);
             this.isAvailable = false;
         }
     }
@@ -66,7 +68,7 @@ class DockerService {
             const containers = await this.docker.listContainers({ all: true });
             return containers;
         } catch (error) {
-            logger.error('Error listing Docker containers:', error);
+            logger.error('Error listing Docker containers:', error, FILENAME);
             throw error;
         }
     }
@@ -81,7 +83,7 @@ class DockerService {
             await container.restart();
             return true;
         } catch (error) {
-            logger.error(`Error restarting container ${containerId}:`, error);
+            logger.error(`Error restarting container ${containerId}:`, error, FILENAME);
             throw error;
         }
     }
@@ -95,20 +97,20 @@ class DockerService {
             // First check if we're running in Docker
             const isInDocker = await this.isRunningInDocker();
             if (!isInDocker) {
-                logger.info('Not running in a Docker container');
+                logger.info('Not running in a Docker container', null, FILENAME);
                 return [];
             }
 
             // If Docker API is not available.
             if (!this.isAvailable) {
-                logger.info('Docker Socket not available.');
+                logger.info('Docker Socket not available.', null, FILENAME);
                 return [];
             }
 
             // Get this container's ID
             const containerId = await this.getThisContainerId();
             if (!containerId) {
-                logger.warn('Could not determine current container ID');
+                logger.warn('Could not determine current container ID', null, FILENAME);
                 return [];
             }
 
@@ -144,10 +146,10 @@ class DockerService {
                 }
             }
             
-            logger.info(`Found ${mounts.length} mounts for container ${containerId.substring(0, 12)}`);
+            logger.info(`Found ${mounts.length} mounts for container ${containerId.substring(0, 12)}`, null, FILENAME);
             return mounts;
         } catch (error) {
-            logger.error('Error getting container mounts:', error);
+            logger.error('Error getting container mounts:', error, FILENAME);
             return [];
         }
     }
@@ -180,7 +182,7 @@ class DockerService {
             
             return false;
         } catch (error) {
-            logger.debug('Error checking if running in Docker:', error);
+            logger.debug('Error checking if running in Docker:', error, FILENAME);
             return false;
         }
     }
@@ -229,7 +231,7 @@ class DockerService {
             
             return null;
         } catch (error) {
-            logger.debug('Error getting this container ID:', error);
+            logger.debug('Error getting this container ID:', error, FILENAME);
             return null;
         }
     }

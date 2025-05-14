@@ -33,7 +33,7 @@ function initializeDeployActionForm(existingAction = null) {
 
   // Reset the form changed status
   clearFormChangedStatus();
-  
+
   // Reset the manually edited flag
   window.actionNameManuallyEdited = isEditing;
 
@@ -59,7 +59,7 @@ function initializeDeployActionForm(existingAction = null) {
     }
 
     // Add input event listeners for tracking changes
-    setupFormChangeTracking();    
+    setupFormChangeTracking();
 
     // Handle Docker container selection change
     const containerSelect = document.getElementById("docker-container-select");
@@ -246,7 +246,7 @@ function initializeDeployActionForm(existingAction = null) {
     // Setup file browser buttons AFTER action options are visible
     setTimeout(() => {
       setupFileBrowserButtons();
-      
+
       // Add event listener with automatic name generation
       Logger.debug("Adding event listener to action-type-select");
       document.getElementById("deployment-action-type").addEventListener("change", () => {
@@ -267,17 +267,17 @@ function setupFormChangeTracking() {
   // Track changes on all input elements in the form
   const form = document.getElementById('deployment-action-form');
   if (!form) return;
-  
+
   // Find all inputs, selects, and textareas in the form
   const formElements = form.querySelectorAll('input, select, textarea');
-  
+
   formElements.forEach(element => {
     const eventType = element.type === 'checkbox' || element.type === 'radio' ? 'change' : 'input';
-    
+
     // Remove existing event listener (if any) by cloning
     const newElement = element.cloneNode(true);
     element.parentNode.replaceChild(newElement, element);
-    
+
     // Add change tracking event listener
     newElement.addEventListener(eventType, () => {
       markFormChanged();
@@ -357,9 +357,8 @@ function generateDeployActionName() {
       const sshSource = document.getElementById("ssh-source")?.value || "cert";
 
       const destFile = sshDest.split("/").pop();
-      name = `SSH copy ${sshSource} to ${sshHost}${
-        destFile ? "/" + destFile : ""
-      }`;
+      name = `SSH copy ${sshSource} to ${sshHost}${destFile ? "/" + destFile : ""
+        }`;
       break;
 
     case "smb-copy":
@@ -369,9 +368,8 @@ function generateDeployActionName() {
       const smbSource = document.getElementById("smb-source")?.value || "cert";
 
       const smbDestFile = smbDest.split("/").pop();
-      name = `SMB copy ${smbSource} to ${smbHost}/${smbShare}${
-        smbDestFile ? "/" + smbDestFile : ""
-      }`;
+      name = `SMB copy ${smbSource} to ${smbHost}/${smbShare}${smbDestFile ? "/" + smbDestFile : ""
+        }`;
       break;
 
     case "ftp-copy":
@@ -380,9 +378,8 @@ function generateDeployActionName() {
       const ftpSource = document.getElementById("ftp-source")?.value || "cert";
 
       const ftpDestFile = ftpDest.split("/").pop();
-      name = `FTP${
-        document.getElementById("ftp-secure")?.checked ? "S" : ""
-      } copy ${ftpSource} to ${ftpHost}${ftpDestFile ? "/" + ftpDestFile : ""}`;
+      name = `FTP${document.getElementById("ftp-secure")?.checked ? "S" : ""
+        } copy ${ftpSource} to ${ftpHost}${ftpDestFile ? "/" + ftpDestFile : ""}`;
       break;
 
     case "api-call":
@@ -426,9 +423,8 @@ function generateDeployActionName() {
       break;
 
     default:
-      name = `${
-        actionType.charAt(0).toUpperCase() + actionType.slice(1)
-      } action`;
+      name = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)
+        } action`;
   }
 
   return name;
@@ -570,324 +566,330 @@ function getEditingAction() {
  * @returns {Promise} Promise that resolves when save is complete
  */
 async function saveDeploymentAction() {
-  try {
-    const form = document.getElementById("deployment-action-form");
-    const actionType = document.getElementById("deployment-action-type").value;
-    const actionName = document.getElementById("deployment-action-name").value;
+  const form = document.getElementById("deployment-action-form");
+  const actionType = document.getElementById("deployment-action-type").value;
+  const actionName = document.getElementById("deployment-action-name").value;
 
-    // Basic validation
-    if (!actionType) {
-      UIUtils.showToast("Please select an action type", "warning");
-      return Promise.reject(new Error("Missing action type"));
-    }
+  // Basic validation
+  if (!actionType) {
+    UIUtils.showToast("Please select an action type", "warning");
+    return Promise.reject(new Error("Missing action type"));
+  }
 
-    if (!actionName) {
-      UIUtils.showToast("Please enter a name for this action", "warning");
-      return Promise.reject(new Error("Missing action name"));
-    }
+  if (!actionName) {
+    UIUtils.showToast("Please enter a name for this action", "warning");
+    return Promise.reject(new Error("Missing action name"));
+  }
 
-    // Create base action object
-    const action = {
-      type: actionType,
-      name: actionName,
-    };
+  // Create base action object
+  const action = {
+    type: actionType,
+    name: actionName,
+  };
 
-    // Add specific properties based on action type
-    switch (actionType) {
-      case "copy":
-        action.source = document.getElementById("copy-source").value;
-        action.destination = document.getElementById("copy-destination").value;
-        const permissions = document.getElementById("copy-permissions").value;
+  // Add specific properties based on action type
+  switch (actionType) {
+    case "copy":
+      action.source = document.getElementById("copy-source").value;
+      action.destination = document.getElementById("copy-destination").value;
+      const permissions = document.getElementById("copy-permissions").value;
 
-        if (!action.source || !action.destination) {
-          UIUtils.showToast("Please specify source and destination", "warning");
-          return;
-        }
+      if (!action.source || !action.destination) {
+        UIUtils.showToast("Please specify source and destination", "warning");
+        return;
+      }
 
-        if (permissions) {
-          action.permissions = parseInt(permissions, 8);
-        }
-        break;
+      if (permissions) {
+        action.permissions = parseInt(permissions, 8);
+      }
+      break;
 
-      case "command":
-        action.command = document.getElementById("command-command").value;
-        action.cwd = document.getElementById("command-cwd").value;
-        action.verbose = document.getElementById("command-verbose").checked;
+    case "command":
+      action.command = document.getElementById("command-command").value;
+      action.cwd = document.getElementById("command-cwd").value;
+      action.verbose = document.getElementById("command-verbose").checked;
 
-        if (!action.command) {
-          UIUtils.showToast("Please enter a command", "warning");
-          return;
-        }
-        break;
+      if (!action.command) {
+        UIUtils.showToast("Please enter a command", "warning");
+        return;
+      }
+      break;
 
-      case "docker-restart":
-        const containerSelect = document.getElementById(
-          "docker-container-select"
+    case "docker-restart":
+      const containerSelect = document.getElementById(
+        "docker-container-select"
+      );
+      const containerCustom = document
+        .getElementById("docker-container-custom")
+        .value.trim();
+
+      const containerId = containerSelect.value || containerCustom;
+
+      if (!containerId) {
+        UIUtils.showToast(
+          "Please select a container or enter a container ID/name",
+          "warning"
         );
-        const containerCustom = document
-          .getElementById("docker-container-custom")
-          .value.trim();
+        return;
+      }
 
-        const containerId = containerSelect.value || containerCustom;
-
-        if (!containerId) {
-          UIUtils.showToast(
-            "Please select a container or enter a container ID/name",
-            "warning"
-          );
-          return;
-        }
-
-        // If a container was selected from dropdown, get both ID and name
-        if (containerSelect.value) {
-          const container = dockerContainers.find(
-            (c) => c.id === containerSelect.value
-          );
-          if (container) {
-            action.containerId = container.id;
-            action.containerName = container.name;
-          } else {
-            action.containerId = containerSelect.value;
-          }
+      // If a container was selected from dropdown, get both ID and name
+      if (containerSelect.value) {
+        const container = dockerContainers.find(
+          (c) => c.id === containerSelect.value
+        );
+        if (container) {
+          action.containerId = container.id;
+          action.containerName = container.name;
         } else {
-          // Custom container ID/name was entered
-          // Determine if it's an ID or name
-          if (containerCustom.match(/^[0-9a-f]{12}$|^[0-9a-f]{64}$/)) {
-            action.containerId = containerCustom;
-          } else {
-            action.containerName = containerCustom;
-          }
+          action.containerId = containerSelect.value;
         }
-        break;
-
-      case "nginx-proxy-manager":
-        const isPathMethod = document.getElementById("npm-method-path").checked;
-
-        if (isPathMethod) {
-          action.npmPath = document.getElementById("npm-path").value;
-          if (!action.npmPath) {
-            UIUtils.showToast(
-              "Please specify the Nginx Proxy Manager path",
-              "warning"
-            );
-            return;
-          }
+      } else {
+        // Custom container ID/name was entered
+        // Determine if it's an ID or name
+        if (containerCustom.match(/^[0-9a-f]{12}$|^[0-9a-f]{64}$/)) {
+          action.containerId = containerCustom;
         } else {
-          action.dockerContainer = document.getElementById(
-            "npm-docker-container"
-          ).value;
-          if (!action.dockerContainer) {
-            UIUtils.showToast(
-              "Please specify the Docker container name",
-              "warning"
-            );
-            return;
-          }
+          action.containerName = containerCustom;
         }
-        break;
+      }
+      break;
 
-      case "ssh-copy":
-        action.host = document.getElementById("ssh-host").value;
-        action.port = parseInt(document.getElementById("ssh-port").value, 10);
-        action.username = document.getElementById("ssh-username").value;
-        action.source = document.getElementById("ssh-source").value;
-        action.destination = document.getElementById("ssh-destination").value;
+    case "nginx-proxy-manager":
+      const isPathMethod = document.getElementById("npm-method-path").checked;
 
-        const isPasswordAuth =
-          document.getElementById("ssh-auth-password").checked;
-        if (isPasswordAuth) {
-          action.password = document.getElementById("ssh-password").value;
-        } else {
-          action.privateKey = document.getElementById("ssh-private-key").value;
-          const passphrase = document.getElementById("ssh-passphrase").value;
-          if (passphrase) {
-            action.passphrase = passphrase;
-          }
-        }
-
-        const sshPermissions = document.getElementById("ssh-permissions").value;
-        if (sshPermissions) {
-          action.permissions = parseInt(sshPermissions, 8);
-        }
-
-        const sshCommand = document.getElementById("ssh-command").value;
-        if (sshCommand) {
-          action.command = sshCommand;
-        }
-
-        action.verbose = document.getElementById("ssh-verbose").checked;
-
-        if (!action.host || !action.source || !action.destination) {
+      if (isPathMethod) {
+        action.npmPath = document.getElementById("npm-path").value;
+        if (!action.npmPath) {
           UIUtils.showToast(
-            "Please fill in all required SSH fields",
+            "Please specify the Nginx Proxy Manager path",
             "warning"
           );
           return;
         }
-        break;
-
-      case "smb-copy":
-        action.host = document.getElementById("smb-host").value;
-        action.share = document.getElementById("smb-share").value;
-        action.username = document.getElementById("smb-username").value;
-        action.password = document.getElementById("smb-password").value;
-        action.domain = document.getElementById("smb-domain").value;
-        action.source = document.getElementById("smb-source").value;
-        action.destination = document.getElementById("smb-destination").value;
-        action.verbose = document.getElementById("smb-verbose").checked;
-
-        if (
-          !action.host ||
-          !action.share ||
-          !action.source ||
-          !action.destination
-        ) {
-          UIUtils.showToast(
-            "Please fill in all required SMB fields",
-            "warning"
-          );
-          return;
-        }
-        break;
-
-      case "ftp-copy":
-        action.host = document.getElementById("ftp-host").value;
-        action.port = parseInt(document.getElementById("ftp-port").value, 10);
-        action.username = document.getElementById("ftp-username").value;
-        action.password = document.getElementById("ftp-password").value;
-        action.secure = document.getElementById("ftp-secure").checked;
-        action.source = document.getElementById("ftp-source").value;
-        action.destination = document.getElementById("ftp-destination").value;
-
-        if (!action.host || !action.source || !action.destination) {
-          UIUtils.showToast(
-            "Please fill in all required FTP fields",
-            "warning"
-          );
-          return;
-        }
-        break;
-
-      case "api-call":
-        action.url = document.getElementById("api-url").value;
-        action.method = document.getElementById("api-method").value;
-        action.contentType = document.getElementById("api-content-type").value;
-        action.body = document.getElementById("api-body").value;
-
-        // Parse headers if provided
-        try {
-          const headersText = document
-            .getElementById("api-headers")
-            .value.trim();
-          if (headersText) {
-            action.headers = JSON.parse(headersText);
-          }
-        } catch (error) {
-          UIUtils.showToast("Invalid JSON format for headers", "error");
-          return;
-        }
-
-        // Add auth if provided
-        const username = document.getElementById("api-auth-username").value;
-        const password = document.getElementById("api-auth-password").value;
-
-        if (username && password) {
-          action.username = username;
-          action.password = password;
-        }
-
-        if (!action.url) {
-          UIUtils.showToast("Please enter a URL", "warning");
-          return;
-        }
-        break;
-
-      case "webhook":
-        action.url = document.getElementById("webhook-url").value;
-        action.method = document.getElementById("webhook-method").value;
-        action.contentType = document.getElementById(
-          "webhook-content-type"
+      } else {
+        action.dockerContainer = document.getElementById(
+          "npm-docker-container"
         ).value;
-
-        // Parse payload if provided
-        try {
-          const payloadText = document
-            .getElementById("webhook-payload")
-            .value.trim();
-          if (payloadText) {
-            action.payload = JSON.parse(payloadText);
-          }
-        } catch (error) {
-          UIUtils.showToast("Invalid JSON format for payload", "error");
+        if (!action.dockerContainer) {
+          UIUtils.showToast(
+            "Please specify the Docker container name",
+            "warning"
+          );
           return;
         }
+      }
+      break;
 
-        if (!action.url) {
-          UIUtils.showToast("Please enter a webhook URL", "warning");
-          return;
+    case "ssh-copy":
+      action.host = document.getElementById("ssh-host").value;
+      action.port = parseInt(document.getElementById("ssh-port").value, 10);
+      action.username = document.getElementById("ssh-username").value;
+      action.source = document.getElementById("ssh-source").value;
+      action.destination = document.getElementById("ssh-destination").value;
+
+      const isPasswordAuth =
+        document.getElementById("ssh-auth-password").checked;
+      if (isPasswordAuth) {
+        action.password = document.getElementById("ssh-password").value;
+      } else {
+        action.privateKey = document.getElementById("ssh-private-key").value;
+        const passphrase = document.getElementById("ssh-passphrase").value;
+        if (passphrase) {
+          action.passphrase = passphrase;
         }
-        break;
+      }
 
-      case "email":
-        action.to = document.getElementById("email-to").value;
-        action.subject = document.getElementById("email-subject").value;
-        action.body = document.getElementById("email-body").value;
-        action.attachCert =
-          document.getElementById("email-attach-cert").checked;
+      const sshPermissions = document.getElementById("ssh-permissions").value;
+      if (sshPermissions) {
+        action.permissions = parseInt(sshPermissions, 8);
+      }
 
-        if (!action.to) {
-          UIUtils.showToast("Please enter recipient email address", "warning");
-          return;
+      const sshCommand = document.getElementById("ssh-command").value;
+      if (sshCommand) {
+        action.command = sshCommand;
+      }
+
+      action.verbose = document.getElementById("ssh-verbose").checked;
+
+      if (!action.host || !action.source || !action.destination) {
+        UIUtils.showToast(
+          "Please fill in all required SSH fields",
+          "warning"
+        );
+        return;
+      }
+      break;
+
+    case "smb-copy":
+      action.host = document.getElementById("smb-host").value;
+      action.share = document.getElementById("smb-share").value;
+      action.username = document.getElementById("smb-username").value;
+      action.password = document.getElementById("smb-password").value;
+      action.domain = document.getElementById("smb-domain").value;
+      action.source = document.getElementById("smb-source").value;
+      action.destination = document.getElementById("smb-destination").value;
+      action.verbose = document.getElementById("smb-verbose").checked;
+
+      if (
+        !action.host ||
+        !action.share ||
+        !action.source ||
+        !action.destination
+      ) {
+        UIUtils.showToast(
+          "Please fill in all required SMB fields",
+          "warning"
+        );
+        return;
+      }
+      break;
+
+    case "ftp-copy":
+      action.host = document.getElementById("ftp-host").value;
+      action.port = parseInt(document.getElementById("ftp-port").value, 10);
+      action.username = document.getElementById("ftp-username").value;
+      action.password = document.getElementById("ftp-password").value;
+      action.secure = document.getElementById("ftp-secure").checked;
+      action.source = document.getElementById("ftp-source").value;
+      action.destination = document.getElementById("ftp-destination").value;
+
+      if (!action.host || !action.source || !action.destination) {
+        UIUtils.showToast(
+          "Please fill in all required FTP fields",
+          "warning"
+        );
+        return;
+      }
+      break;
+
+    case "api-call":
+      action.url = document.getElementById("api-url").value;
+      action.method = document.getElementById("api-method").value;
+      action.contentType = document.getElementById("api-content-type").value;
+      action.body = document.getElementById("api-body").value;
+
+      // Parse headers if provided
+      try {
+        const headersText = document
+          .getElementById("api-headers")
+          .value.trim();
+        if (headersText) {
+          action.headers = JSON.parse(headersText);
         }
+      } catch (error) {
+        UIUtils.showToast("Invalid JSON format for headers", "error");
+        return;
+      }
 
-        // Validate email address
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(action.to)) {
-          UIUtils.showToast("Please enter a valid email address", "warning");
-          return;
+      // Add auth if provided
+      const username = document.getElementById("api-auth-username").value;
+      const password = document.getElementById("api-auth-password").value;
+
+      if (username && password) {
+        action.username = username;
+        action.password = password;
+      }
+
+      if (!action.url) {
+        UIUtils.showToast("Please enter a URL", "warning");
+        return;
+      }
+      break;
+
+    case "webhook":
+      action.url = document.getElementById("webhook-url").value;
+      action.method = document.getElementById("webhook-method").value;
+      action.contentType = document.getElementById(
+        "webhook-content-type"
+      ).value;
+
+      // Parse payload if provided
+      try {
+        const payloadText = document
+          .getElementById("webhook-payload")
+          .value.trim();
+        if (payloadText) {
+          action.payload = JSON.parse(payloadText);
         }
-        break;
-    }
+      } catch (error) {
+        UIUtils.showToast("Invalid JSON format for payload", "error");
+        return;
+      }
 
-    // Get the current certificate fingerprint
-    const fingerprint = state.currentCertificate.fingerprint;
-    const isEditing = window.editingAction !== null;
-    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+      if (!action.url) {
+        UIUtils.showToast("Please enter a webhook URL", "warning");
+        return;
+      }
+      break;
 
-    // Set URL based on whether we're creating or editing
-    let url, method;
+    case "email":
+      action.to = document.getElementById("email-to").value;
+      action.subject = document.getElementById("email-subject").value;
+      action.body = document.getElementById("email-body").value;
+      action.attachCert =
+        document.getElementById("email-attach-cert").checked;
 
-    if (isEditing && window.editingActionIndex !== null) {
-      url = `/api/certificates/${encodedFingerprint}/deploy-actions/${window.editingActionIndex}`;
-      method = "PUT";
-    } else {
-      url = `/api/certificates/${encodedFingerprint}/deploy-actions`;
-      method = "POST";
-    }
+      if (!action.to) {
+        UIUtils.showToast("Please enter recipient email address", "warning");
+        return;
+      }
 
-    // Save the action
-    const saveBtn = document.getElementById("save-deploy-action-btn");
-    const originalText = saveBtn.textContent;
-    saveBtn.textContent = "Saving...";
-    saveBtn.disabled = true;
+      // Validate email address
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(action.to)) {
+        UIUtils.showToast("Please enter a valid email address", "warning");
+        return;
+      }
+      break;
+  }
 
-    Logger.debug("Saving action:", JSON.stringify(action, null, 2));
+  // Get the current certificate fingerprint
+  const fingerprint = state.currentCertificate.fingerprint;
+  const isEditing = window.editingAction !== null;
+  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
 
+  // Set URL based on whether we're creating or editing
+  let url, method;
+
+  if (isEditing && window.editingActionIndex !== null) {
+    url = `/api/certificates/${encodedFingerprint}/deploy-actions/${window.editingActionIndex}`;
+    method = "PUT";
+  } else {
+    url = `/api/certificates/${encodedFingerprint}/deploy-actions`;
+    method = "POST";
+  }
+
+  // Save the action
+  const saveBtn = document.getElementById("save-deploy-action-btn");
+  const originalText = saveBtn.textContent;
+  saveBtn.textContent = "Saving...";
+  saveBtn.disabled = true;
+
+  try {
+    Logger.debug(`Sending ${method} request to ${url} with data:`, action);
     const response = await fetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(action),
+      // Add credentials if your API requires authentication cookies
+      credentials: 'same-origin'
     });
+
+    // Log detailed response information
+    Logger.debug(`Received response: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
+      Logger.error(`Server error response (${response.status}):`, errorText);
       throw new Error(`Server error (${response.status}): ${errorText}`);
     }
 
     // Parse response
     const result = await response.json();
+    Logger.debug("Server response:", result);
 
     if (!result.success) {
       throw new Error(result.message || "Unknown error");
@@ -895,7 +897,7 @@ async function saveDeploymentAction() {
 
     // After successful save, clear the changed status
     clearFormChangedStatus();
-    
+
     // Close modal and show success message
     UIUtils.closeModal("deployment-action-modal");
 
@@ -1023,17 +1025,17 @@ function showDeploymentActionForm(existingAction = null, actionIndex = null) {
         '[data-dismiss="modal"]'
       );
       closeButtons.forEach((button) => {
-        button.addEventListener("click", function(e) {
+        button.addEventListener("click", function (e) {
           checkUnsavedChangesBeforeClosing(modalId, e);
         });
       });
 
       // Show the modal using UIUtils
       UIUtils.openModal(modalId);
-      
+
       // Add override for the modal's existing close behavior
       const originalCloseModal = UIUtils.closeModal;
-      UIUtils.closeModal = function(modalIdToClose) {
+      UIUtils.closeModal = function (modalIdToClose) {
         if (modalIdToClose === modalId) {
           if (checkUnsavedChangesBeforeClosing(modalId)) {
             // Only close if confirmed
@@ -1057,11 +1059,10 @@ function showDeploymentActionForm(existingAction = null, actionIndex = null) {
         </div>
         <div class="modal-body">
           <p class="error-message">Failed to load the deployment action form. Please try again.</p>
-          <p>Error details: ${
-            UIUtils.sanitizeErrorMessage
-              ? UIUtils.sanitizeErrorMessage(error)
-              : error.message
-          }</p>
+          <p>Error details: ${UIUtils.sanitizeErrorMessage
+          ? UIUtils.sanitizeErrorMessage(error)
+          : error.message
+        }</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="button button-secondary close-modal">Close</button>
@@ -1091,7 +1092,7 @@ function checkUnsavedChangesBeforeClosing(modalId, event) {
   if (formHasUnsavedChanges) {
     // Show confirmation dialog
     const confirmed = confirm('You have unsaved changes. Are you sure you want to close this form?');
-    
+
     if (!confirmed) {
       // Prevent default if event was provided
       if (event) {
@@ -1100,11 +1101,11 @@ function checkUnsavedChangesBeforeClosing(modalId, event) {
       }
       return false;
     }
-    
+
     // User confirmed, reset the changed status
     clearFormChangedStatus();
   }
-  
+
   // It's safe to close
   return true;
 }
@@ -1326,8 +1327,8 @@ async function testDeploymentAction(fingerprint, actionIndex) {
 }
 
 /**
- * Load deployment actions for the certificate
- * @param {string|Object} fingerprint - Certificate fingerprint or certificate object
+ * Load deployment actions for a certificate
+ * @param {string} fingerprint - Certificate fingerprint
  */
 function loadCertificateDeploymentActions(fingerprint) {
   // Handle case where a full certificate object is passed
@@ -1371,6 +1372,9 @@ function loadCertificateDeploymentActions(fingerprint) {
         return;
       }
 
+      // Create a sortable container for the actions
+      let html = '<div class="sortable-actions">';
+
       // Create HTML for actions list using safeTemplate
       const actionsHtml = actions
         .map((action, index) => {
@@ -1384,14 +1388,12 @@ function loadCertificateDeploymentActions(fingerprint) {
               description = `SSH copy to ${action.host}:${action.destination}`;
               break;
             case "command":
-              description = `Run command: ${action.command.substring(0, 40)}${
-                action.command.length > 40 ? "..." : ""
-              }`;
+              description = `Run command: ${action.command.substring(0, 40)}${action.command.length > 40 ? "..." : ""
+                }`;
               break;
             case "docker-restart":
-              description = `Restart Docker container: ${
-                action.containerName || action.containerId
-              }`;
+              description = `Restart Docker container: ${action.containerName || action.containerId
+                }`;
               break;
             case "webhook":
               description = `Send webhook to ${action.url}`;
@@ -1419,22 +1421,24 @@ function loadCertificateDeploymentActions(fingerprint) {
 
           return UIUtils.safeTemplate(
             `
-          <div class="deployment-action-item">
-            <div class="deployment-action-info">
-              <div class="deployment-action-name">${
-                action.name || "Unnamed Action"
-              }</div>
-              <span class="deployment-action-type">\${type}</span>
-              <span class="deployment-action-desc">\${desc}</span>
+            <div class="deployment-action-item" data-index="\${index|attr}" data-type="\${type|attr}">
+              <div class="drag-handle">
+                <i class="fas fa-grip-vertical"></i>
+              </div>
+              <div class="deployment-action-info">
+                <div class="deployment-action-name">\${name}</div>
+                <span class="deployment-action-type">\${type}</span>
+                <span class="deployment-action-desc">\${desc}</span>
+              </div>
+              <div class="deployment-action-buttons">
+                <button class="button small test-action-btn" data-index="\${index|attr}">Test</button>
+                <button class="button small edit-action-btn" data-index="\${index|attr}">Edit</button>
+                <button class="button small danger remove-action-btn" data-index="\${index|attr}">Remove</button>
+              </div>
             </div>
-            <div class="deployment-action-buttons">
-              <button class="button small test-action-btn" data-index="\${index|attr}">Test</button>
-              <button class="button small edit-action-btn" data-index="\${index|attr}">Edit</button>
-              <button class="button small danger remove-action-btn" data-index="\${index|attr}">Remove</button>
-            </div>
-          </div>
-        `,
+          `,
             {
+              name: action.name || "Unnamed Action",
               type: action.type,
               desc: description,
               index: index,
@@ -1443,7 +1447,16 @@ function loadCertificateDeploymentActions(fingerprint) {
         })
         .join("");
 
-      container.innerHTML = actionsHtml;
+      // Close the sortable container
+      html += actionsHtml + '</div>';
+
+      // Add order info if more than one action exists
+      if (actions.length > 1) {
+        // Add helpful message about drag and drop functionality
+        html += '<div class="action-order-info"><i class="fas fa-info-circle"></i> Drag actions to change execution order</div>';
+      }
+
+      container.innerHTML = html;
 
       // Add event listeners to buttons
       container.querySelectorAll(".test-action-btn").forEach((btn) => {
@@ -1469,6 +1482,11 @@ function loadCertificateDeploymentActions(fingerprint) {
           deleteDeploymentAction(fingerprint, index);
         });
       });
+
+      // Initialize sortable functionality if more than one action exists
+      if (actions.length > 1 && typeof initDeployActionsSortable === 'function') {
+        setTimeout(() => initDeployActionsSortable(fingerprint), 100);
+      }
     })
     .catch((error) => {
       Logger.error("Error loading deployment actions:", error);
@@ -1543,33 +1561,33 @@ function initializeDeploymentActionButton(button) {
  */
 function updateActionOptions() {
   const actionType = document.getElementById("deployment-action-type")?.value;
-  
+
   Logger.debug(`Updating action options for type: ${actionType}`);
-  
+
   // Hide all action options first
   hideAllActionOptions();
   Logger.debug("All action options hidden");
-  
+
   // Show the selected action type options
   if (actionType) {
     const optionsDiv = document.getElementById(`${actionType}-action-options`);
     if (optionsDiv) {
       Logger.debug(`Found options div for ${actionType}, showing it now`);
       optionsDiv.classList.remove("hidden");
-      
+
       // Update the action name based on the type
       updateActionName();
-      
+
       // Setup additional handlers for specific action types
       setupActionTypeHandlers(actionType);
-      
+
       // Set up name generation listeners
       setupNameGenerationListeners();
-      
+
       Logger.debug(`Action options for ${actionType} are now visible: ${!optionsDiv.classList.contains('hidden')}`);
     } else {
       Logger.warn(`Could not find options div for action type: ${actionType}`);
-      Logger.debug("Available options divs:", 
+      Logger.debug("Available options divs:",
         Array.from(document.querySelectorAll('.action-type-options'))
           .map(div => div.id)
       );
@@ -1585,14 +1603,14 @@ function updateActionOptions() {
  */
 function setupActionTypeHandlers(actionType) {
   Logger.debug(`Setting up handlers for action type: ${actionType}`);
-  
+
   // Setup additional handlers for specific action types
   switch (actionType) {
     case "docker-restart":
       Logger.debug("Loading Docker containers");
       loadDockerContainers();
       break;
-      
+
     case "nginx-proxy-manager":
       if (typeof setupNpmMethodToggle === 'function') {
         Logger.debug("Setting up NPM toggle");
@@ -1601,7 +1619,7 @@ function setupActionTypeHandlers(actionType) {
         Logger.warn("NPM setup function not found");
       }
       break;
-      
+
     case "ssh-copy":
       if (typeof setupSshAuthToggle === 'function') {
         Logger.debug("Setting up SSH auth toggle");
@@ -1610,9 +1628,9 @@ function setupActionTypeHandlers(actionType) {
         Logger.warn("SSH setup function not found");
       }
       break;
-      
+
     // Add other action types as needed
-    
+
     default:
       Logger.debug(`No special handlers for action type: ${actionType}`);
   }
@@ -1730,7 +1748,7 @@ function setupNpmMethodToggle() {
   }
 
   // Add change listeners
-  pathMethodRadio.addEventListener("change", function() {
+  pathMethodRadio.addEventListener("change", function () {
     if (this.checked) {
       pathGroup.classList.remove("hidden");
       dockerGroup.classList.add("hidden");
@@ -1739,7 +1757,7 @@ function setupNpmMethodToggle() {
     }
   });
 
-  dockerMethodRadio.addEventListener("change", function() {
+  dockerMethodRadio.addEventListener("change", function () {
     if (this.checked) {
       pathGroup.classList.add("hidden");
       dockerGroup.classList.remove("hidden");
@@ -1773,7 +1791,7 @@ function setupSshAuthToggle() {
   }
 
   // Add change listeners
-  passwordMethodRadio.addEventListener("change", function() {
+  passwordMethodRadio.addEventListener("change", function () {
     if (this.checked) {
       passwordGroup.classList.remove("hidden");
       keyGroup.classList.add("hidden");
@@ -1781,7 +1799,7 @@ function setupSshAuthToggle() {
     }
   });
 
-  keyMethodRadio.addEventListener("change", function() {
+  keyMethodRadio.addEventListener("change", function () {
     if (this.checked) {
       passwordGroup.classList.add("hidden");
       keyGroup.classList.remove("hidden");
@@ -1797,13 +1815,13 @@ function setupSmbFields() {
   // Enable domain field only when username is provided
   const usernameField = document.getElementById("smb-username");
   const domainField = document.getElementById("smb-domain");
-  
+
   if (usernameField && domainField) {
     // Initial state
     domainField.disabled = !usernameField.value;
-    
+
     // Add listener
-    usernameField.addEventListener("input", function() {
+    usernameField.addEventListener("input", function () {
       domainField.disabled = !this.value;
     });
   }
@@ -1816,17 +1834,17 @@ function setupFtpFields() {
   // Adjust port based on secure checkbox
   const secureCheckbox = document.getElementById("ftp-secure");
   const portField = document.getElementById("ftp-port");
-  
+
   if (secureCheckbox && portField) {
     // Add listener to change default port based on secure option
-    secureCheckbox.addEventListener("change", function() {
+    secureCheckbox.addEventListener("change", function () {
       // Only change port if it's at the default values
       if (portField.value === "21" && this.checked) {
         portField.value = "990"; // Default FTPS port
       } else if (portField.value === "990" && !this.checked) {
         portField.value = "21"; // Default FTP port
       }
-      
+
       updateActionName();
     });
   }
@@ -1841,14 +1859,14 @@ function setupApiFields() {
   const contentTypeField = document.getElementById("api-content-type");
   const bodyField = document.getElementById("api-body");
   const bodyGroup = document.getElementById("api-body-group");
-  
+
   if (methodSelect && contentTypeField && bodyGroup) {
     // Initial state
     const isBodyApplicable = ["POST", "PUT", "PATCH"].includes(methodSelect.value);
     bodyGroup.classList.toggle("hidden", !isBodyApplicable);
-    
+
     // Add listener
-    methodSelect.addEventListener("change", function() {
+    methodSelect.addEventListener("change", function () {
       const isBodyApplicable = ["POST", "PUT", "PATCH"].includes(this.value);
       bodyGroup.classList.toggle("hidden", !isBodyApplicable);
       updateActionName();
@@ -1865,14 +1883,14 @@ function setupWebhookFields() {
   const contentTypeField = document.getElementById("webhook-content-type");
   const payloadField = document.getElementById("webhook-payload");
   const payloadGroup = document.getElementById("webhook-payload-group");
-  
+
   if (methodSelect && contentTypeField && payloadGroup) {
     // Initial state
     const isPayloadApplicable = ["POST", "PUT", "PATCH"].includes(methodSelect.value);
     payloadGroup.classList.toggle("hidden", !isPayloadApplicable);
-    
+
     // Add listener
-    methodSelect.addEventListener("change", function() {
+    methodSelect.addEventListener("change", function () {
       const isPayloadApplicable = ["POST", "PUT", "PATCH"].includes(this.value);
       payloadGroup.classList.toggle("hidden", !isPayloadApplicable);
       updateActionName();
@@ -1887,10 +1905,10 @@ function setupEmailFields() {
   // Add template insertion buttons for email subject and body
   const emailSubject = document.getElementById("email-subject");
   const emailBody = document.getElementById("email-body");
-  
+
   // Insert template variables on special key combinations
   if (emailSubject) {
-    emailSubject.addEventListener("keydown", function(e) {
+    emailSubject.addEventListener("keydown", function (e) {
       // Ctrl+Space to show template variables
       if (e.ctrlKey && e.code === "Space") {
         showTemplateVariablesMenu(this);
@@ -1898,9 +1916,9 @@ function setupEmailFields() {
       }
     });
   }
-  
+
   if (emailBody) {
-    emailBody.addEventListener("keydown", function(e) {
+    emailBody.addEventListener("keydown", function (e) {
       // Ctrl+Space to show template variables
       if (e.ctrlKey && e.code === "Space") {
         showTemplateVariablesMenu(this);
@@ -1916,16 +1934,16 @@ function setupEmailFields() {
  */
 function showTemplateVariablesMenu(element) {
   const variables = [
-    {name: "Certificate Name", code: "{cert_name}"},
-    {name: "Certificate Domains", code: "{cert_domains}"},
-    {name: "Expiry Date", code: "{cert_expiry}"},
-    {name: "Fingerprint", code: "{cert_fingerprint}"},
-    {name: "Common Name", code: "{cert_common_name}"},
-    {name: "Organization", code: "{cert_organization}"},
-    {name: "Current Date", code: "{current_date}"},
-    {name: "Server Name", code: "{server_name}"}
+    { name: "Certificate Name", code: "{cert_name}" },
+    { name: "Certificate Domains", code: "{cert_domains}" },
+    { name: "Expiry Date", code: "{cert_expiry}" },
+    { name: "Fingerprint", code: "{cert_fingerprint}" },
+    { name: "Common Name", code: "{cert_common_name}" },
+    { name: "Organization", code: "{cert_organization}" },
+    { name: "Current Date", code: "{current_date}" },
+    { name: "Server Name", code: "{server_name}" }
   ];
-  
+
   // Create popup menu
   const menu = document.createElement("div");
   menu.className = "template-variables-menu";
@@ -1938,12 +1956,12 @@ function showTemplateVariablesMenu(element) {
   menu.style.padding = "5px 0";
   menu.style.maxHeight = "200px";
   menu.style.overflowY = "auto";
-  
+
   // Position near the element
   const rect = element.getBoundingClientRect();
   menu.style.left = `${rect.left}px`;
   menu.style.top = `${rect.bottom + 5}px`;
-  
+
   // Add variables to menu
   variables.forEach(variable => {
     const item = document.createElement("div");
@@ -1952,16 +1970,16 @@ function showTemplateVariablesMenu(element) {
     item.style.cursor = "pointer";
     item.style.userSelect = "none";
     item.textContent = `${variable.name} (${variable.code})`;
-    
+
     // Hover effect
     item.addEventListener("mouseover", () => {
       item.style.backgroundColor = "#f0f0f0";
     });
-    
+
     item.addEventListener("mouseout", () => {
       item.style.backgroundColor = "";
     });
-    
+
     // Click to insert
     item.addEventListener("click", () => {
       // Insert variable at cursor position or replace selection
@@ -1969,10 +1987,10 @@ function showTemplateVariablesMenu(element) {
       document.body.removeChild(menu);
       markFormChanged();
     });
-    
+
     menu.appendChild(item);
   });
-  
+
   // Close when clicking outside
   function handleClickOutside(e) {
     if (!menu.contains(e.target) && e.target !== element) {
@@ -1980,10 +1998,10 @@ function showTemplateVariablesMenu(element) {
       document.removeEventListener("click", handleClickOutside);
     }
   }
-  
+
   // Add to document
   document.body.appendChild(menu);
-  
+
   // Listen for clicks outside
   setTimeout(() => {
     document.addEventListener("click", handleClickOutside);
@@ -2001,9 +2019,9 @@ function insertTextAtCursor(element, text) {
     const end = element.selectionEnd || start;
     const beforeText = element.value.substring(0, start);
     const afterText = element.value.substring(end, element.value.length);
-    
+
     element.value = beforeText + text + afterText;
-    
+
     // Move cursor position after inserted text
     element.selectionStart = element.selectionEnd = start + text.length;
     element.focus();
@@ -2016,9 +2034,9 @@ function insertTextAtCursor(element, text) {
 function setupCopyFields() {
   // Set up source selection behavior
   const sourceSelect = document.getElementById("copy-source");
-  
+
   if (sourceSelect) {
-    sourceSelect.addEventListener("change", function() {
+    sourceSelect.addEventListener("change", function () {
       updateActionName();
     });
   }
@@ -2030,10 +2048,10 @@ function setupCopyFields() {
 function setupCommandFields() {
   // Add command history/suggestion feature if needed
   const commandField = document.getElementById("command-command");
-  
+
   if (commandField) {
     // Example: Add syntax highlighting or command suggestions
-    commandField.addEventListener("input", function() {
+    commandField.addEventListener("input", function () {
       // Update action name on input for immediate feedback
       updateActionName();
     });
@@ -2044,3 +2062,275 @@ function setupCommandFields() {
 window.initializeDeploymentActionButton = initializeDeploymentActionButton;
 window.showDeploymentActionForm = showDeploymentActionForm;
 window.loadCertificateDeploymentActions = loadCertificateDeploymentActions;
+
+/**
+ * Function to load deployment actions for a certificate
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+function loadDeploymentActions(fingerprint) {
+  const actionsContainer = document.getElementById('deployment-actions-list');
+
+  if (!actionsContainer) return;
+
+  // Show loading state
+  actionsContainer.innerHTML = `
+    <div class="loading-container">
+      <div class="loading-spinner small"></div>
+      <div class="loading-text">Loading deployment actions...</div>
+    </div>
+  `;
+
+  // Fetch deployment actions
+  fetch(`/api/certificates/${fingerprint}/deploy-actions`)
+    .then(response => response.json())
+    .then(actions => {
+      // Check if we have actions
+      if (actions && Array.isArray(actions) && actions.length > 0) {
+        // Create sortable container
+        let html = '<div class="sortable-actions">';
+
+        // Generate HTML for each action
+        actions.forEach((action, index) => {
+          html += createActionItemHtml(action, index);
+        });
+
+        html += '</div>';
+
+        // Add execute button below the actions
+        html += `
+          <div class="execute-actions-container">
+            <button id="execute-all-actions-btn" class="button primary">
+              <i class="fas fa-play-circle"></i> Execute All Actions
+            </button>
+          </div>
+        `;
+
+        // Update container
+        actionsContainer.innerHTML = html;
+
+        // Setup event listeners
+        setupActionEventListeners(fingerprint);
+
+        // Make actions sortable 
+        if (typeof initDeployActionsSortable === 'function') {
+          initDeployActionsSortable(fingerprint);
+        }
+
+      } else {
+        // Show empty state
+        actionsContainer.innerHTML = `
+          <div class="empty-actions-message">
+            <i class="fas fa-rocket fa-3x"></i>
+            <p>No deployment actions configured yet.</p>
+            <p>Click "Add Action" to configure how this certificate should be deployed.</p>
+          </div>
+        `;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading deployment actions:', error);
+      actionsContainer.innerHTML = `
+        <div class="error-message">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Failed to load deployment actions.</p>
+          <button class="button small" onclick="loadDeploymentActions('${fingerprint}')">Try Again</button>
+        </div>
+      `;
+    });
+}
+
+// Create HTML for an action item
+function createActionItemHtml(action, index) {
+  const enabledClass = action.enabled === false ? 'disabled' : '';
+  const actionName = action.name || `${action.type} action`;
+  const actionDescription = getActionDescription(action);
+
+  return `
+    <div class="deployment-action-item ${enabledClass}" data-index="${index}">
+      <div class="drag-handle">
+        <i class="fas fa-grip-lines"></i>
+      </div>
+      <div class="deployment-action-info">
+        <span class="deployment-action-name">${UIUtils.escapeHTML(actionName)}</span>
+        <span class="deployment-action-type">${action.type}</span>
+        <span class="deployment-action-desc">${UIUtils.escapeHTML(actionDescription)}</span>
+      </div>
+      <div class="deployment-action-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" class="action-toggle" data-index="${index}" 
+                 ${action.enabled === false ? '' : 'checked'}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="deployment-action-buttons">
+        <button class="button small test-action" data-index="${index}">
+          <i class="fas fa-vial"></i> Test
+        </button>
+        <button class="button small edit-action" data-index="${index}">
+          <i class="fas fa-pencil"></i> Edit
+        </button>
+        <button class="button small danger delete-action" data-index="${index}">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Get a description for the action based on its type and settings
+function getActionDescription(action) {
+  switch (action.type) {
+    case 'copy':
+      return `Copy ${action.source} to ${action.destination}`;
+    case 'command':
+      return `Execute: ${action.command.substring(0, 50)}${action.command.length > 50 ? '...' : ''}`;
+    case 'docker-restart':
+      return `Restart container: ${action.container}`;
+    case 'nginx-proxy-manager':
+      return `Update NPM cert at ${action.url}`;
+    case 'ssh-copy':
+      return `Copy ${action.source} to ${action.host}:${action.destination}`;
+    case 'ftp-copy':
+      return `FTP upload ${action.source} to ${action.host}`;
+    case 'api-call':
+      return `API ${action.method.toUpperCase()} to ${action.url}`;
+    case 'webhook':
+      return `Send ${action.type} webhook to ${action.url}`;
+    case 'email':
+      return `Email notification to ${action.to}`;
+    default:
+      return `${action.type} action`;
+  }
+}
+
+// Setup event listeners for action buttons
+function setupActionEventListeners(fingerprint) {
+  // Add action button
+  const addActionBtn = document.getElementById('add-deployment-action-btn');
+  if (addActionBtn) {
+    addActionBtn.addEventListener('click', () => {
+      showAddActionDialog(fingerprint);
+    });
+  }
+
+  // Execute all actions button
+  const executeAllBtn = document.getElementById('execute-all-actions-btn');
+  if (executeAllBtn) {
+    executeAllBtn.addEventListener('click', () => {
+      executeAllActions(fingerprint);
+    });
+  }
+
+  // Action toggle switches
+  document.querySelectorAll('.action-toggle').forEach(toggle => {
+    toggle.addEventListener('change', function () {
+      const index = this.dataset.index;
+      toggleAction(fingerprint, index, this.checked);
+    });
+  });
+
+  // Test action buttons
+  document.querySelectorAll('.test-action').forEach(button => {
+    button.addEventListener('click', function () {
+      const index = this.dataset.index;
+      testAction(fingerprint, index);
+    });
+  });
+
+  // Edit action buttons
+  document.querySelectorAll('.edit-action').forEach(button => {
+    button.addEventListener('click', function () {
+      const index = this.dataset.index;
+      editAction(fingerprint, index);
+    });
+  });
+
+  // Delete action buttons
+  document.querySelectorAll('.delete-action').forEach(button => {
+    button.addEventListener('click', function () {
+      const index = this.dataset.index;
+      deleteAction(fingerprint, index);
+    });
+  });
+}
+
+// Toggle an action's enabled state
+function toggleAction(fingerprint, index, enabled) {
+  fetch(`/api/certificates/${fingerprint}/deploy-actions/${index}/toggle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ enabled })
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast(`Action ${enabled ? 'enabled' : 'disabled'} successfully`, 'success');
+      } else {
+        showToast(`Failed to ${enabled ? 'enable' : 'disable'} action: ${data.message}`, 'error');
+        loadDeploymentActions(fingerprint); // Reload to reset toggle state
+      }
+    })
+    .catch(error => {
+      console.error('Error toggling action:', error);
+      showToast('Error updating action status', 'error');
+      loadDeploymentActions(fingerprint); // Reload to reset toggle state
+    });
+}
+
+// Test action execution
+function testAction(fingerprint, index) {
+  showToast('Testing action...', 'info');
+
+  fetch(`/api/certificates/${fingerprint}/deploy-actions/${index}/test`, {
+    method: 'POST'
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast('Test execution completed successfully', 'success');
+
+        // Show detailed results in a modal
+        showActionResultDialog('Test Results', data.result);
+      } else {
+        showToast(`Test execution failed: ${data.message}`, 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error testing action:', error);
+      showToast('Error during test execution', 'error');
+    });
+}
+
+// Execute all actions
+function executeAllActions(fingerprint) {
+  // Ask for confirmation
+  if (!confirm('Execute all deployment actions for this certificate?')) {
+    return;
+  }
+
+  showToast('Executing all actions...', 'info');
+
+  fetch(`/api/certificates/${fingerprint}/deploy-actions/execute`, {
+    method: 'POST'
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast(`Successfully executed ${data.actionsSucceeded} of ${data.actionsExecuted} actions`, 'success');
+
+        // Show detailed results in a modal
+        showActionResultsDialog('Execution Results', data.results);
+      } else {
+        showToast(`Execution failed: ${data.message}`, 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error executing actions:', error);
+      showToast('Error during action execution', 'error');
+    });
+}
+
+// Expose functions to global scope
+window.loadDeploymentActions = loadDeploymentActions;

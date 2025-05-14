@@ -216,16 +216,6 @@ input:checked + .toggle-slider:before {
   min-width: 100px;
 }
 
-/* Loading indicator */
-.loading-spinner.small {
-  width: 16px;
-  height: 16px;
-  border-width: 2px;
-  margin-left: 10px;
-  display: inline-block;
-  vertical-align: middle;
-}
-
 #docker-loading {
   display: none;
   margin-top: 8px;
@@ -343,4 +333,107 @@ select.form-control {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+}
+
+.sortable-actions {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+
+.deployment-action-item {
+  display: flex;
+  align-items: center;
+  background: var(--bg-lighter, white);
+  border: 1px solid var(--border-color, #ddd);
+  margin-bottom: 8px;
+  border-radius: 4px;
+  padding-right: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.deployment-action-item.dragging {
+  z-index: 100;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+  opacity: 0.9;
+  background-color: var(--bg-light, #f5f5f5);
+  position: relative;
+}
+
+.deployment-action-item.placeholder {
+  background-color: var(--bg-lighter, #f0f0f0);
+  border: 1px dashed var(--border-color, #ccc);
+  box-shadow: none;
+}
+
+.deployment-action-item.drag-over {
+  border-top: 2px dashed var(--accent-color);
+  padding-top: 11px;
+}
+
+.drag-handle {
+  cursor: grab;
+  padding: 8px;
+  color: var(--text-muted, #999);
+}
+
+.drag-handle:hover {
+  color: var(--primary-color, #0078D4);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.deployment-action-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.deployment-action-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.deployment-action-type {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: var(--accent-color-light);
+  color: var(--accent-color-dark);
+  border-radius: 4px;
+  font-size: 0.85em;
+  margin-right: 8px;
+}
+
+.deployment-action-desc {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.9em;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-action-toggle {
+  margin-right: 15px;
+}
+
+.deployment-action-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.action-order-info {
+  background-color: var(--info-bg, #e6f7ff);
+  border: 1px solid var(--info-border, #91d5ff);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--info-text, #1890ff);
+}
+
+.action-order-info i {
+  margin-right: 6px;
 }

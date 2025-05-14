@@ -7,21 +7,24 @@
 .file-browser-container {
   display: flex;
   flex-direction: column;
-  height: 450px;
+  height: 100%;
+  min-height: 400px;
+  max-height: 70vh;
 }
 
 /* Toolbar styles */
 .file-browser-toolbar {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 /* Path input area */
 .file-browser-path {
   display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 10px;
+  gap: 8px;
   background-color: var(--bg-color, #f5f5f5);
   border-radius: 0.25rem;
   padding: 0.5rem;
@@ -44,31 +47,40 @@
 /* Location buttons */
 .file-browser-locations {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
   flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .location-btn {
-  background-color: var(--btn-bg, #f0f0f0);
-  border: 1px solid var(--border-color, #ddd);
-  border-radius: 0.25rem;
-  padding: 0.25rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
   cursor: pointer;
-  transition: all var(--transition-speed, 0.2s);
+  transition: all 0.2s;
 }
 
 .location-btn:hover {
-  background-color: var(--hover-bg, #e0e0e0);
+  background-color: var(--background-accent);
+}
+
+.location-btn i {
+  margin-right: 6px;
 }
 
 /* File list container */
 .file-browser-list {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid var(--border-color, #ddd);
-  border-radius: 0.25rem;
-  background-color: var(--card-bg, #fff);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color);
+  padding: 10px;
+  min-height: 200px;
   margin-bottom: 0.5rem;
 }
 
@@ -80,14 +92,14 @@
 
 .file-browser-table th {
   text-align: left;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--border-color, #ddd);
-  font-weight: 500;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: bold;
   background-color: var(--table-header-bg, #f8f8f8);
 }
 
 .file-browser-table td {
-  padding: 0.5rem;
+  padding: 8px;
 }
 
 .file-browser-table th,
@@ -122,53 +134,61 @@
 }
 
 /* File item styles for both table rows and standalone items */
-.file-item {
+.file-browser-file-item {
   cursor: pointer;
 }
 
-.file-item:hover {
-  background-color: var(--hover-bg, #f5f5f5);
+.file-browser-file-item:hover {
+  background-color: var(--background-accent);
 }
 
-.file-item.selected {
-  background-color: var(--selected-bg, #e0f0ff);
+.file-browser-file-item.selected {
+  background-color: var(--background-accent);
 }
 
-.file-item .item-icon {
+.file-browser-file-item .item-icon {
   margin-right: 0.5rem;
+}
+
+.file-browser-file-item.directory td:first-child {
+  color: var(--primary-color);
 }
 
 /* Footer styles */
 .file-browser-footer {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
   align-items: center;
   padding: 0.5rem 0;
   justify-content: space-between;
   border-top: 1px solid var(--border-color, #ddd);
-  margin-top: 0.5rem;
   padding-top: 1rem;
 }
 
-.file-name-input {
+.file-browser-file-name-input {
   display: flex;
   align-items: center;
+  gap: 10px;
   flex: 1;
   margin-right: 1rem;
   height: 1.5rem;
 }
 
-.file-name-input label {
+.file-browser-file-name-input label {
+  min-width: 80px;
   margin-right: 0.5rem;
   white-space: nowrap;
 }
 
-.file-name-input input {
+.file-browser-file-name-input input {
   flex: 1;
 }
 
 .file-browser-actions {
   display: flex;
-  gap: 0.5rem;
+    gap: 0.5rem;
 }
 
 /* Empty state and loading/error messages */
@@ -182,7 +202,11 @@
   color: var(--error-color, #d9534f);
 }
 
-.select-current-dir {
+.select-curr
+
+.retry-btn {
+  margin-top: 10px;
+}ent-dir {
   margin: 0 0 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-color, #eee);

@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
+const FILENAME = 'services/config-service.js';
+
 class ConfigService {
     /**
      * Create a new ConfigService
@@ -30,13 +32,13 @@ class ConfigService {
         try {
             if (!fs.existsSync(this.configDir)) {
                 fs.mkdirSync(this.configDir, { recursive: true });
-                logger.info(`Created configuration directory: ${this.configDir}`);
+                logger.info(`Created configuration directory: ${this.configDir}`, null, FILENAME);
             }
         } catch (error) {
-            logger.error(`Error creating config directory ${this.configDir}:`, error);
+            logger.error(`Error creating config directory ${this.configDir}:`, error, FILENAME);
             // Fall back to a directory we know should be writable
             this.configDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-            logger.info(`Using fallback config directory: ${this.configDir}`);
+            logger.info(`Using fallback config directory: ${this.configDir}`, null, FILENAME);
         }
         
         this.settingsPath = path.join(this.configDir, 'settings.json');
@@ -50,13 +52,13 @@ class ConfigService {
         try {
             if (!fs.existsSync(this.certPath)) {
                 fs.mkdirSync(this.certPath, { recursive: true });
-                logger.info(`Created certificates directory: ${this.certPath}`);
+                logger.info(`Created certificates directory: ${this.certPath}`, null, FILENAME);
             }
         } catch (error) {
-            logger.error(`Error creating certificates directory ${this.certPath}:`, error);
+            logger.error(`Error creating certificates directory ${this.certPath}:`, error, FILENAME);
             // Fall back to a directory we know should be writable
             this.certPath = process.env.HOME || process.env.USERPROFILE || '/tmp';
-            logger.info(`Using fallback config directory: ${this.certPath}`);
+            logger.info(`Using fallback config directory: ${this.certPath}`, null, FILENAME);
         }
         // Define default settings
         this.defaultSettings = {
@@ -82,16 +84,56 @@ class ConfigService {
             signStandardCertsWithCA: false,
             enableAutoRenewalJob: true,
             renewalSchedule: "0 0 * * *",
-            enableFileWatch: true
+            enableFileWatch: true,
+            // Add deployment settings to the default settings
+            deployment: {
+                email: {
+                    smtp: {
+                        host: '',
+                        port: 587,
+                        secure: false,
+                        user: '',
+                        password: '',
+                        from: 'Certificate Manager <cert-manager@localhost>'
+                    }
+                },
+                nginxProxyManager: {
+                    host: '',
+                    port: 81,
+                    useHttps: false,
+                    username: '',
+                    password: '',
+                    accessToken: '',
+                    refreshToken: '',
+                    tokenExpiry: null
+                },
+                dockerDefaults: {
+                    socketPath: '/var/run/docker.sock',
+                    host: '',
+                    port: 2375,
+                    useTLS: false
+                }
+            }
         };
 
+        // Security config
+        this.security = {
+            disableAuth: process.env.DISABLE_AUTH === 'true',
+            authMode: process.env.AUTH_MODE || 'basic',  // basic, oidc, ldap
+            jwtSecret: process.env.JWT_SECRET || '',     // Will be auto-generated if empty
+            tokenExpiration: process.env.TOKEN_EXPIRATION || '8h'
+        };
+        
         // Load settings from file
         this.fileSettings = this.loadSettings();
         
         // Process environment variables and create effective settings
         this.processEnvironmentVariables();
         
-        logger.debug('ConfigService initialized with settings from file and environment variables');
+        this.config = {};
+        this.loaded = false;
+        
+        logger.debug('ConfigService initialized with settings from file and environment variables', null, FILENAME);
     }
 
     /**
@@ -116,7 +158,7 @@ class ConfigService {
             if (process.env[envName] !== undefined) {
                 const value = this.parseEnvValue(process.env[envName]);
                 this.effectiveSettings[settingKey] = value;
-                logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`);
+                logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`, null, FILENAME);
             }
         });
         
@@ -128,7 +170,7 @@ class ConfigService {
                 if (settingKey) {
                     const value = this.parseEnvValue(process.env[envName]);
                     this.effectiveSettings[settingKey] = value;
-                    logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`);
+                    logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`, null, FILENAME);
                 }
             });
     }
@@ -182,7 +224,7 @@ class ConfigService {
                 try {
                     settings = JSON.parse(fileContents);
                 } catch (jsonError) {
-                    logger.warn(`Invalid JSON in settings file: ${jsonError.message}. Removing comments and trying again...`);
+                    logger.warn(`Invalid JSON in settings file: ${jsonError.message}. Removing comments and trying again...`, null, FILENAME);
                     
                     // Try to fix common JSON issues (comments and trailing commas)
                     const cleanedJson = fileContents
@@ -196,10 +238,10 @@ class ConfigService {
                         settings = JSON.parse(cleanedJson);
                         // Since we successfully parsed after cleaning, save the clean version
                         fs.writeFileSync(this.settingsPath, JSON.stringify(settings, null, 2), 'utf8');
-                        logger.info('Settings file has been automatically reformatted to valid JSON');
+                        logger.info('Settings file has been automatically reformatted to valid JSON', null, FILENAME);
                     } catch (fallbackError) {
                         // If we still can't parse it, use default settings
-                        logger.error(`Could not parse settings file even after cleaning: ${fallbackError.message}`);
+                        logger.error(`Could not parse settings file even after cleaning: ${fallbackError.message}`, null, FILENAME);
                         return this.defaultSettings;
                     }
                 }
@@ -207,11 +249,11 @@ class ConfigService {
                 // Merge with default settings to ensure all properties exist
                 return { ...this.defaultSettings, ...settings };
             } catch (error) {
-                logger.error('Error reading settings file:', error);
+                logger.error('Error reading settings file:', error, FILENAME);
                 return this.defaultSettings;
             }
         } catch (error) {
-            logger.error('Error loading settings:', error);
+            logger.error('Error loading settings:', error, FILENAME);
             return this.defaultSettings;
         }
     }
@@ -243,7 +285,7 @@ class ConfigService {
             
             return true;
         } catch (error) {
-            logger.error('Error saving settings:', error);
+            logger.error('Error saving settings:', error, FILENAME);
             return false;
         }
     }
@@ -266,9 +308,20 @@ class ConfigService {
             
             return result;
         } catch (error) {
-            logger.error('Error updating settings:', error);
+            logger.error('Error updating settings:', error, FILENAME);
             return false;
         }
+    }
+
+    /**
+     * Update method alias for updateSettings (for compatibility)
+     * @param {Object} newConfig - New configuration
+     * @param {string} section - Not used, kept for compatibility
+     * @returns {boolean} Success status
+     */
+    update(newConfig, section = null) {
+        logger.debug('ConfigService.update called (compatibility method)', null, FILENAME);
+        return this.updateSettings(newConfig);
     }
 
     /**

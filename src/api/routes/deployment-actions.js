@@ -3,6 +3,9 @@
  */
 const express = require('express');
 const logger = require('../../services/logger');
+const crypto = require('crypto');
+
+const FILENAME = 'api/routes/deployment-actions.js';
 
 /**
  * Initialize the deployment actions router with dependencies
@@ -19,135 +22,208 @@ function initDeploymentActionsRouter(deps) {
   router.get('/', async (req, res) => {
     try {
       const { fingerprint } = req.params;
-      logger.debug(`API received GET request for /api/certificates/${fingerprint}/deploy-actions.`);
-
-      // Get certificate
       const cert = certificateManager.getCertificate(fingerprint);
+
       if (!cert) {
-        return res.status(404).json({ 
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404 
-        });
+        return res.status(404).json({ error: 'Certificate not found' });
       }
-      
-      // Return deployment actions
-      res.json(cert.deployActions || []);
+
+      // Access deployment actions from the consistent structure
+      const deployActions = cert._config?.deployActions || [];
+      res.json(deployActions);
     } catch (error) {
-      logger.error(`Error getting deployment actions for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ 
-        message: `Failed to get deployment actions: ${error.message}`,
-        statusCode: 500 
-      });
+      logger.error('Error getting deployment actions:', error);
+      res.status(500).json({ error: 'Failed to get deployment actions' });
     }
   });
-  
+
   // Add a new deployment action
   router.post('/', async (req, res) => {
     try {
       const { fingerprint } = req.params;
-      const actionData = req.body;
-      
-      logger.debug(`API received POST request for /api/certificates/${fingerprint}/deploy-actions with action data:`, actionData);
+      const action = req.body;
 
-      if (!actionData || !actionData.type) {
-        return res.status(400).json({ 
-          message: 'Missing action type',
-          statusCode: 400 
-        });
+      if (!action || !action.type) {
+        return res.status(400).json({ success: false, error: 'Action type is required' });
       }
-      
-      // Get certificate
+
       const cert = certificateManager.getCertificate(fingerprint);
       if (!cert) {
-        return res.status(404).json({ 
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404 
-        });
+        return res.status(404).json({ success: false, error: 'Certificate not found' });
       }
-      
-      let deployActions = [];
-      
-      // Check if deployActions is in cert._config
-      if (cert._config && Array.isArray(cert._config.deployActions)) {
-        deployActions = cert._config.deployActions;
-        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`);
+
+      // Ensure _config.deployActions exists
+      if (!cert._config) cert._config = {};
+      if (!Array.isArray(cert._config.deployActions)) cert._config.deployActions = [];
+
+      // Add action ID if not present
+      if (!action.id) {
+        action.id = crypto.randomUUID();
       }
-      // Fallback to cert.deployActions if available
-      else if (Array.isArray(cert.deployActions)) {
-        deployActions = cert.deployActions;
-        logger.debug(`Found deployActions in cert.deployActions: ${deployActions.length} actions`);
-      }
-      // Otherwise, initialize as empty array
-      else {
-        logger.debug('No deployActions found, initializing as empty array');
-      }
+
+      // Add the action to _config.deployActions
+      cert._config.deployActions.push(action);
+
+      logger.debug(`Adding deployment action: ${action.type} for certificate: ${fingerprint}`, action, FILENAME);
       
-      // Add the new action
-      deployActions.push(actionData);
-      logger.debug(`Added new action, now have ${deployActions.length} actions`);
-      
-      // Update the certificate with the new deployActions
-      // The key insight: need to update _config.deployActions, not deployActions directly
-      await certificateManager.updateCertificateConfig(fingerprint, {
-        deployActions: deployActions
-      });
-      
-      // Verify the update worked
-      const updatedCert = certificateManager.getCertificate(fingerprint);
-      const updatedActions = updatedCert._config ? updatedCert._config.deployActions : updatedCert.deployActions;
-      logger.debug(`After update, certificate has ${updatedActions ? updatedActions.length : 0} actions`);
-      
-      // Return success with the action data
-      res.json({ 
+      // Save the updated certificate
+      await certificateManager.saveCertificateConfigs();
+
+      // Return success property along with the action
+      res.json({
         success: true,
-        message: 'Deployment action added successfully',
-        action: actionData
+        action: action,
+        message: 'Deployment action added successfully'
       });
     } catch (error) {
-      logger.error(`Error adding deployment action: ${error.message}`, error);
+      logger.error('Error adding deployment action:', error);
       res.status(500).json({ 
-        message: `Failed to add deployment action: ${error.message}`,
-        statusCode: 500 
+        success: false, 
+        error: 'Failed to add deployment action',
+        message: error.message || 'Unknown error'
       });
     }
   });
-  
+
+  // Update a deployment action
+  router.put('/:actionIndex', async (req, res) => {
+    try {
+      const { fingerprint, actionId } = req.params;
+      const updatedAction = req.body;
+
+      if (!updatedAction || !updatedAction.type) {
+        return res.status(400).json({ success: false, error: 'Action type is required' });
+      }
+
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({ success: false, error: 'Certificate not found' });
+      }
+
+      // Ensure _config.deployActions exists
+      if (!cert._config) cert._config = {};
+      if (!Array.isArray(cert._config.deployActions)) cert._config.deployActions = [];
+
+      // Find the action index
+      const actionIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
+
+      if (actionIndex === -1) {
+        return res.status(404).json({ success: false, error: 'Deployment action not found' });
+      }
+
+      // Update the action with the new properties
+      cert._config.deployActions[actionIndex] = {
+        ...cert._config.deployActions[actionIndex],
+        ...updatedAction,
+        id: actionId // Ensure ID remains the same
+      };
+
+      // Save the updated certificate
+      await certificateManager.saveCertificateConfigs();
+
+      // Return success property along with the updated action
+      res.json({
+        success: true,
+        action: cert._config.deployActions[actionIndex],
+        message: 'Deployment action updated successfully'
+      });
+    } catch (error) {
+      logger.error('Error updating deployment action:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to update deployment action',
+        message: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Delete a deployment action
+  router.delete('/:actionIndex', async (req, res) => {
+    try {
+      const { fingerprint, actionId } = req.params;
+
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        return res.status(404).json({ error: 'Certificate not found' });
+      }
+
+      // Check if deployActions exists
+      if (!cert._config || !Array.isArray(cert._config.deployActions)) {
+        return res.status(404).json({ error: 'No deployment actions found' });
+      }
+
+      // Find the action index
+      const actionIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
+
+      if (actionIndex === -1) {
+        return res.status(404).json({ error: 'Deployment action not found' });
+      }
+
+      // Remove the action
+      cert._config.deployActions.splice(actionIndex, 1);
+
+      // Save the updated certificate
+      await certificateManager.saveCertificateConfigs();
+
+      res.json({ success: true, message: 'Deployment action deleted' });
+    } catch (error) {
+      logger.error('Error deleting deployment action:', error);
+      res.status(500).json({ error: 'Failed to delete deployment action' });
+    }
+  });
+
   // Test a deployment action
   router.post('/:actionIndex/test', async (req, res) => {
     try {
       const { fingerprint, actionIndex } = req.params;
       const index = parseInt(actionIndex, 10);
-      logger.debug(`API received POST request for /api/certificates/${fingerprint}/deploy-actions/${actionIndex}/test with request params:`, req.params);
+      logger.debug(`API received POST request for /api/certificates/${fingerprint}/deploy-actions/${actionIndex}/test with request params:`, req.params, FILENAME);
 
       if (isNaN(index)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'Invalid action index',
-          statusCode: 400 
+          statusCode: 400
         });
       }
-      
+
       // Get certificate
-      const cert = certificateManager.getCertificate(fingerprint);
+      const cert = await certificateManager.getCertificate(fingerprint);
       if (!cert) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404 
+          statusCode: 404
         });
       }
-      
+
+      // Use the same approach to get deployActions as in the GET handler
+      let deployActions = [];
+
+      // Check if deployActions is in cert._config
+      if (cert._config && Array.isArray(cert._config.deployActions)) {
+        deployActions = cert._config.deployActions;
+        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`, null, FILENAME);
+      }
+      // Fallback to cert.config.deployActions if available
+      else if (cert.config && Array.isArray(cert.config.deployActions)) {
+        deployActions = cert.config.deployActions;
+        logger.debug(`Found deployActions in cert.config.deployActions: ${deployActions.length} actions`, null, FILENAME);
+      }
+
       // Check if action exists
-      if (!cert.deployActions || !cert.deployActions[index]) {
-        return res.status(404).json({ 
+      if (!deployActions || !deployActions[index]) {
+        logger.error(`Deployment action with index ${index} not found. Found ${deployActions?.length || 0} actions`, null, FILENAME);
+        return res.status(404).json({
           message: `Deployment action with index ${index} not found`,
-          statusCode: 404 
+          statusCode: 404
         });
       }
-      
-      const action = cert.deployActions[index];
-      
+
+      const action = deployActions[index];
+      logger.debug(`Testing deployment action at index ${index}:`, action, FILENAME);
+
       // Use deploy service to test the action (simulated execution)
       let result;
-      
+
       switch (action.type) {
         case 'copy':
           result = await deployService.executeCopyAction(cert, action);
@@ -180,147 +256,57 @@ function initDeploymentActionsRouter(deps) {
           result = await deployService.executeEmailAction(cert, action);
           break;
         default:
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: `Unknown action type: ${action.type}`,
-            statusCode: 400 
+            statusCode: 400
           });
       }
-      
+
       res.json({
         success: true,
         message: `Test execution completed for ${action.type} action`,
         result
       });
     } catch (error) {
-      logger.error(`Error testing deployment action for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ 
+      logger.error(`Error testing deployment action for ${req.params.fingerprint}:`, error, FILENAME);
+      res.status(500).json({
         success: false,
         message: `Failed to test deployment action: ${error.message}`,
-        statusCode: 500 
+        statusCode: 500
       });
     }
   });
-  
-  // Delete a deployment action
-  router.delete('/:actionIndex', async (req, res) => {
-    try {
-      const { fingerprint, actionIndex } = req.params;
-      const index = parseInt(actionIndex, 10);
-      logger.debug(`API received DELETE request for /api/certificates/${fingerprint}/deploy-actions/${actionIndex}.`);
 
-      if (isNaN(index)) {
-        return res.status(400).json({ 
-          success: false,
-          message: 'Invalid action index',
-          statusCode: 400 
-        });
-      }
-      
-      // Get certificate
-      const cert = certificateManager.getCertificate(fingerprint);
-      if (!cert) {
-        return res.status(404).json({ 
-          success: false,
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404 
-        });
-      }
-      
-      // Get deployment actions using the same approach as in POST
-      let deployActions = [];
-      
-      // Check if deployActions is in cert._config
-      if (cert._config && Array.isArray(cert._config.deployActions)) {
-        deployActions = cert._config.deployActions;
-        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`);
-      }
-      // Fallback to cert.deployActions if available
-      else if (Array.isArray(cert.deployActions)) {
-        deployActions = cert.deployActions;
-        logger.debug(`Found deployActions in cert.deployActions: ${deployActions.length} actions`);
-      }
-      // Otherwise, initialize as empty array
-      else {
-        logger.debug('No deployActions found, initializing as empty array');
-        return res.status(404).json({ 
-          success: false,
-          message: `Deployment action with index ${index} not found`,
-          statusCode: 404 
-        });
-      }
-      
-      // Check if action exists
-      if (index < 0 || index >= deployActions.length) {
-        return res.status(404).json({ 
-          success: false,
-          message: `Deployment action with index ${index} not found`,
-          statusCode: 404 
-        });
-      }
-      
-      // Get the action being removed for logging
-      const actionBeingRemoved = deployActions[index];
-      
-      // Remove the action
-      deployActions.splice(index, 1);
-      logger.debug(`Removed action at index ${index}, now have ${deployActions.length} actions`);
-      
-      // Save updated certificate configuration
-      await certificateManager.updateCertificateConfig(fingerprint, {
-        deployActions: deployActions
-      });
-      
-      // Verify the update worked
-      const updatedCert = certificateManager.getCertificate(fingerprint);
-      const updatedActions = updatedCert._config ? updatedCert._config.deployActions : updatedCert.deployActions;
-      logger.debug(`After update, certificate has ${updatedActions ? updatedActions.length : 0} actions`);
-      
-      res.json({ 
-        success: true,
-        message: 'Deployment action removed',
-        removedAction: actionBeingRemoved,
-        remainingActions: deployActions.length
-      });
-    } catch (error) {
-      logger.error(`Error removing deployment action for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ 
-        success: false,
-        message: `Failed to remove deployment action: ${error.message}`,
-        statusCode: 500 
-      });
-    }
-  });
-  
   // Execute all deployment actions
   router.post('/execute', async (req, res) => {
     try {
       const { fingerprint } = req.params;
-      logger.debug(`API received POST request for /api/certificates/${fingerprint}/deploy-actions/execute.`);
+      logger.debug(`API received POST request for /api/certificates/${fingerprint}/deploy-actions/execute.`, null, FILENAME);
 
       // Get certificate
       const cert = certificateManager.getCertificate(fingerprint);
       if (!cert) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
           message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404 
+          statusCode: 404
         });
       }
-      
+
       // Get deployment actions using the same approach
       let deployActions = [];
-      
+
       // Check if deployActions is in cert._config
       if (cert._config && Array.isArray(cert._config.deployActions)) {
         deployActions = cert._config.deployActions;
-        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`);
+        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`, null, FILENAME);
       }
-      // Fallback to cert.deployActions if available
-      else if (Array.isArray(cert.deployActions)) {
-        deployActions = cert.deployActions;
-        logger.debug(`Found deployActions in cert.deployActions: ${deployActions.length} actions`);
+      // Fallback to cert.config.deployActions if available
+      else if (Array.isArray(cert.config.deployActions)) {
+        deployActions = cert.config.deployActions;
+        logger.debug(`Found deployActions in cert.config.deployActions: ${deployActions.length} actions`, null, FILENAME);
       }
-      
+
       // Check if certificate has deployment actions
       if (!deployActions || deployActions.length === 0) {
         return res.json({
@@ -329,19 +315,19 @@ function initDeploymentActionsRouter(deps) {
           actionsExecuted: 0
         });
       }
-      
+
       // Execute deployment actions
       const results = [];
       let executedCount = 0;
       let successCount = 0;
-      
+
       // Execute each action
       for (let i = 0; i < deployActions.length; i++) {
         const action = deployActions[i];
         try {
           // Use deploy service to execute the action
           let result;
-          
+
           switch (action.type) {
             case 'copy':
               result = await deployService.executeCopyAction(cert, action);
@@ -377,13 +363,13 @@ function initDeploymentActionsRouter(deps) {
               result = { success: false, message: `Unknown action type: ${action.type}` };
               break;
           }
-          
+
           // Track execution
           executedCount++;
           if (result && result.success) {
             successCount++;
           }
-          
+
           // Add result to results array
           results.push({
             index: i,
@@ -392,9 +378,9 @@ function initDeploymentActionsRouter(deps) {
             success: result && result.success ? true : false,
             message: result ? result.message : 'No result returned'
           });
-          
+
         } catch (actionError) {
-          logger.error(`Error executing action ${i} (${action.name}):`, actionError);
+          logger.error(`Error executing action ${i} (${action.name}):`, actionError, FILENAME);
           results.push({
             index: i,
             name: action.name,
@@ -404,7 +390,7 @@ function initDeploymentActionsRouter(deps) {
           });
         }
       }
-      
+
       // Return the results
       res.json({
         success: true,
@@ -413,103 +399,206 @@ function initDeploymentActionsRouter(deps) {
         actionsSucceeded: successCount,
         results: results
       });
-      
+
     } catch (error) {
-      logger.error(`Error executing deployment actions for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ 
+      logger.error(`Error executing deployment actions for ${req.params.fingerprint}:`, error, FILENAME);
+      res.status(500).json({
         success: false,
         message: `Failed to execute deployment actions: ${error.message}`,
-        statusCode: 500 
+        statusCode: 500
       });
     }
   });
 
-  // Update a deployment action
-  router.put('/:actionIndex', async (req, res) => {
+  /**
+   * Reorder deployment actions
+   */
+  router.post('/reorder', async (req, res) => {
     try {
-      const { fingerprint, actionIndex } = req.params;
-      const actionData = req.body;
-      logger.debug(`API received PUT request for /api/certificates/${fingerprint}/deploy-actions/${actionIndex} with action data:`, actionData);
+      const { fingerprint } = req.params;
+      const { order } = req.body;
 
-      if (!actionData || !actionData.type) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Missing action type or invalid action data',
+      logger.debug(`API received POST request to reorder deployment actions for certificate: ${fingerprint}`,
+        { orderRequest: order }, FILENAME);
+
+      // Validate order array
+      if (!Array.isArray(order)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Order must be an array of action indices',
+          statusCode: 400
         });
       }
-      
+
       // Get certificate
       const cert = certificateManager.getCertificate(fingerprint);
       if (!cert) {
-        return res.status(404).json({ 
-          success: false,
-          message: `Certificate not found with fingerprint: ${fingerprint}` 
-        });
-      }
-      
-      // Get deployment actions using the same approach as in POST
-      let deployActions = [];
-      
-      // Check if deployActions is in cert._config
-      if (cert._config && Array.isArray(cert._config.deployActions)) {
-        deployActions = cert._config.deployActions;
-        logger.debug(`Found deployActions in cert._config.deployActions: ${deployActions.length} actions`);
-      }
-      // Fallback to cert.deployActions if available
-      else if (Array.isArray(cert.deployActions)) {
-        deployActions = cert.deployActions;
-        logger.debug(`Found deployActions in cert.deployActions: ${deployActions.length} actions`);
-      }
-      // Otherwise, initialize as empty array
-      else {
-        logger.debug('No deployActions found, initializing as empty array');
-      }
-      
-      // Check if action index is valid
-      const index = parseInt(actionIndex, 10);
-      if (isNaN(index) || index < 0 || index >= deployActions.length) {
+        logger.warn(`Certificate not found: ${fingerprint}`, null, FILENAME);
         return res.status(404).json({
           success: false,
-          message: `Invalid action index: ${actionIndex}`
+          message: 'Certificate not found',
+          statusCode: 404
         });
       }
-      
-      // Update the action at the specified index
-      deployActions[index] = actionData;
-      logger.debug(`Updated action at index ${index}, now have ${deployActions.length} actions`);
-      
-      // Save the updated  configurationcertificate configuration
-      await certificateManager.updateCertificateConfig(fingerprint, {
-        deployActions: deployActions
+
+      // Get current deploy actions using the same approach as in other methods
+      let deployActions = [];
+
+      // Check if deployActions is in cert._config
+      if (cert._config && Array.isArray(cert._config.deployActions)) {
+        deployActions = [...cert._config.deployActions];
+      }
+      // Fallback to cert.config.deployActions if available
+      else if (Array.isArray(cert.config.deployActions)) {
+        deployActions = [...cert.config.deployActions];
+      }
+
+      // Log current state for debugging
+      logger.debug(`Current deployActions: ${deployActions.length}, order indices: ${JSON.stringify(order)}`, null, FILENAME);
+
+      // Validate indices more permissively - just make sure they're valid integers within range
+      const invalidIndices = order.filter(index =>
+        !Number.isInteger(index) || index < 0 || index >= deployActions.length
+      );
+
+      if (invalidIndices.length > 0) {
+        logger.warn(`Invalid action indices in reorder request: ${JSON.stringify(invalidIndices)}`, null, FILENAME);
+        return res.status(400).json({
+          success: false,
+          message: `Invalid action indices: ${invalidIndices.join(', ')}`,
+          statusCode: 400
+        });
+      }
+
+      // Check if the order contains the right number of elements
+      if (order.length !== deployActions.length) {
+        logger.warn(`Order length (${order.length}) doesn't match actions length (${deployActions.length})`, null, FILENAME);
+        return res.status(400).json({
+          success: false,
+          message: `Order length (${order.length}) doesn't match actions length (${deployActions.length})`,
+          statusCode: 400
+        });
+      }
+
+      // Create new array based on order
+      const newActions = order.map(index => deployActions[index]);
+
+      // Log what we're about to save
+      logger.debug(`Reordering actions from [${deployActions.map(a => a.name || a.type).join(', ')}] to [${newActions.map(a => a.name || a.type).join(', ')}]`, null, FILENAME);
+
+      // Update certificate using the sync method
+      await certificateManager.updateCertificateConfigAndSync(fingerprint, {
+        deployActions: newActions
       });
-      
-      // Verify the update worked
-      const updatedCert = certificateManager.getCertificate(fingerprint);
-      const updatedActions = updatedCert._config ? updatedCert._config.deployActions : updatedCert.deployActions;
-      logger.debug(`After update, certificate has ${updatedActions ? updatedActions.length : 0} actions`);
-      
-      // Log the successful update
-      logger.info(`Deployment action updated at index ${index} for certificate`, {
-        fingerprint,
-        actionType: actionData.type
-      });
-      
-      // Return success response with the updated action
-      res.json({ 
+
+      logger.info(`Reordered deployment actions for certificate: ${fingerprint}`, null, FILENAME);
+
+      return res.json({
         success: true,
-        message: 'Deployment action updated successfully',
-        action: actionData
+        message: 'Deployment actions reordered successfully',
+        actions: newActions
       });
-      
     } catch (error) {
-      logger.error(`Error updating deployment action for ${req.params.fingerprint}:`, error);
-      res.status(500).json({ 
+      logger.error(`Error reordering deployment actions: ${error.message}`, error, FILENAME);
+
+      return res.status(500).json({
         success: false,
-        message: `Failed to update deployment action: ${error.message}`
+        message: `Failed to reorder deployment actions: ${error.message}`,
+        statusCode: 500
       });
     }
   });
-  
+
+  /**
+   * Toggle deployment action enabled/disabled state
+   */
+  router.post('/:actionIndex/toggle', async (req, res) => {
+    try {
+      const { fingerprint, actionIndex } = req.params;
+      const { enabled } = req.body;
+
+      logger.debug(`API received POST request to toggle deployment action ${actionIndex} for certificate: ${fingerprint}`,
+        { enabled }, FILENAME);
+
+      // Validate index
+      const index = parseInt(actionIndex, 10);
+      if (isNaN(index) || index < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid action index',
+          statusCode: 400
+        });
+      }
+
+      // Check if enabled is boolean
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'Enabled status must be a boolean',
+          statusCode: 400
+        });
+      }
+
+      // Get certificate
+      const cert = certificateManager.getCertificate(fingerprint);
+      if (!cert) {
+        logger.warn(`Certificate not found: ${fingerprint}`, null, FILENAME);
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate not found',
+          statusCode: 404
+        });
+      }
+
+      // Get current deploy actions
+      let actions = [];
+
+      // Check if deployActions is in cert._config
+      if (cert._config && Array.isArray(cert._config.deployActions)) {
+        actions = [...cert._config.deployActions];
+      }
+      // Fallback to cert.config.deployActions if available
+      else if (Array.isArray(cert.config.deployActions)) {
+        actions = [...cert.config.deployActions];
+      }
+
+      // Check if action exists
+      if (index >= actions.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'Action not found',
+          statusCode: 404
+        });
+      }
+
+      // Update action
+      actions[index].enabled = enabled;
+
+      // Save changes
+      await certificateManager.updateCertificateConfigAndSync(fingerprint, {
+        deployActions: actions
+      });
+
+      logger.info(`Toggled deployment action ${index} to ${enabled ? 'enabled' : 'disabled'} for certificate: ${fingerprint}`,
+        null, FILENAME);
+
+      return res.json({
+        success: true,
+        message: `Action ${enabled ? 'enabled' : 'disabled'} successfully`,
+        action: actions[index]
+      });
+    } catch (error) {
+      logger.error(`Error toggling deployment action: ${error.message}`, error, FILENAME);
+
+      return res.status(500).json({
+        success: false,
+        message: `Failed to toggle deployment action: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
+
   return router;
 }
 

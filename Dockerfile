@@ -1,8 +1,13 @@
 FROM node:23-slim
 
-RUN apt-get update && apt-get install -y openssl && apt-get clean
+RUN apt-get update && apt-get install -y openssl curl && apt-get clean
 
 WORKDIR /app
+
+#Enable AUTH by default
+ENV DISABLE_AUTH=false
+# Set default admin password to empty, to force user to set it in setup or env
+ENV DEFAULT_ADMIN_PASSWORD=''
 
 # Copy package files and install dependencies
 COPY package*.json ./

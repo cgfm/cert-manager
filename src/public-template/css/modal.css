@@ -1,15 +1,7 @@
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1050;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+/* ===============================
+   1. BASIC MODAL STRUCTURE
+   =============================== */
+
 
 .modal {
     display: flex;
@@ -33,8 +25,19 @@
     visibility: visible;
 }
 
+.modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .modal.hidden {
     display: none;
+}
+
+/* Add body style to prevent scrolling when modal is open */
+body.modal-open {
+    overflow: hidden;
 }
 
 .modal-content {
@@ -44,12 +47,8 @@
     width: 100%;
     max-width: 600px;
     max-height: 90vh;
-    overflow-y: auto;
     margin: 0 20px;
-    background-color: #fff;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    width: 90%;
-    max-width: 800px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -66,6 +65,7 @@
     padding: 16px 20px;
     border-bottom: 1px solid var(--border-color, #eee);
     background-color: #f8f9fa;
+    flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -84,6 +84,12 @@
     font-weight: bold;
     cursor: pointer;
     color: var(--secondary-color);
+    transition: color 0.2s;
+}
+
+.modal-header .close-modal {
+    background-color: unset;
+    border: unset;
 }
 
 .close-modal:hover {
@@ -94,6 +100,7 @@
     padding: 20px;
     color: var(--text-color);
     line-height: 1.5;
+    flex: 1;
 }
 
 .modal-footer {
@@ -109,6 +116,7 @@
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -116,795 +124,407 @@
 }
 
 .button-spacer {
-  visibility: hidden;
-  flex: auto;
+    visibility: hidden;
+    flex: auto;
 }
 
-/* Certificate details tabs */
-.cert-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-color);
-  margin: 1rem 0;
-}
-
-.cert-tab-btn {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-weight: 500;
-  color: var(--text-muted);
-  transition: all 0.2s;
-}
-
-.cert-tab-btn:hover {
-  color: var(--primary-color);
-}
-
-.cert-tab-btn.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-}
-
-.cert-tab-content {
-  display: none;
-}
-
-.cert-tab-content.active {
-  display: block;
-}
-
-.cert-tab-content > div > * {
-  padding: 0 1rem;
-}
-
-.cert-details-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  padding: 0 1rem;
-}
-
-.cert-details-table th, 
-.cert-details-table td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.cert-details-table th {
-  width: 180px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.cert-files-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 20px;
-}
-
-.cert-files-table th,
-.cert-files-table td {
-  text-align: left;
-  padding: 8px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.cert-files-table th {
-  background-color: #f5f5f5;
-  font-weight: 600;
-}
-
-.deployment-action-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
-  align-items: center;
-}
-
-.deployment-action-type {
-  display: inline-block;
-  background-color: var(--primary-light);
-  color: var(--primary-color);
-  padding: 0.15rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  margin-right: 0.5rem;
-}
-
-.deployment-action-desc {
-  color: var(--text-color);
-}
-
-.deployment-action-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-/* Detail tabs */
-.detail-tabs {
-  margin-top: 1rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.detail-tab-button {
-  background: none;
-  border: none;
-  padding: 0.5rem 1rem;
-  margin-right: 0.5rem;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-
-.detail-tab-button.active {
-  border-bottom-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.detail-tab-content {
-  display: none;
-  padding: 1rem 0;
-}
-
-.detail-tab-content.active {
-  display: block;
-}
-
+/* ===============================
+   2. CERTIFICATE DETAILS MODAL
+   =============================== */
 /* Certificate details modal with fixed dimensions */
 #cert-details-modal .modal-content {
-  width: 100%;
-  max-width: 800px;
-  height: 600px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* Prevent double scrollbars */
-}
-
-#edit-cert-details-btn{
-  margin-bottom: 0.25rem;
-}
-
-#cert-details-modal .modal-header {
-  flex-shrink: 0;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 900px;
+    /* Using the larger size from newer styles */
+    height: 600px;
+    /* Using the larger size from newer styles */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Prevent double scrollbars */
 }
 
 #cert-details-modal .modal-body {
-  flex: 1;
-  overflow: hidden; /* Prevent scrollbar in the modal body */
-  padding: 0; /* Remove padding to maximize space */
-}
-
-#cert-details-modal #cert-details-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+    flex: 1;
+    overflow-y: auto;
+    /* Allow scrolling within the body */
+    padding: 0;
 }
 
 /* Cert header */
-#cert-details-modal .cert-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
+.cert-modal-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
 }
 
-/* Tabs styling */
-#cert-details-modal .cert-tabs {
-  display: flex;
-  background-color: var(--bg-light);
-  border-bottom: 1px solid var(--border-color);
-  padding: 0;
-  margin: 0;
-  overflow-x: auto; /* Allow scrolling for many tabs on small screens */
+.cert-modal-header h3 {
+    margin: 0;
+    flex: 0 0 auto;
+    margin-right: 15px;
 }
 
-#cert-details-modal .cert-tab-btn {
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  padding: 12px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-muted);
-  transition: all 0.2s;
-  white-space: nowrap;
+.cert-modal-header .cert-name {
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-#cert-details-modal .cert-tab-btn:hover {
-  color: var(--primary-color);
-  background-color: rgba(0, 0, 0, 0.03);
+.cert-modal-header .cert-status {
+    margin-right: 15px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
-#cert-details-modal .cert-tab-btn.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
+/* Add this to your CSS file */
+.cert-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.cert-status.status-valid {
+    background-color: var(--success-light, #e6f7e6);
+    color: var(--success-color, #2e7d32);
+}
+
+.cert-status.status-warning {
+    background-color: var(--warning-light, #fff8e1);
+    color: var(--warning-color, #ff8f00);
+}
+
+.cert-status.status-expired {
+    background-color: var(--danger-light, #ffebee);
+    color: var(--danger-color, #c62828);
+}
+
+.cert-status.status-unknown {
+    background-color: var(--bg-light, #f5f5f5);
+    color: var(--text-muted, #666);
+}
+
+/* ===============================
+   3. CERTIFICATE DETAILS LAYOUT
+   =============================== */
+/* Certificate details layout */
+.cert-details-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+/* Tab Layouts - Responsive */
+/* Default styling for horizontal tabs (mobile first) */
+.cert-tabs-sidebar {
+    display: none;
+    /* Hidden by default on small screens */
+}
+
+.cert-tabs-horizontal {
+    display: flex;
+    /*overflow-x: auto;*/
+    background-color: var(--bg-light);
+    border-bottom: 1px solid var(--border-color);
+    margin: 0;
+    padding: 0;
+}
+
+.cert-tabs-horizontal .cert-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.cert-tabs-horizontal .cert-tab-btn:hover {
+    color: var(--primary-color);
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.cert-tabs-horizontal .cert-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
 }
 
 /* Content wrapper with correct scrolling */
-#cert-details-modal .cert-content-wrapper {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+.cert-content-wrapper {
+    flex: 1;
+    position: relative;
 }
 
 /* Tab content with proper scrolling */
-#cert-details-modal .cert-tab-content {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 20px;
-  overflow-y: auto; /* Single scrollbar per tab */
-  display: none;
+.cert-tab-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 20px;
+    overflow-y: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    visibility: hidden;
+    display: none;
+    /* Default hidden */
 }
 
-#cert-details-modal .cert-tab-content.active {
-  display: block;
+.cert-tab-content.active {
+    opacity: 1;
+    display: block;
+    position: relative;
+    visibility: visible;
 }
 
-/* Section styling */
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
+/* Scrollbar styling for tab content */
+.cert-tab-content::-webkit-scrollbar {
+    width: 6px;
 }
 
-/* Form layouts */
-.form-row {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
+.cert-tab-content::-webkit-scrollbar-track {
+    background: var(--bg-light, #f1f1f1);
+    border-radius: 10px;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-  margin-top: 15px;
+.cert-tab-content::-webkit-scrollbar-thumb {
+    background: var(--border-color, #cccccc);
+    border-radius: 10px;
 }
 
-/* Tables styling */
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 20px;
+.cert-tab-content::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color, #999999);
 }
 
-.data-table th,
-.data-table td {
-  padding: 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
+/* Media query for larger screens - switch to sidebar layout */
+@media (min-width: 992px) {
+    #cert-details-modal .modal-content {
+        width: 100%;
+        max-width: 950px;
+        /* Increase maximum width for sidebar layout */
+        height: 600px;
+        /* Increase height slightly */
+    }
 
-.data-table th {
-  font-weight: 500;
-  color: var(--text-muted);
-  background-color: var(--bg-light);
-}
+    .cert-details-container {
+        flex-direction: row;
+        /* Change to row layout on larger screens */
+    }
 
-/* Domains section */
-.domains-list-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
+    .cert-tabs-horizontal {
+        display: none;
+        /* Hide horizontal tabs */
+    }
 
-.domains-list {
-  margin-bottom: 20px;
-  overflow-y: auto;
-  max-height: 200px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-}
+    .cert-tabs-sidebar {
+        display: flex;
+        flex-direction: column;
+        width: 200px;
+        min-width: 200px;
+        background-color: var(--bg-light, #f8f9fa);
+        border-right: 1px solid var(--border-color);
+        overflow-y: auto;
+        padding: 15px 0;
+    }
 
-/* Files section */
-.file-list {
-  margin-bottom: 20px;
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-}
+    .cert-tabs-sidebar .cert-tab-btn {
+        display: flex;
+        align-items: center;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 12px 15px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-color);
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+        position: relative;
+        overflow: hidden;
+    }
 
-.file-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 15px;
-  border-bottom: 1px solid var(--border-color);
-}
+    .cert-tabs-sidebar .cert-tab-btn i {
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+    }
 
-.file-item:last-child {
-  border-bottom: none;
-}
+    .cert-tabs-sidebar .cert-tab-btn>span {
+        padding-left: 0.5rem;
+    }
 
-.file-info {
-  flex: 1;
-}
+    .cert-tabs-sidebar .cert-tab-btn::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 0;
+        background-color: var(--primary-color);
+        opacity: 0.1;
+        transition: width 0.2s ease;
+        z-index: -1;
+    }
 
-.file-type {
-  font-weight: 500;
-  margin-bottom: 3px;
-}
+    .cert-tabs-sidebar .cert-tab-btn:hover {
+        background-color: var(--hover-bg);
+    }
 
-.file-path {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+    .cert-tabs-sidebar .cert-tab-btn:hover::after {
+        width: 100%;
+        left: 0;
+        right: auto;
+    }
 
-.file-actions {
-  display: flex;
-  gap: 5px;
-}
+    .cert-tabs-sidebar .cert-tab-btn.active {
+        color: var(--primary-color);
+        background-color: rgba(var(--primary-color-rgb, 52, 152, 219), 0.05);
+        border-left-color: var(--primary-color);
+    }
 
-.file-description {
-  color: #666;
-  font-size: 0.9em;
-}
+    .cert-content-wrapper {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+    }
 
-/* More responsive handling for small screens */
-@media (max-width: 768px) {
-  .cert-files-table .file-path {
-    max-width: 150px;
-  }
-}
+    .cert-tab-content {
+        padding: 20px;
+        height: 100%;
+        overflow-y: auto;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
 
-/* Toggle switch for settings */
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
+    .cert-tab-content .section-header {
+        margin-top: 0;
+    }
 
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
+    /* Add a subtle visual separator between sections */
+    .cert-tab-content>div:not(:last-child) {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
 
-.toggle-slider {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-  background-color: var(--border-color);
-  border-radius: 20px;
-  margin-right: 10px;
-  transition: .4s;
-}
+    /* Improve scrollbar appearance for sidebar */
+    .cert-tabs-sidebar::-webkit-scrollbar {
+        width: 5px;
+    }
 
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: white;
-  border-radius: 50%;
-  transition: .4s;
-}
+    .cert-tabs-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
 
-input:checked + .toggle-slider {
-  background-color: var(--primary-color);
-}
+    .cert-tabs-sidebar::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 10px;
+    }
 
-input:focus + .toggle-slider {
-  box-shadow: 0 0 1px var(--primary-color);
-}
-
-input:checked + .toggle-slider:before {
-  transform: translateX(20px);
-}
-
-.toggle-label {
-  user-select: none;
-}
-
-/* Loading indicator */
-.loading-cell {
-  text-align: center;
-  padding: 20px !important;
-}
-
-/* Certificate details modal with fixed dimensions */
-#cert-details-modal .modal-content {
-  width: 100%;
-  max-width: 700px; /* Fixed maximum width */
-  height: 550px;    /* Fixed height */
-  display: flex;
-  flex-direction: column;
-}
-
-#cert-details-modal .modal-body {
-  flex: 1;
-  overflow-y: auto; /* Allow scrolling within the body */
-  padding-bottom: 20px;
-}
-
-#cert-details-modal #cert-details-content {
-  min-height: 400px; /* Minimum content height */
-  display: flex;
-  flex-direction: column;
-}
-
-/* Ensure tab content areas maintain consistent height */
-#cert-details-modal .cert-tab-content {
-  min-height: 300px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding: 1rem 0.5rem 1rem 0;
-}
-
-/* Add subtle scrollbar styling */
-#cert-details-modal .cert-tab-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-#cert-details-modal .cert-tab-content::-webkit-scrollbar-track {
-  background: var(--bg-light, #f1f1f1);
-  border-radius: 10px;
-}
-
-#cert-details-modal .cert-tab-content::-webkit-scrollbar-thumb {
-  background: var(--border-color, #cccccc);
-  border-radius: 10px;
-}
-
-#cert-details-modal .cert-tab-content::-webkit-scrollbar-thumb:hover {
-  background: var(--secondary-color, #999999);
-}
-
-/* Maintain tab height consistency */
-#cert-details-modal .cert-tabs {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-/* Add loading spinner consistent positioning */
-#cert-details-modal .loading-state {
-  min-height: 300px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Consistent error state positioning */
-#cert-details-modal .error-state {
-  min-height: 300px;
-}
-
-/* Deployment actions section - prevent layout shift */
-#cert-details-modal .deployment-actions {
-  margin-top: 0;
-}
-
-#cert-details-modal .deployment-options {
-  min-height: 100px; /* Ensure space for at least one action */
-}
-
-/* Add smooth transitions for tab content */
-#cert-details-modal .cert-tab-content {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-  position: absolute;
-  visibility: hidden;
-}
-
-#cert-details-modal .cert-tab-content.active {
-  opacity: 1;
-  position: relative;
-  visibility: visible;
-}
-
-/* Container for tab content to enable absolute positioning */
-#cert-details-modal .cert-tabs-container {
-  position: relative;
-  min-height: 350px;
-  margin-top: 1rem;
+    .cert-tabs-sidebar::-webkit-scrollbar-thumb:hover {
+        background-color: var(--text-muted);
+    }
 }
 
 /* Mobile adjustments for certificate details modal */
 @media (max-width: 768px) {
-  #cert-details-modal .modal-content {
-    height: 90vh;
-    max-height: 650px;
-  }
-  
-  #cert-details-modal .cert-tab-content {
-    min-height: 250px;
-    max-height: 250px;
-  }
-  
-  #cert-details-modal .cert-details-table th,
-  #cert-details-modal .cert-files-table th {
-    width: 120px;
-  }
+    #cert-details-modal .modal-content {
+        height: 90vh;
+        max-height: 650px;
+    }
 }
 
-/* Cert modal header */
-.cert-modal-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.cert-modal-header h3 {
-  margin: 0;
-  flex: 0 0 auto;
-  margin-right: 15px;
-}
-
-.cert-modal-header .cert-name {
-  font-weight: 500;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cert-modal-header .cert-status {
-  margin-right: 15px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8em;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.close-modal {
-  font-size: 24px;
-  font-weight: bold;
-  cursor: pointer;
-  color: #666;
-  transition: color 0.2s;
-}
-
-.close-modal:hover {
-  color: #000;
-}
-
-/* Add this to your CSS file */
-.convert-form-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.format-selection-group {
-  flex: 1;
-  min-width: 0;
-}
-
-.convert-button-group {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-end;
-}
-
-.password-row {
-  margin-top: 10px;
-}
-
-.password-row.hidden {
-  display: none;
-}
-
-.format-selection-group select {
-  width: 100%;
-}
-
-/* Enhanced responsive certificate conversion form */
-.convert-form-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.format-selection-group {
-  flex: 1.5;
-  min-width: 180px;
-}
-
-.password-field-group {
-  flex: 1;
-  min-width: 150px;
-}
-
-.convert-button-group {
-  flex: 0 0 auto;
-}
-
-/* Hide standalone password row by default */
-.password-row.standalone {
-  display: none;
-}
-
-/* Media query for smaller screens */
-@media (max-width: 600px) {
-  .convert-form-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .format-selection-group,
-  .password-field-group,
-  .convert-button-group {
-    width: 100%;
-  }
-  
-  /* On small screens, show the standalone password row */
-  .password-row.standalone {
-    display: block;
-    margin-top: 10px;
-  }
-  
-  /* And hide the inline password field */
-  .password-field-group.inline {
-    display: none;
-  }
-}
-
-.format-selection-group select {
-  width: 100%;
-}
-
-.password-field-group input {
-  width: 100%;
-}
-
-/* Transition for showing/hiding password fields */
-.password-field-group,
-.password-row {
-  transition: opacity 0.3s, max-height 0.3s;
-  overflow: hidden;
-}
-
-.password-field-group.hidden,
-.password-row.hidden {
-  opacity: 0;
-  max-height: 0;
-  margin: 0;
-}
-
-.password-field-group:not(.hidden),
-.password-row:not(.hidden):not(.standalone) {
-  opacity: 1;
-  max-height: 80px;
-}
-
-/* Add to your CSS file */
-.domains-section {
-  padding: 15px 0;
-}
-
+/* ===============================
+   4. SECTION STYLING
+   =============================== */
+/* Section styling */
 .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
 }
 
 .section-header h4 {
-  margin: 0;
+    margin: 0;
+}
+
+/* Form layouts */
+.form-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* ===============================
+   5. DOMAINS MANAGEMENT
+   =============================== */
+/* Domains section */
+.domains-section {
+    padding: 15px 0;
+}
+
+.domains-table-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
 }
 
 .domains-table {
-  width: 100%;
-  border-collapse: collapse;
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .domains-table th,
 .domains-table td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid #e0e0e0;
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
 }
 
 .domains-table th {
-  background-color: #f5f5f5;
-  font-weight: 600;
+    font-weight: 600;
+    background-color: #f5f5f5;
+}
+
+.domains-table .text-center {
+    text-align: center;
 }
 
 .empty-cell {
-  text-align: center;
-  color: #666;
-  padding: 20px;
+    text-align: center;
+    color: #666;
+    padding: 20px;
 }
 
 .loading-cell {
-  text-align: center;
-  padding: 20px;
-}
-
-.add-domain-form {
-  margin-top: 20px;
-  padding: 15px;
-  background: #f9f9f9;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-}
-
-.add-domain-form .form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-@media (min-width: 768px) {
-  .add-domain-form .form-row {
-    flex-direction: row;
-    align-items: flex-end;
-  }
-  
-  .add-domain-form .form-group {
-    flex: 1;
-  }
-}
-
-/* Add these styles at the end of the file */
-
-/* Group selection with new group input */
-.group-select-container {
-  position: relative;
-}
-
-.new-group-input-container {
-  margin-top: 8px;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #f9f9f9;
-}
-
-.new-group-input-container.hidden {
-  display: none;
-}
-
-.new-group-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
-  gap: 8px;
-}
-
-/* No results item */
-.select-no-results {
-  padding: 8px;
-  color: #666;
-  font-style: italic;
-}
-
-/* Create new group option styling */
-option[value="__new__"] {
-  font-weight: 500;
-  color: #0078d4;
-  background-color: #f0f8ff;
+    text-align: center;
+    padding: 20px !important;
 }
 
 /* Domain management styles */
@@ -977,6 +597,7 @@ option[value="__new__"] {
     flex: 1;
 }
 
+/* Add domain form */
 .add-domain-form {
     margin-top: 20px;
     padding: 15px;
@@ -1008,38 +629,12 @@ option[value="__new__"] {
     flex: 1 0 100%;
 }
 
-/* Make tables more responsive */
-.domains-table-container {
-    overflow-x: auto;
-    margin-bottom: 20px;
-}
-
-.domains-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.domains-table th,
-.domains-table td {
-    padding: 10px;
-    text-align: left;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.domains-table th {
-    font-weight: 600;
-    background-color: #f5f5f5;
-}
-
-.domains-table .text-center {
-    text-align: center;
-}
-
-/* Add these styles to your CSS file */
+/* Input validation feedback */
 .input-feedback {
     font-size: 0.85rem;
     margin-top: 5px;
-    min-height: 18px; /* Maintain height even when empty */
+    min-height: 18px;
+    /* Maintain height even when empty */
 }
 
 .valid-feedback {
@@ -1063,4 +658,459 @@ input.is-invalid {
 /* Add a bit of transition for smoother UI */
 input.form-control {
     transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+/* ===============================
+   6. FILES SECTION
+   =============================== */
+/* Files section */
+.cert-files-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.cert-files-table th,
+.cert-files-table td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.cert-files-table th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+}
+
+.file-list {
+    margin-bottom: 20px;
+    max-height: 198px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-type {
+    font-weight: 500;
+    margin-bottom: 3px;
+}
+
+.file-path {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.file-description {
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* ===============================
+   7. DEPLOYMENT SECTION
+   =============================== */
+.deployment-action-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+}
+
+.deployment-action-type {
+    display: inline-block;
+    background-color: var(--primary-light);
+    color: var(--primary-color);
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+}
+
+.deployment-action-desc {
+    color: var(--text-color);
+}
+
+.deployment-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Deployment actions section - prevent layout shift */
+#cert-details-modal .deployment-actions {
+    margin-top: 0;
+}
+
+#cert-details-modal .deployment-options {
+    min-height: 100px;
+    /* Ensure space for at least one action */
+}
+
+/* ===============================
+   8. CERTIFICATE DETAILS TABLE
+   =============================== */
+.cert-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    padding: 0 1rem;
+}
+
+.cert-details-table th,
+.cert-details-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cert-details-table th {
+    width: 180px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ===============================
+   9. CERTIFICATE CONVERSION
+   =============================== */
+/* Certificate conversion form */
+.convert-form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.format-selection-group {
+    flex: 1.5;
+    min-width: 180px;
+}
+
+.password-field-group {
+    flex: 1;
+    min-width: 150px;
+}
+
+.convert-button-group {
+    flex: 0 0 auto;
+}
+
+/* Hide standalone password row by default */
+.password-row.standalone {
+    display: none;
+}
+
+/* Transition for showing/hiding password fields */
+.password-field-group,
+.password-row {
+    transition: opacity 0.3s, max-height 0.3s;
+    overflow: hidden;
+}
+
+.password-field-group.hidden,
+.password-row.hidden {
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+}
+
+.password-field-group:not(.hidden),
+.password-row:not(.hidden):not(.standalone) {
+    opacity: 1;
+    max-height: 80px;
+}
+
+.format-selection-group select {
+    width: 100%;
+}
+
+.password-field-group input {
+    width: 100%;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 600px) {
+    .convert-form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .format-selection-group,
+    .password-field-group,
+    .convert-button-group {
+        width: 100%;
+    }
+
+    /* On small screens, show the standalone password row */
+    .password-row.standalone {
+        display: block;
+        margin-top: 10px;
+    }
+
+    /* And hide the inline password field */
+    .password-field-group.inline {
+        display: none;
+    }
+}
+
+/* ===============================
+   10. TOGGLE SWITCH
+   =============================== */
+/* Toggle switch for settings */
+.toggle-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    background-color: var(--border-color);
+    border-radius: 20px;
+    margin-right: 10px;
+    transition: .4s;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+}
+
+input:checked+.toggle-slider {
+    background-color: var(--primary-color);
+}
+
+input:focus+.toggle-slider {
+    box-shadow: 0 0 1px var(--primary-color);
+}
+
+input:checked+.toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    user-select: none;
+}
+
+/* ===============================
+   11. GROUP SELECTION
+   =============================== */
+/* Group selection with new group input */
+.group-select-container {
+    position: relative;
+}
+
+.new-group-input-container {
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.new-group-input-container.hidden {
+    display: none;
+}
+
+.new-group-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+    gap: 8px;
+}
+
+/* No results item */
+.select-no-results {
+    padding: 8px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Create new group option styling */
+option[value="__new__"] {
+    font-weight: 500;
+    color: #0078d4;
+    background-color: #f0f8ff;
+}
+
+/* ===============================
+   12. MEDIA QUERIES
+   =============================== */
+/* More responsive handling for small screens */
+@media (max-width: 768px) {
+    .cert-files-table .file-path {
+        max-width: 150px;
+    }
+
+    #cert-details-modal .cert-details-table th,
+    #cert-details-modal .cert-files-table th {
+        width: 120px;
+    }
+}
+
+@media (min-width: 768px) {
+    .add-domain-form .form-row {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+
+    .add-domain-form .form-group {
+        flex: 1;
+    }
+}
+
+/* ===============================
+   13. CSS VARIABLES
+   =============================== */
+/* Fix for CSS variables if needed */
+:root {
+    --primary-color-rgb: 52, 152, 219;
+    /* RGB values for primary color */
+}
+
+[data-theme="dark"] {
+    --primary-color-rgb: 44, 123, 229;
+    /* RGB values for primary color in dark mode */
+}
+
+
+/* ===============================
+   14. Create Certificate Modal
+   =============================== */
+
+#certificate-modal .modal-body {
+    overflow: auto;
+}
+
+/* ================================
+   15. Loader
+   =============================== */
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.loader-spinner {
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin: 10px auto;
+}
+
+.loader-spinner.small {
+  width: 20px;
+  height: 20px;
+}
+
+.loader-spinner.large {
+  width: 60px;
+  height: 60px;
+}
+
+.loader-spinner:before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--primary-color, #3498db);
+  animation: loader-spin 0.8s infinite linear;
+}
+
+.loader-spinner.small:before {
+  border-width: 2px;
+}
+
+.loader-spinner.large:before {
+  border-width: 4px;
+}
+
+.loader-message {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-color-secondary, #666);
+}
+
+@keyframes loader-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* When inside modal */
+.modal .loader-container {
+  min-height: 120px;
+}
+
+/* For full-screen loader */
+.fullscreen-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullscreen-loader .loader-container {
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }

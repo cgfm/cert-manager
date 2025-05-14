@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First-Time Setup - Certificate Manager</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/login.css">
+  <link rel="stylesheet" href="/css/setup.css">
+  <link rel="stylesheet" href="/css/modal.css" />
+  <link rel="stylesheet" href="/css/notifications.css" />
+  <link rel="stylesheet" href="/css/file-browser.css">
+  <link rel="stylesheet" href="/fontawesome/css/fontawesome.min.css" />
+  <link rel="stylesheet" href="/fontawesome/css/all.min.css" />
+  
+  <link rel="shortcut icon" href="/img/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/img/favicon.png" type="image/png" />
+
+</head>
+<body>
+  <div class="setup-container">
+    <div class="setup-box">
+      <div class="setup-header">
+        <img src="/img/logo.svg" alt="Certificate Manager Logo" class="setup-logo">
+        <h1>Certificate Manager</h1>
+        <h2>First-Time Setup</h2>
+      </div>
+      
+      <div class="setup-progress">
+        <div class="progress-step active" id="step-1">
+          <div class="step-number">1</div>
+          <div class="step-label">Admin Account</div>
+        </div>
+        <div class="progress-step" id="step-2">
+          <div class="step-number">2</div>
+          <div class="step-label">Configuration</div>
+        </div>
+        <div class="progress-step" id="step-3">
+          <div class="step-number">3</div>
+          <div class="step-label">Finish</div>
+        </div>
+      </div>
+      
+      <div class="setup-message" id="setup-message" style="display: none;"></div>
+      
+      <!-- Step 1: Admin Account -->
+      <div class="setup-step active" id="setup-step-1">
+        <h3>Create Admin Account</h3>
+        <p>Enter the credentials for your administrator account. This account will have full access to the Certificate Manager.</p>
+        
+        <form id="admin-form">
+          <div class="form-group">
+            <label for="admin-username">Username</label>
+            <input type="text" id="admin-username" name="username" value="admin" autocomplete="username" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="admin-name">Display Name</label>
+            <input type="text" id="admin-name" name="name" value="Administrator" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="admin-password">Password</label>
+            <div class="password-input-group">
+              <input type="password" id="admin-password" name="password" autocomplete="new-password" required>
+              <button type="button" class="toggle-password" data-target="admin-password">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="admin-password-confirm">Confirm Password</label>
+            <div class="password-input-group">
+              <input type="password" id="admin-password-confirm" name="passwordConfirm" autocomplete="new-password" required>
+              <button type="button" class="toggle-password" data-target="admin-password-confirm">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="password-strength" id="password-strength">
+            <div class="strength-bar">
+              <div class="strength-fill" id="strength-fill"></div>
+            </div>
+            <div class="strength-text" id="strength-text">Password strength: Too weak</div>
+          </div>
+          
+          <div class="setup-buttons">
+            <button type="submit" class="button primary full-width">
+              Continue <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Step 2: Basic Configuration -->
+      <div class="setup-step" id="setup-step-2">
+        <h3>Basic Configuration</h3>
+        <p>Configure the basic settings for your Certificate Manager instance.</p>
+        
+        <form id="config-form">
+          <div class="form-group">
+            <label for="cert-path">Certificate Directory</label>
+            <div class="input-with-button">
+              <input type="text" id="cert-path" name="certPath" required>
+              <button type="button" class="browse-btn" data-target="cert-path">
+                <i class="fas fa-folder-open"></i>
+              </button>
+            </div>
+            <small>Directory where certificates will be stored</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="port">Server Port</label>
+            <input type="number" id="port" name="port" min="1" max="65535" value="3000" required>
+            <small>Port where Certificate Manager will be accessible</small>
+          </div>
+          
+          <div class="form-group">
+            <label>Enable HTTPS</label>
+            <div class="toggle-switch-container">
+              <label class="toggle-switch">
+                <input type="checkbox" id="enable-https" name="enableHttps">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="https-settings" style="display: none;">
+            <div class="form-group">
+              <label for="https-port">HTTPS Port</label>
+              <input type="number" id="https-port" name="httpsPort" min="1" max="65535" value="9443">
+            </div>
+            
+            <div class="form-group">
+              <label for="https-cert">HTTPS Certificate</label>
+              <div class="input-with-button">
+                <input type="text" id="https-cert" name="httpsCert">
+                <button type="button" class="browse-btn" data-target="https-cert">
+                  <i class="fas fa-folder-open"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="https-key">HTTPS Private Key</label>
+              <div class="input-with-button">
+                <input type="text" id="https-key" name="httpsKey">
+                <button type="button" class="browse-btn" data-target="https-key">
+                  <i class="fas fa-folder-open"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="setup-buttons">
+            <button type="button" class="button secondary" id="back-to-step-1">
+              <i class="fas fa-arrow-left"></i> Back
+            </button>
+            <button type="submit" class="button primary">
+              Continue <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Step 3: Finish -->
+      <div class="setup-step" id="setup-step-3">
+        <h3>Setup Complete!</h3>
+        <p>Your Certificate Manager has been successfully configured and is ready to use.</p>
+        
+        <div class="setup-summary">
+          <div class="summary-item">
+            <span class="summary-label">Admin Username:</span>
+            <span class="summary-value" id="summary-username"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Certificate Directory:</span>
+            <span class="summary-value" id="summary-cert-path"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">HTTP Port:</span>
+            <span class="summary-value" id="summary-port"></span>
+          </div>
+          <div class="summary-item https-summary" style="display: none;">
+            <span class="summary-label">HTTPS Port:</span>
+            <span class="summary-value" id="summary-https-port"></span>
+          </div>
+        </div>
+        
+        <div class="setup-buttons">
+          <button type="button" class="button secondary" id="back-to-step-2">
+            <i class="fas fa-arrow-left"></i> Back
+          </button>
+          <button type="button" class="button primary" id="finish-setup">
+            Start using Certificate Manager <i class="fas fa-check"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="version-info">
+        <span>Version <%= version %></span>
+      </div>
+    </div>
+  </div>
+  <script src="js/modules/logger.js"></script>
+  <script src="/js/utils/ui-utils.js"></script>
+  <script src="/js/file-browser.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Variables to store setup data
+      const setupData = {
+        admin: {},
+        config: {}
+      };
+      
+      // Form references
+      const adminForm = document.getElementById('admin-form');
+      const configForm = document.getElementById('config-form');
+      const messageEl = document.getElementById('setup-message');
+      
+      // Password toggle functionality
+      document.querySelectorAll('.toggle-password').forEach(button => {
+        button.addEventListener('click', function() {
+          const targetId = this.getAttribute('data-target');
+          const passwordInput = document.getElementById(targetId);
+          
+          const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+          passwordInput.setAttribute('type', type);
+          
+          // Change eye icon
+          const icon = this.querySelector('i');
+          if (type === 'password') {
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+          } else {
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+          }
+        });
+      });
+      
+      // Password strength checker
+      const passwordInput = document.getElementById('admin-password');
+      const confirmInput = document.getElementById('admin-password-confirm');
+      const strengthFill = document.getElementById('strength-fill');
+      const strengthText = document.getElementById('strength-text');
+      
+      passwordInput.addEventListener('input', checkPasswordStrength);
+      
+      function checkPasswordStrength() {
+        const password = passwordInput.value;
+        let strength = 0;
+        
+        // Length check
+        if (password.length >= 8) strength += 1;
+        if (password.length >= 12) strength += 1;
+        
+        // Complexity checks
+        if (/[0-9]/.test(password)) strength += 1;  // Has number
+        if (/[a-z]/.test(password)) strength += 1;  // Has lowercase
+        if (/[A-Z]/.test(password)) strength += 1;  // Has uppercase
+        if (/[^A-Za-z0-9]/.test(password)) strength += 1;  // Has special char
+        
+        // Update UI
+        let percentage = (strength / 6) * 100;
+        let color, text;
+        
+        if (strength < 2) {
+          color = '#e74c3c';
+          text = 'Too weak';
+        } else if (strength < 4) {
+          color = '#f39c12';
+          text = 'Weak';
+        } else if (strength < 5) {
+          color = '#3498db';
+          text = 'Medium';
+        } else {
+          color = '#2ecc71';
+          text = 'Strong';
+        }
+        
+        strengthFill.style.width = `${percentage}%`;
+        strengthFill.style.backgroundColor = color;
+        strengthText.textContent = `Password strength: ${text}`;
+        strengthText.style.color = color;
+      }
+      
+      // HTTPS toggle
+      document.getElementById('enable-https').addEventListener('change', function() {
+        const httpsFields = document.querySelectorAll('.https-settings');
+        httpsFields.forEach(field => {
+          field.style.display = this.checked ? 'block' : 'none';
+        });
+      });
+      
+      // Step navigation
+      function showStep(stepNumber) {
+        // Update progress indicators
+        document.querySelectorAll('.progress-step').forEach((step, index) => {
+          step.classList.toggle('active', index < stepNumber);
+          step.classList.toggle('completed', index < stepNumber - 1);
+        });
+        
+        // Show only the current step
+        document.querySelectorAll('.setup-step').forEach((step, index) => {
+          step.classList.toggle('active', index === stepNumber - 1);
+        });
+      }
+      
+      // Back button handlers
+      document.getElementById('back-to-step-1').addEventListener('click', () => showStep(1));
+      document.getElementById('back-to-step-2').addEventListener('click', () => showStep(2));
+      
+      // Admin form submission
+      adminForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('admin-username').value.trim();
+        const name = document.getElementById('admin-name').value.trim();
+        const password = passwordInput.value;
+        const confirmPassword = confirmInput.value;
+        
+        // Validate form
+        if (!username || !name || !password) {
+          showMessage('Please fill in all fields', 'error');
+          return;
+        }
+        
+        if (password.length < 8) {
+          showMessage('Password must be at least 8 characters long', 'error');
+          return;
+        }
+        
+        if (password !== confirmPassword) {
+          showMessage('Passwords do not match', 'error');
+          return;
+        }
+        
+        // Store admin data
+        setupData.admin = {
+          username,
+          name,
+          password,
+          role: 'admin'
+        };
+        
+        // Move to next step
+        showStep(2);
+      });
+      
+      // Config form submission
+      configForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const certPath = document.getElementById('cert-path').value.trim();
+        const port = document.getElementById('port').value;
+        const enableHttps = document.getElementById('enable-https').checked;
+        
+        // Validate form
+        if (!certPath || !port) {
+          showMessage('Please fill in all required fields', 'error');
+          return;
+        }
+        
+        // Store config data
+        setupData.config = {
+          certPath,
+          port: parseInt(port, 10),
+          enableHttps
+        };
+        
+        if (enableHttps) {
+          setupData.config.httpsPort = document.getElementById('https-port').value;
+          setupData.config.httpsCert = document.getElementById('https-cert').value.trim();
+          setupData.config.httpsKey = document.getElementById('https-key').value.trim();
+          
+          // Show HTTPS summary
+          document.querySelector('.https-summary').style.display = 'block';
+          document.getElementById('summary-https-port').textContent = setupData.config.httpsPort;
+        } else {
+          document.querySelector('.https-summary').style.display = 'none';
+        }
+        
+        // Update summary
+        document.getElementById('summary-username').textContent = setupData.admin.username;
+        document.getElementById('summary-cert-path').textContent = setupData.config.certPath;
+        document.getElementById('summary-port').textContent = setupData.config.port;
+        
+        // Move to next step
+        showStep(3);
+      });
+      
+      // Finish setup
+      document.getElementById('finish-setup').addEventListener('click', function() {
+        // Disable button to prevent multiple submissions
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Setting up...';
+        
+        // Send setup data to server
+        fetch('/api/setup/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(setupData)
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            showMessage('Setup completed! Redirecting to login...', 'success');
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 2000);
+          } else {
+            showMessage(`Setup failed: ${data.message}`, 'error');
+            this.disabled = false;
+            this.innerHTML = 'Start using Certificate Manager <i class="fas fa-check"></i>';
+          }
+        })
+        .catch(error => {
+          console.error('Setup error:', error);
+          showMessage('An error occurred during setup', 'error');
+          this.disabled = false;
+          this.innerHTML = 'Start using Certificate Manager <i class="fas fa-check"></i>';
+        });
+      });
+      
+      // Helper to show messages
+      function showMessage(message, type = 'info') {
+        messageEl.textContent = message;
+        messageEl.className = `setup-message ${type}`;
+        messageEl.style.display = 'block';
+        
+        // Scroll message into view
+        messageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      // Add file browser functionality
+      setupFileBrowserHandlers();
+      
+      function setupFileBrowserHandlers() {
+        // Set up click handlers for all browse buttons
+        document.querySelectorAll('.browse-btn').forEach(button => {
+          button.addEventListener('click', function() {
+            const targetInputId = this.getAttribute('data-target');
+            const inputField = document.getElementById(targetInputId);
+            if (!inputField) return;
+            
+            const initialPath = inputField.value || '';
+            
+            // Initialize file browser with the current path
+            initializeFileBrowser(initialPath, function(selectedPath) {
+              // Update the input field with the selected path
+              inputField.value = selectedPath;
+              // Trigger a change event so any listeners know the value changed
+              inputField.dispatchEvent(new Event('change'));
+            }, true); // true = directory mode
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>

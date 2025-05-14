@@ -12,6 +12,6 @@ dist/
 build/
 .env
 config/
-
 # Ignore everything in certs/
 certs/
+dummyParent/

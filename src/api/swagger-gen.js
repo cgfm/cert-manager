@@ -20,6 +20,8 @@ const path = require('path');
 const swaggerJsdoc = require('swagger-jsdoc');
 const yaml = require('js-yaml');
 
+const FILENAME = 'api/swagger-gen.js';
+
 /**
  * Generate a basic OpenAPI spec file if it doesn't exist
  */
@@ -28,7 +30,7 @@ function generateOpenApiSpec() {
   
   // Check if the file already exists
   if (fs.existsSync(apiSpecPath)) {
-    console.log('OpenAPI spec file already exists');
+    logger.info('OpenAPI spec file already exists', null, FILENAME);
     return;
   }
   
@@ -122,7 +124,7 @@ function generateOpenApiSpec() {
   
   // Write to file
   fs.writeFileSync(apiSpecPath, yaml.dump(spec));
-  console.log(`Generated OpenAPI spec at: ${apiSpecPath}`);
+  logger.info(`Generated OpenAPI spec at: ${apiSpecPath}`, null, FILENAME);
 }
 
 // Options for swagger-jsdoc
@@ -155,7 +157,7 @@ const openapiSpecification = swaggerJsdoc(options);
 const yamlStr = yaml.dump(openapiSpecification);
 fs.writeFileSync(path.join(__dirname, 'openapi.yaml'), yamlStr, 'utf8');
 
-console.log('OpenAPI specification generated at src/api/openapi.yaml');
+logger.info('OpenAPI specification generated at src/api/openapi.yaml', null, FILENAME);
 
 // Run the function when script is executed directly
 if (require.main === module) {

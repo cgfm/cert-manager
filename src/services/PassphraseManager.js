@@ -3,6 +3,8 @@ const path = require('path');
 const crypto = require('crypto');
 const logger = require('./logger');
 
+const FILENAME = 'services/PassphraseManager.js';
+
 /**
  * Manages certificate passphrases securely
  */
@@ -58,10 +60,10 @@ class PassphraseManager {
                     };
                 }
                 
-                logger.info(`Loaded passphrase metadata for ${Object.keys(passphraseStore).length} certificates`);
+                logger.info(`Loaded passphrase metadata for ${Object.keys(passphraseStore).length} certificates`, null, FILENAME);
             }
         } catch (error) {
-            logger.error(`Error loading passphrases: ${error.message}`);
+            logger.error(`Error loading passphrases: ${error.message}`, null, FILENAME);
             this.passphrases = {};
         }
     }
@@ -94,9 +96,9 @@ class PassphraseManager {
             
             fs.writeFileSync(this.passphraseStoreFile, encryptedData, { mode: 0o600 });
             
-            logger.info('Passphrases saved securely');
+            logger.info('Passphrases saved securely', null, FILENAME);
         } catch (error) {
-            logger.error(`Error saving passphrases: ${error.message}`);
+            logger.error(`Error saving passphrases: ${error.message}`, null, FILENAME);
             throw error;
         }
     }
@@ -167,7 +169,7 @@ class PassphraseManager {
                 }
             }
         } catch (error) {
-            logger.error(`Error loading passphrase for ${fingerprint}: ${error.message}`);
+            logger.error(`Error loading passphrase for ${fingerprint}: ${error.message}`, null, FILENAME);
         }
     }
     
@@ -187,7 +189,7 @@ class PassphraseManager {
         };
         
         this.savePassphrases();
-        logger.info(`Passphrase stored for certificate: ${fingerprint}`);
+        logger.info(`Passphrase stored for certificate: ${fingerprint}`, null, FILENAME);
     }
     
     /**
@@ -202,7 +204,7 @@ class PassphraseManager {
         
         delete this.passphrases[fingerprint];
         this.savePassphrases();
-        logger.info(`Passphrase deleted for certificate: ${fingerprint}`);
+        logger.info(`Passphrase deleted for certificate: ${fingerprint}`, null, FILENAME);
         
         return true;
     }
@@ -268,10 +270,10 @@ class PassphraseManager {
             // Re-encrypt passphrases with new key
             this.savePassphrases();
             
-            logger.info('Encryption key rotated successfully');
+            logger.info('Encryption key rotated successfully', null, FILENAME);
             return true;
         } catch (error) {
-            logger.error(`Error rotating encryption key: ${error.message}`);
+            logger.error(`Error rotating encryption key: ${error.message}`, null, FILENAME);
             return false;
         }
     }
@@ -296,7 +298,7 @@ class PassphraseManager {
         }
         
         if (importCount > 0) {
-            logger.info(`Imported ${importCount} passphrases from legacy storage`);
+            logger.info(`Imported ${importCount} passphrases from legacy storage`, null, FILENAME);
         }
         
         return importCount;

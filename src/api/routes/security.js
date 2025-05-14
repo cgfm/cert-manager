@@ -11,6 +11,8 @@
 const express = require('express');
 const logger = require('../../services/logger');
 
+const FILENAME = 'api/routes/security.js';
+
 /**
  * Initialize the security router with dependencies
  * @param {Object} deps - Dependencies
@@ -32,7 +34,7 @@ function initSecurityRouter(deps) {
       
       res.json({ success: true });
     } catch (error) {
-      logger.error('Error rotating encryption key:', error);
+      logger.error('Error rotating encryption key:', error, FILENAME);
       res.status(500).json({ message: 'Failed to rotate encryption key', statusCode: 500 });
     }
   });

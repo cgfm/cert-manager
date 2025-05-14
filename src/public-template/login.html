@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Certificate Manager</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/login.css">
+  <link rel="shortcut icon" href="img/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="img/favicon.png" type="image/png" />
+
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-header">
+        <img src="/img/logo.svg" alt="Certificate Manager Logo" class="login-logo">
+        <h1>Certificate Manager</h1>
+      </div>
+      
+      <div class="login-message" id="login-message" style="display: none;"></div>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="password-input-group">
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <button type="button" id="toggle-password" class="toggle-password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <button type="submit" class="button primary full-width">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </button>
+        </div>
+      </form>
+      
+      <div class="version-info">
+        <span>Version <%= version %></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/modules/logger.js"></script>
+  <script src="js/utils/ui-utils.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const loginForm = document.getElementById('login-form');
+      const messageEl = document.getElementById('login-message');
+      const togglePasswordBtn = document.getElementById('toggle-password');
+      const passwordInput = document.getElementById('password');
+      
+      // Handle form submission
+      loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        // Hide any previous messages
+        messageEl.style.display = 'none';
+        
+        // Disable the submit button to prevent multiple submissions
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+        
+        // Send login request
+        fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username, password })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Redirect to main application
+            window.location.href = '/';
+          } else {
+            // Show error message
+            messageEl.textContent = data.message || 'Login failed';
+            messageEl.style.display = 'block';
+            messageEl.className = 'login-message error';
+            
+            // Re-enable the submit button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+          }
+        })
+        .catch(error => {
+          console.error('Login error:', error);
+          messageEl.textContent = 'An error occurred during login';
+          messageEl.style.display = 'block';
+          messageEl.className = 'login-message error';
+          
+          // Re-enable the submit button
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+        });
+      });
+      
+      // Toggle password visibility
+      if (togglePasswordBtn) {
+        togglePasswordBtn.addEventListener('click', function() {
+          const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+          passwordInput.setAttribute('type', type);
+          
+          // Change the eye icon
+          const icon = this.querySelector('i');
+          if (type === 'password') {
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+          } else {
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

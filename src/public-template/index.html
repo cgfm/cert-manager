@@ -1,458 +1,1396 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Certificate Manager</title>
-    <link rel="shortcut icon" href="img/favicon.svg" type="image/svg+xml">
-    <link rel="alternate icon" href="img/favicon.png" type="image/png">
+    <link rel="shortcut icon" href="/img/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/img/favicon.png" type="image/png" />
 
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/tabs.css">
-    <link rel="stylesheet" href="css/modal.css">
-    <link rel="stylesheet" href="css/notifications.css">
-    <link rel="stylesheet" href="css/ui-states.css">
-    <link rel="stylesheet" href="css/file-browser.css">
-    <link rel="stylesheet" href="css/deploy-actions.css">
-    
-    <script src="/fontawesome/fontawesome.js"></script>
-    <script src="/fontawesome/all.js"></script>
-</head>
-<body>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/certificates.css" />
+    <link rel="stylesheet" href="/css/log-manager.css" />
+    <link rel="stylesheet" href="/css/modal.css" />
+    <link rel="stylesheet" href="/css/notifications.css" />
+    <link rel="stylesheet" href="/css/ui-states.css" />
+    <link rel="stylesheet" href="/css/file-browser.css" />
+    <link rel="stylesheet" href="/css/deploy-actions.css" />
+    <link rel="stylesheet" href="/css/log-manager.css" />
+    <link rel="stylesheet" href="/css/user-management.css" />
+    <link rel="stylesheet" href="/fontawesome/css/fontawesome.min.css" />
+    <link rel="stylesheet" href="/fontawesome/css/all.min.css" />
+  </head>
+  <body>
     <header class="app-header">
-        <div class="app-logo">
-            <object id="logo-svg" data="img/favicon.svg" type="image/svg+xml" class="logo-svg"></object>
-            <h1>Certificate Manager</h1>
+      <div class="app-logo">
+        <img
+          id="app-logo-light"
+          src="img/favicon.svg"
+          class="logo-svg theme-light-only"
+          alt="Certificate Manager Logo"
+        />
+        <img
+          id="app-logo-dark"
+          src="img/favicon-dark.svg"
+          class="logo-svg theme-dark-only"
+          alt="Certificate Manager Logo"
+        />
+        <h1>Certificate Manager</h1>
+      </div>
+      <nav>
+        <ul>
+          <li>
+            <a href="#dashboard" class="active" data-tab="dashboard"
+              >Dashboard</a
+            >
+          </li>
+          <li>
+            <a href="#certificates" data-tab="certificates">Certificates</a>
+          </li>
+          <li><a href="#ca" data-tab="ca">CA Certificates</a></li>
+          <li><a href="#settings" data-tab="settings">Settings</a></li>
+          <li><a href="#logs" data-tab="logs">Logs</a></li>
+          <li><a href="/api/docs" target="_blank">API Docs</a></li>
+        </ul>
+      </nav>
+      <div class="user-menu">
+        <button id="theme-toggle" title="Toggle dark/light mode">
+          <i class="fa-solid fa-sun" id="theme-icon-light"></i>
+          <i class="fa-solid fa-moon" id="theme-icon-dark"></i>
+        </button>
+        <div class="user-info">
+          <span id="user-name">User</span>
+          <button id="logout-btn" class="button small">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </button>
         </div>
-        <nav>
-            <ul>
-                <li><a href="#dashboard" class="active" data-tab="dashboard">Dashboard</a></li>
-                <li><a href="#certificates" data-tab="certificates">Certificates</a></li>
-                <li><a href="#ca" data-tab="ca">CA Certificates</a></li>
-                <li><a href="#settings" data-tab="settings">Settings</a></li>
-                <li><a href="#logs" data-tab="logs">Logs</a></li>
-                <li><a href="/api/docs" target="_blank">API Docs</a></li>
-            </ul>
-        </nav>
-        <div class="user-menu">
-            <button id="theme-toggle" title="Toggle dark/light mode">
-                <svg viewBox="0 0 24 24" width="24" height="24">
-                    <path class="sun-icon" d="M12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.65 0-3 1.35-3 3s1.35 3 3 3 3-1.35 3-3-1.35-3-3-3zm5 12h-10v-1.5c0-1.38 1.12-2.5 2.5-2.5h5c1.38 0 2.5 1.12 2.5 2.5v1.5z"></path>
-                    <path class="moon-icon" d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm0-10c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"></path>
-                </svg>
-            </button>
-        </div>
+      </div>
     </header>
 
     <main>
-        <!-- Dashboard Tab -->
-        <section id="dashboard" class="tab-content active">
-            <div class="dashboard-header">
-                <h1>Certificate Dashboard</h1>
-                <button id="refresh-dashboard" class="button"><i class="icon-refresh"></i> Refresh</button>
-            </div>
-            
-            <div id="dashboard-content">
-                <!-- Dashboard content will be loaded here -->
-            </div>
-            
-            <div class="dashboard-grid">
-                <div class="dashboard-card" id="cert-stats-container">
-                    <h2 class="card-title">Certificate Statistics</h2>
-                    <div id="cert-stats" class="card-content"></div>
-                </div>
-                
-                <div class="dashboard-card" id="expiring-certs-container">
-                    <h2 class="card-title">Expiring Certificates</h2>
-                    <div id="expiring-certs-list" class="card-content"></div>
-                </div>
-                
-                <div class="dashboard-card" id="ca-summary-container">
-                    <h2 class="card-title">CA Certificates</h2>
-                    <div id="ca-list-summary" class="card-content"></div>
-                </div>
-                
-                <div class="dashboard-card" id="recent-activity-container">
-                    <h2 class="card-title">Recent Activity</h2>
-                    <div id="recent-activity" class="card-content"></div>
-                </div>
-            </div>
-        </section>
+      <!-- Dashboard Tab -->
+      <section id="dashboard" class="tab-content active">
+        <div class="dashboard-header">
+          <h1>Certificate Dashboard</h1>
+          <button id="refresh-dashboard" class="button">
+            <i class="icon-refresh"></i> Refresh
+          </button>
+        </div>
 
-        <!-- Certificates Tab -->
-        <section id="certificates" class="tab-content">
-            <div class="certificates-header">
-                <h2>Certificates</h2>
-                <div class="certificate-actions">
-                    <button id="create-cert-btn" class="button primary">Create Certificate</button>
-                    <button id="refresh-certs" class="button">Refresh</button>
-                </div>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="cert-search" placeholder="Search certificates...">
-                <div class="filter-options">
-                    <label>
-                        <input type="checkbox" id="filter-valid" checked>
-                        Valid
-                    </label>
-                    <label>
-                        <input type="checkbox" id="filter-expiring" checked>
-                        Expiring Soon
-                    </label>
-                    <label>
-                        <input type="checkbox" id="filter-expired" checked>
-                        Expired
-                    </label>
-                </div>
-            </div>
-            <div class="certificates-list" id="certificates-list">
-                <div class="loading">Loading certificates...</div>
-            </div>
-        </section>
+        <div id="dashboard-content">
+          <!-- Dashboard content will be loaded here -->
+        </div>
 
-        <!-- CA Certificates Tab -->
-        <section id="ca" class="tab-content">
-            <div class="ca-header">
-                <h2>CA Certificates</h2>
-                <div class="ca-actions">
-                    <button id="create-ca-btn" class="button primary">Create CA</button>
-                    <button id="refresh-ca" class="button">Refresh</button>
-                </div>
-            </div>
-            <div class="ca-certificates" id="ca-certificates">
-                <div class="loading">Loading CA certificates...</div>
-            </div>
-        </section>
+        <div class="dashboard-grid">
+          <div class="dashboard-card" id="cert-stats-container">
+            <h2 class="card-title">Certificate Statistics</h2>
+            <div id="cert-stats" class="card-content"></div>
+          </div>
 
-        <!-- Settings Tab -->
-        <section id="settings" class="tab-content">
+          <div class="dashboard-card" id="expiring-certs-container">
+            <h2 class="card-title">Expiring Certificates</h2>
+            <div id="expiring-certs-list" class="card-content"></div>
+          </div>
+
+          <div class="dashboard-card" id="ca-summary-container">
+            <h2 class="card-title">CA Certificates</h2>
+            <div id="ca-list-summary" class="card-content"></div>
+          </div>
+
+          <div class="dashboard-card" id="recent-activity-container">
+            <h2 class="card-title">Recent Activity</h2>
+            <div id="recent-activity" class="card-content"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Certificates Tab -->
+      <section id="certificates" class="tab-content">
+        <div class="certificates-header">
+          <h2>Certificates</h2>
+          <div class="certificate-actions">
+            <button id="create-cert-btn" class="button primary">
+              Create Certificate
+            </button>
+            <button id="refresh-certs" class="button">Refresh</button>
+          </div>
+        </div>
+        <div class="certificates-list" id="certificates-list">
+          <div class="loading">Loading certificates...</div>
+        </div>
+      </section>
+
+      <!-- CA Certificates Tab -->
+      <section id="ca" class="tab-content">
+        <div class="ca-header">
+          <h2>CA Certificates</h2>
+          <div class="ca-actions">
+            <button id="create-ca-btn" class="button primary">Create CA</button>
+            <button id="refresh-ca" class="button">Refresh</button>
+          </div>
+        </div>
+        <div class="ca-certificates" id="ca-certificates">
+          <div class="loading">Loading CA certificates...</div>
+        </div>
+      </section>
+
+      <!-- Settings Tab -->
+      <section id="settings" class="tab-content">
+        <div class="settings-container">
+          <div class="settings-sidebar">
             <h2>Settings</h2>
-            <div class="settings-container">
-                <div class="settings-sidebar">
-                    <ul>
-                        <li><a href="#general-settings" class="active">General</a></li>
-                        <li><a href="#security-settings">Security</a></li>
-                        <li><a href="#renewal-settings">Auto-Renewal</a></li>
-                        <li><a href="#notification-settings">Notifications</a></li>
-                        <li><a href="#backup-settings">Backup</a></li>
-                    </ul>
+            <ul>
+              <li>
+                <a
+                  href="javascript:void(0)"
+                  data-panel="general-settings"
+                  class="active"
+                  >General</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="security-settings"
+                  >Security</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="user-settings"
+                  >User Management</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="api-tokens"
+                  >API Tokens</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="renewal-settings"
+                  >Auto-Renewal</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="notification-settings"
+                  >Notifications</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="backup-settings"
+                  >Backup</a
+                >
+              </li>
+              <li>
+                <a href="javascript:void(0)" data-panel="deployment-settings"
+                  >Deployment</a
+                >
+              </li>
+            </ul>
+          </div>
+          <div class="settings-content">
+            <div id="general-settings" class="settings-panel active">
+              <h3>General Settings</h3>
+              <form id="general-settings-form">
+                <div class="form-group">
+                  <label for="cert-path">Certificates Path</label>
+                  <div class="input-with-button">
+                    <input type="text" id="cert-path" name="certPath" />
+                    <button
+                      type="button"
+                      class="browse-btn"
+                      data-target="cert-path"
+                    >
+                      Browse
+                    </button>
+                  </div>
                 </div>
-                <div class="settings-content">
-                    <div id="general-settings" class="settings-panel active">
-                        <h3>General Settings</h3>
-                        <form id="general-settings-form">
-                            <div class="form-group">
-                                <label for="cert-path">Certificates Path</label>
-                                <div class="input-with-button">
-                                    <input type="text" id="cert-path" name="certPath">
-                                    <button type="button" class="browse-btn" data-target="cert-path">Browse</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="log-level">Log Level</label>
-                                <select id="log-level" name="logLevel">
-                                    <option value="error">Error</option>
-                                    <option value="warn">Warning</option>
-                                    <option value="info">Info</option>
-                                    <option value="debug">Debug</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="openssl-path">OpenSSL Path</label>
-                                <input type="text" id="openssl-path" name="openSSLPath">
-                            </div>
-                            <button type="submit" class="button primary">Save Settings</button>
-                        </form>
-                    </div>
-
-                    <div id="security-settings" class="settings-panel">
-                        <h3>Security Settings</h3>
-                        <form id="security-settings-form">
-                            <div class="form-group checkbox">
-                                <input type="checkbox" id="enable-https" name="enableHttps">
-                                <label for="enable-https">Enable HTTPS</label>
-                            </div>
-                            <div class="form-group https-settings">
-                                <label for="https-port">HTTPS Port</label>
-                                <input type="number" id="https-port" name="httpsPort" min="1" max="65535">
-                            </div>
-                            <div class="form-group https-settings">
-                                <label for="https-cert">HTTPS Certificate Path</label>
-                                <div class="input-with-button">
-                                    <input type="text" id="https-cert" name="httpsCertPath">
-                                    <button type="button" class="browse-btn" data-target="https-cert">Browse</button>
-                                </div>
-                            </div>
-                            <div class="form-group https-settings">
-                                <label for="https-key">HTTPS Key Path</label>
-                                <div class="input-with-button">
-                                    <input type="text" id="https-key" name="httpsKeyPath">
-                                    <button type="button" class="browse-btn" data-target="https-key">Browse</button>
-                                </div>
-                            </div>
-                            <button type="submit" class="button primary">Save Settings</button>
-                        </form>
-                    </div>
-
-                    <div id="renewal-settings" class="settings-panel">
-                        <h3>Auto-Renewal Settings</h3>
-                        <form id="renewal-settings-form">
-                            <div class="form-group checkbox">
-                                <input type="checkbox" id="enable-auto-renewal" name="enableAutoRenewalJob">
-                                <label for="enable-auto-renewal">Enable Auto-Renewal</label>
-                            </div>
-                            <div class="form-group">
-                                <label for="renewal-schedule">Renewal Schedule (cron)</label>
-                                <input type="text" id="renewal-schedule" name="renewalSchedule" placeholder="0 0 * * *">
-                                <span class="form-help">Format: minute hour day month weekday</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="renew-days">Days Before Expiry</label>
-                                <input type="number" id="renew-days" name="renewDaysBeforeExpiry" min="1" max="90">
-                            </div>
-                            <div class="form-group checkbox">
-                                <input type="checkbox" id="enable-file-watch" name="enableFileWatch">
-                                <label for="enable-file-watch">Watch for Certificate Changes</label>
-                            </div>
-                            <button type="submit" class="button primary">Save Settings</button>
-                        </form>
-                    </div>
-
-                    <div id="notification-settings" class="settings-panel">
-                        <h3>Notification Settings</h3>
-                        <p>Configure notifications for certificate events.</p>
-                        <form id="notification-settings-form">
-                            <!-- Placeholder for future notification settings -->
-                            <p class="placeholder-note">Notification settings will be available in a future update.</p>
-                            <button type="submit" class="button primary" disabled>Save Settings</button>
-                        </form>
-                    </div>
-
-                    <div id="backup-settings" class="settings-panel">
-                        <h3>Backup Settings</h3>
-                        <form id="backup-settings-form">
-                            <div class="form-group checkbox">
-                                <input type="checkbox" id="enable-backups" name="enableCertificateBackups">
-                                <label for="enable-backups">Enable Certificate Backups</label>
-                            </div>
-                            <div class="form-group checkbox">
-                                <input type="checkbox" id="keep-backups" name="keepBackupsForever">
-                                <label for="keep-backups">Keep Backups Forever</label>
-                            </div>
-                            <div class="form-group" id="backup-retention-group">
-                                <label for="backup-retention">Backup Retention (days)</label>
-                                <input type="number" id="backup-retention" name="backupRetention" min="1" max="365">
-                            </div>
-                            <button type="submit" class="button primary">Save Settings</button>
-                        </form>
-                    </div>
+                <div class="form-group">
+                  <label for="log-level">Log Level</label>
+                  <select id="log-level" name="logLevel">
+                    <option value="error">Error</option>
+                    <option value="warn">Warning</option>
+                    <option value="info">Info</option>
+                    <option value="debug">Debug</option>
+                  </select>
                 </div>
+                <div class="form-group">
+                  <label for="openssl-path">OpenSSL Path</label>
+                  <input type="text" id="openssl-path" name="openSSLPath" />
+                </div>
+                <button type="submit" class="button primary">
+                  Save Settings
+                </button>
+              </form>
             </div>
-        </section>
 
-        <!-- Logs Tab -->
-        <section id="logs" class="tab-content">
-            <h2>System Logs</h2>
-            <div class="logs-controls">
-                <label>
-                    <span>Log Level:</span>
-                    <select id="log-filter-level">
-                        <option value="all">All Levels</option>
-                        <option value="error">Error</option>
-                        <option value="warn">Warning</option>
-                        <option value="info">Info</option>
-                        <option value="debug">Debug</option>
-                    </select>
-                </label>
-                <label>
-                    <span>Search:</span>
-                    <input type="text" id="log-search" placeholder="Filter logs...">
-                </label>
-                <button id="refresh-logs" class="button">Refresh</button>
-                <button id="clear-logs" class="button">Clear View</button>
+            <div id="security-settings" class="settings-panel">
+              <h3>Security Settings</h3>
+              <form id="security-settings-form">
+                <div class="form-group checkbox">
+                  <input type="checkbox" id="enable-https" name="enableHttps" />
+                  <label for="enable-https">Enable HTTPS</label>
+                </div>
+                <div class="form-group https-settings">
+                  <label for="https-port">HTTPS Port</label>
+                  <input
+                    type="number"
+                    id="https-port"
+                    name="httpsPort"
+                    min="1"
+                    max="65535"
+                  />
+                </div>
+                <div class="form-group https-settings">
+                  <label for="https-cert">HTTPS Certificate Path</label>
+                  <div class="input-with-button">
+                    <input type="text" id="https-cert" name="httpsCertPath" />
+                    <button
+                      type="button"
+                      class="browse-btn"
+                      data-target="https-cert"
+                    >
+                      Browse
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group https-settings">
+                  <label for="https-key">HTTPS Key Path</label>
+                  <div class="input-with-button">
+                    <input type="text" id="https-key" name="httpsKeyPath" />
+                    <button
+                      type="button"
+                      class="browse-btn"
+                      data-target="https-key"
+                    >
+                      Browse
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" class="button primary">
+                  Save Settings
+                </button>
+              </form>
             </div>
-            <div class="logs-container">
-                <div id="logs-output" class="logs-output"></div>
+
+            <div id="user-settings" class="settings-panel">
+              <h3>User Management</h3>
+
+              <div class="admin-only">
+                <div class="panel-actions">
+                  <button id="create-user-btn" class="button primary">
+                    <i class="fas fa-user-plus"></i> Create User
+                  </button>
+                </div>
+
+                <div class="users-list-container">
+                  <table class="data-table" id="users-table">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Last Login</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- User rows will be populated dynamically -->
+                    </tbody>
+                  </table>
+                  <div id="users-loading" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Loading users...</p>
+                  </div>
+                  <div id="users-empty" class="empty-state hidden">
+                    <p>No users found.</p>
+                  </div>
+                  <div id="users-error" class="error-state hidden">
+                    <p>Failed to load users.</p>
+                    <button id="retry-load-users" class="button">Retry</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Regular users will only see change password option -->
+              <div class="user-only">
+                <h4>Change Your Password</h4>
+                <form id="change-password-form">
+                  <div class="form-group">
+                    <label for="current-password">Current Password</label>
+                    <input
+                      type="password"
+                      id="current-password"
+                      name="currentPassword"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input
+                      type="password"
+                      id="new-password"
+                      name="newPassword"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="confirm-password">Confirm New Password</label>
+                    <input
+                      type="password"
+                      id="confirm-password"
+                      name="confirmPassword"
+                      required
+                    />
+                  </div>
+                  <div class="form-actions">
+                    <button type="submit" class="button primary">
+                      Change Password
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-        </section>
+
+            <div id="api-tokens" class="settings-panel">
+              <h3>API Tokens</h3>
+              <p>
+                Manage API tokens for programmatic access to the Certificate
+                Manager API.
+              </p>
+
+              <div class="panel-actions">
+                <button id="create-token-btn" class="button primary">
+                  <i class="fas fa-key"></i> Create New Token
+                </button>
+              </div>
+
+              <!-- Admin-only filter -->
+              <div class="admin-only token-filters">
+                <label>
+                  <input type="checkbox" id="show-all-tokens" />
+                  Show tokens from all users
+                </label>
+              </div>
+
+              <div class="tokens-list-container">
+                <table class="data-table" id="tokens-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Username</th>
+                      <th>Created</th>
+                      <th>Last Used</th>
+                      <th>Expires</th>
+                      <th>Scopes</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Token rows will be populated dynamically -->
+                  </tbody>
+                </table>
+                <div id="tokens-loading" class="loading-container">
+                  <div class="loading-spinner"></div>
+                  <p>Loading API tokens...</p>
+                </div>
+                <div id="tokens-empty" class="empty-state hidden">
+                  <p>No API tokens found.</p>
+                </div>
+                <div id="tokens-error" class="error-state hidden">
+                  <p>Failed to load API tokens.</p>
+                  <button id="retry-load-tokens" class="button">Retry</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="renewal-settings" class="settings-panel">
+              <h3>Auto-Renewal Settings</h3>
+              <form id="renewal-settings-form">
+                <div class="form-group checkbox">
+                  <input
+                    type="checkbox"
+                    id="enable-auto-renewal"
+                    name="enableAutoRenewalJob"
+                  />
+                  <label for="enable-auto-renewal">Enable Auto-Renewal</label>
+                </div>
+                <div class="form-group">
+                  <label for="renewal-schedule">Renewal Schedule (cron)</label>
+                  <input
+                    type="text"
+                    id="renewal-schedule"
+                    name="renewalSchedule"
+                    placeholder="0 0 * * *"
+                  />
+                  <span class="form-help"
+                    >Format: minute hour day month weekday</span
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="renew-days">Days Before Expiry</label>
+                  <input
+                    type="number"
+                    id="renew-days"
+                    name="renewDaysBeforeExpiry"
+                    min="1"
+                    max="90"
+                  />
+                </div>
+                <div class="form-group checkbox">
+                  <input
+                    type="checkbox"
+                    id="enable-file-watch"
+                    name="enableFileWatch"
+                  />
+                  <label for="enable-file-watch"
+                    >Watch for Certificate Changes</label
+                  >
+                </div>
+                <button type="submit" class="button primary">
+                  Save Settings
+                </button>
+              </form>
+            </div>
+
+            <div id="notification-settings" class="settings-panel">
+              <h3>Notification Settings</h3>
+              <p>Configure notifications for certificate events.</p>
+              <form id="notification-settings-form">
+                <!-- Placeholder for future notification settings -->
+                <p class="placeholder-note">
+                  Notification settings will be available in a future update.
+                </p>
+                <button type="submit" class="button primary" disabled>
+                  Save Settings
+                </button>
+              </form>
+            </div>
+
+            <div id="backup-settings" class="settings-panel">
+              <h3>Backup Settings</h3>
+              <form id="backup-settings-form">
+                <div class="form-group checkbox">
+                  <input
+                    type="checkbox"
+                    id="enable-backups"
+                    name="enableCertificateBackups"
+                  />
+                  <label for="enable-backups">Enable Certificate Backups</label>
+                </div>
+                <div class="form-group checkbox">
+                  <input
+                    type="checkbox"
+                    id="keep-backups"
+                    name="keepBackupsForever"
+                  />
+                  <label for="keep-backups">Keep Backups Forever</label>
+                </div>
+                <div class="form-group" id="backup-retention-group">
+                  <label for="backup-retention">Backup Retention (days)</label>
+                  <input
+                    type="number"
+                    id="backup-retention"
+                    name="backupRetention"
+                    min="1"
+                    max="365"
+                  />
+                </div>
+                <button type="submit" class="button primary">
+                  Save Settings
+                </button>
+              </form>
+            </div>
+
+            <div id="deployment-settings" class="settings-panel">
+              <h3>Deployment Settings</h3>
+              <p>Configure global settings for deployment actions</p>
+
+              <!-- Tabs for different deployment settings -->
+              <div class="settings-tabs">
+                <button class="settings-tab-button active" data-tab="email-settings">
+                  Email
+                </button>
+                <button class="settings-tab-button" data-tab="nginx-settings">
+                  Nginx Proxy Manager
+                </button>
+                <button class="settings-tab-button" data-tab="docker-settings">
+                  Docker
+                </button>
+              </div>
+
+              <!-- Email Settings -->
+              <div class="settings-tab-content active" id="email-settings">
+                <h4>SMTP Server Settings</h4>
+                <form id="email-settings-form">
+                  <div class="form-group">
+                    <label for="smtp-host">SMTP Host</label>
+                    <input
+                      type="text"
+                      id="smtp-host"
+                      name="host"
+                      placeholder="smtp.example.com"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="smtp-port">SMTP Port</label>
+                    <input
+                      type="number"
+                      id="smtp-port"
+                      name="port"
+                      placeholder="587"
+                      value="587"
+                      min="1"
+                      max="65535"
+                    />
+                  </div>
+
+                  <div class="form-group checkbox">
+                    <input type="checkbox" id="smtp-secure" name="secure" />
+                    <label for="smtp-secure">Use SSL/TLS</label>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="smtp-user">Username</label>
+                    <input
+                      type="text"
+                      id="smtp-user"
+                      name="user"
+                      placeholder="user@example.com"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="smtp-password">Password</label>
+                    <input
+                      type="password"
+                      id="smtp-password"
+                      name="password"
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="smtp-from">From Address</label>
+                    <input
+                      type="text"
+                      id="smtp-from"
+                      name="from"
+                      placeholder="Certificate Manager <cert-manager@example.com>"
+                    />
+                  </div>
+
+                  <div class="form-actions">
+                    <button type="submit" class="button primary">
+                      Save SMTP Settings
+                    </button>
+                    <button type="button" id="test-email-btn" class="button">
+                      Test Connection
+                    </button>
+                  </div>
+                </form>
+
+                <!-- Test Email Form -->
+                <div id="test-email-form" class="hidden">
+                  <h4>Send Test Email</h4>
+                  <div class="form-group">
+                    <label for="test-email-recipient">Recipient Email</label>
+                    <input
+                      type="email"
+                      id="test-email-recipient"
+                      placeholder="your@email.com"
+                      required
+                    />
+                  </div>
+                  <div class="form-actions">
+                    <button
+                      type="button"
+                      id="send-test-email-btn"
+                      class="button primary"
+                    >
+                      Send Test Email
+                    </button>
+                    <button
+                      type="button"
+                      id="cancel-test-email-btn"
+                      class="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nginx Proxy Manager Settings -->
+              <div class="settings-tab-content" id="nginx-settings">
+                <h4>Nginx Proxy Manager Connection</h4>
+                <form id="nginx-settings-form">
+                  <div class="form-group">
+                    <label for="npm-host">Host</label>
+                    <input
+                      type="text"
+                      id="npm-host"
+                      name="host"
+                      placeholder="npm.example.com"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="npm-port">Port</label>
+                    <input
+                      type="number"
+                      id="npm-port"
+                      name="port"
+                      placeholder="81"
+                      value="81"
+                      min="1"
+                      max="65535"
+                    />
+                  </div>
+
+                  <div class="form-group checkbox">
+                    <input type="checkbox" id="npm-https" name="useHttps" />
+                    <label for="npm-https">Use HTTPS</label>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="npm-username">Username</label>
+                    <input
+                      type="text"
+                      id="npm-username"
+                      name="username"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="npm-password">Password</label>
+                    <input
+                      type="password"
+                      id="npm-password"
+                      name="password"
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <div class="form-group checkbox">
+                    <input
+                      type="checkbox"
+                      id="npm-reject-unauthorized"
+                      name="rejectUnauthorized"
+                      checked
+                    />
+                    <label for="npm-reject-unauthorized"
+                      >Verify SSL certificates</label
+                    >
+                    <span class="form-help"
+                      >Uncheck this if you are using a self-signed
+                      certificate</span
+                    >
+                  </div>
+
+                  <div class="form-actions">
+                    <button type="submit" class="button primary">
+                      Save NPM Settings
+                    </button>
+                    <button type="button" id="test-npm-btn" class="button">
+                      Test Connection
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Docker Settings -->
+              <div class="settings-tab-content" id="docker-settings">
+                <h4>Docker Connection Settings</h4>
+                <form id="docker-settings-form">
+                  <div class="form-group">
+                    <label for="docker-socket">Socket Path (Unix)</label>
+                    <input
+                      type="text"
+                      id="docker-socket"
+                      name="socketPath"
+                      value="/var/run/docker.sock"
+                    />
+                    <span class="form-help"
+                      >Leave empty to use TCP connection</span
+                    >
+                  </div>
+
+                  <div class="form-group">
+                    <label for="docker-host">Host (TCP)</label>
+                    <input
+                      type="text"
+                      id="docker-host"
+                      name="host"
+                      placeholder="localhost"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="docker-port">Port (TCP)</label>
+                    <input
+                      type="number"
+                      id="docker-port"
+                      name="port"
+                      value="2375"
+                      min="1"
+                      max="65535"
+                    />
+                  </div>
+
+                  <div class="form-group checkbox">
+                    <input type="checkbox" id="docker-tls" name="useTLS" />
+                    <label for="docker-tls">Use TLS</label>
+                  </div>
+
+                  <div class="form-actions">
+                    <button type="submit" class="button primary">
+                      Save Docker Settings
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Logs Tab -->
+      <section id="logs" class="tab-content">
+        <div class="logs-header">
+          <h2>System Logs</h2>
+          <div class="logs-status">
+            <span id="logs-count">0 logs</span>
+            <span id="logs-filtered-count" class="logs-filtered-count"
+              >(0 filtered)</span
+            >
+          </div>
+          <div class="auto-refresh">
+            <input type="checkbox" id="auto-refresh-logs" name="autoRefresh" />
+            <label for="auto-refresh-logs">Auto-refresh</label>
+            <select id="auto-refresh-interval">
+              <option value="5000">5 seconds</option>
+              <option value="10000" selected>10 seconds</option>
+              <option value="30000">30 seconds</option>
+              <option value="60000">1 minute</option>
+            </select>
+          </div>
+          <div class="logs-header-buttons">
+            <button id="log-settings-btn" class="button">
+              <i class="fas fa-cog"></i> Log Settings
+            </button>
+            <button id="refresh-logs" class="button">
+              <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="logs-controls">
+          <div class="logs-filter-group">
+            <label>
+              <span>Level:</span>
+              <select id="log-filter-level">
+                <option value="all">All Levels</option>
+                <option value="error">Error</option>
+                <option value="warn">Warning</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+                <option value="fine">Fine</option>
+                <option value="finest">Finest</option>
+              </select>
+            </label>
+
+            <label>
+              <span>File:</span>
+              <select id="log-filter-file">
+                <option value="all">All Files</option>
+                <!-- Will be populated dynamically -->
+              </select>
+            </label>
+
+            <label>
+              <span>Search:</span>
+              <input type="text" id="log-search" placeholder="Filter logs..." />
+            </label>
+          </div>
+
+          <div class="logs-control-buttons">
+            <button id="export-logs" class="button" title="Export logs to file">
+              <i class="fas fa-file-export"></i> Export
+            </button>
+            <button id="clear-logs" class="button" title="Clear log view">
+              <i class="fas fa-eraser"></i> Clear View
+            </button>
+          </div>
+        </div>
+
+        <div class="logs-container">
+          <div id="logs-output" class="logs-output"></div>
+        </div>
+      </section>
+
+      <!-- Activity Tab -->
+      <section id="activity" class="tab-content">
+        <h1 class="section-title">Activity Log</h1>
+
+        <div class="activity-container">
+          <div class="activity-header">
+            <div class="activity-filters" id="activity-filters">
+              <div class="activity-filter">
+                <label for="activity-search">Search:</label>
+                <input
+                  type="text"
+                  id="activity-search"
+                  placeholder="Search activities..."
+                />
+              </div>
+
+              <div class="activity-filter">
+                <label for="activity-type-filter">Type:</label>
+                <select id="activity-type-filter">
+                  <option value="all">All Activities</option>
+                  <option value="certificate">Certificate</option>
+                  <option value="user">User</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+
+              <button
+                class="button danger-outline small"
+                id="clear-activities-btn"
+              >
+                <i class="fas fa-trash"></i> Clear All
+              </button>
+            </div>
+          </div>
+
+          <div class="activity-log-container" id="activity-log-container">
+            <!-- Activities will be inserted here -->
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Modals -->
-    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
 
     <!-- Certificate Create/Edit Modal -->
     <div id="certificate-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="cert-modal-title">Create Certificate</h2>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="certificate-form">
-                    <input type="hidden" id="cert-id" name="id">
-                    
-                    <div class="form-group">
-                        <label for="cert-name">Certificate Name</label>
-                        <input type="text" id="cert-name" name="name" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-type">Certificate Type</label>
-                        <select id="cert-type" name="type">
-                            <option value="standard">Standard Certificate</option>
-                            <option value="rootCA">Root CA Certificate</option>
-                            <option value="intermediateCA">Intermediate CA Certificate</option>
-                        </select>
-                    </div>
-                    
-                    <div id="standard-cert-fields">
-                        <div class="form-group">
-                            <label for="cert-common-name">Common Name (Domain)</label>
-                            <input type="text" id="cert-common-name" name="commonName" placeholder="example.com">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="cert-alt-names">Alternative Names</label>
-                            <textarea id="cert-alt-names" name="altNames" placeholder="www.example.com&#10;api.example.com"></textarea>
-                            <span class="form-help">One domain per line</span>
-                        </div>
-                    </div>
-                    
-                    <div id="ca-cert-fields" class="hidden">
-                        <div class="form-group">
-                            <label for="ca-common-name">CA Name</label>
-                            <input type="text" id="ca-common-name" name="caName" placeholder="My Certificate Authority">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="ca-organization">Organization</label>
-                            <input type="text" id="ca-organization" name="organization" placeholder="My Organization">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-country">Country Code</label>
-                        <input type="text" id="cert-country" name="country" placeholder="US" maxlength="2">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-state">State/Province</label>
-                        <input type="text" id="cert-state" name="state" placeholder="California">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-locality">City/Locality</label>
-                        <input type="text" id="cert-locality" name="locality" placeholder="San Francisco">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-organization">Organization</label>
-                        <input type="text" id="cert-organization" name="organization" placeholder="My Organization">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-org-unit">Organizational Unit</label>
-                        <input type="text" id="cert-org-unit" name="organizationalUnit" placeholder="IT Department">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-email">Email Address</label>
-                        <input type="email" id="cert-email" name="email" placeholder="admin@example.com">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cert-validity">Validity Period (days)</label>
-                        <input type="number" id="cert-validity" name="validityDays" min="1" value="90">
-                    </div>
-                    
-                    <div class="form-group checkbox">
-                        <input type="checkbox" id="cert-passphrase" name="usePassphrase">
-                        <label for="cert-passphrase">Protect with Passphrase</label>
-                    </div>
-                    
-                    <div id="passphrase-fields" class="hidden">
-                        <div class="form-group">
-                            <label for="cert-passphrase-value">Passphrase</label>
-                            <input type="password" id="cert-passphrase-value" name="passphrase">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="cert-passphrase-confirm">Confirm Passphrase</label>
-                            <input type="password" id="cert-passphrase-confirm" name="passphraseConfirm">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group checkbox">
-                        <input type="checkbox" id="cert-auto-renew" name="autoRenew" checked>
-                        <label for="cert-auto-renew">Auto-Renew Before Expiry</label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="button" id="cert-modal-cancel">Cancel</button>
-                <button class="button primary" id="cert-modal-save">Create</button>
-            </div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="cert-modal-title">Create Certificate</h2>
+          <button class="close-modal">&times;</button>
         </div>
+        <div class="modal-body">
+          <form id="certificate-form">
+            <input type="hidden" id="cert-id" name="id" />
+
+            <div class="form-group">
+              <label for="cert-name">Certificate Name</label>
+              <input type="text" id="cert-name" name="name" required />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-type">Certificate Type</label>
+              <select id="cert-type" name="type">
+                <option value="standard">Standard Certificate</option>
+                <option value="rootCA">Root CA Certificate</option>
+                <option value="intermediateCA">
+                  Intermediate CA Certificate
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group" id="signing-ca-section">
+              <label for="signing-ca">Sign with CA Certificate</label>
+              <select id="signing-ca" name="signingCA">
+                <option value="">None (self-signed)</option>
+                <!-- CA certificates will be populated dynamically -->
+              </select>
+            </div>
+
+            <div id="standard-cert-fields">
+              <div class="form-group">
+                <label for="cert-common-name">Common Name (Domain)</label>
+                <input
+                  type="text"
+                  id="cert-common-name"
+                  name="commonName"
+                  placeholder="example.com"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="cert-alt-names">Alternative Names</label>
+                <textarea
+                  id="cert-alt-names"
+                  name="altNames"
+                  placeholder="www.example.com&#10;api.example.com"
+                ></textarea>
+                <span class="form-help">One domain per line</span>
+              </div>
+            </div>
+
+            <div id="ca-cert-fields" class="hidden">
+              <div class="form-group">
+                <label for="ca-common-name">CA Name</label>
+                <input
+                  type="text"
+                  id="ca-common-name"
+                  name="caName"
+                  placeholder="My Certificate Authority"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="ca-organization">Organization</label>
+                <input
+                  type="text"
+                  id="ca-organization"
+                  name="organization"
+                  placeholder="My Organization"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cert-country">Country Code</label>
+              <input
+                type="text"
+                id="cert-country"
+                name="country"
+                placeholder="US"
+                maxlength="2"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-state">State/Province</label>
+              <input
+                type="text"
+                id="cert-state"
+                name="state"
+                placeholder="California"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-locality">City/Locality</label>
+              <input
+                type="text"
+                id="cert-locality"
+                name="locality"
+                placeholder="San Francisco"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-organization">Organization</label>
+              <input
+                type="text"
+                id="cert-organization"
+                name="organization"
+                placeholder="My Organization"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-org-unit">Organizational Unit</label>
+              <input
+                type="text"
+                id="cert-org-unit"
+                name="organizationalUnit"
+                placeholder="IT Department"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-email">Email Address</label>
+              <input
+                type="email"
+                id="cert-email"
+                name="email"
+                placeholder="admin@example.com"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cert-validity">Validity Period (days)</label>
+              <input
+                type="number"
+                id="cert-validity"
+                name="validityDays"
+                min="1"
+                value="90"
+              />
+            </div>
+
+            <div class="form-group checkbox">
+              <input
+                type="checkbox"
+                id="cert-passphrase"
+                name="usePassphrase"
+              />
+              <label for="cert-passphrase">Protect with Passphrase</label>
+            </div>
+
+            <div id="passphrase-fields" class="hidden">
+              <div class="form-group">
+                <label for="cert-passphrase-value">Passphrase</label>
+                <input
+                  type="password"
+                  id="cert-passphrase-value"
+                  name="passphrase"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="cert-passphrase-confirm">Confirm Passphrase</label>
+                <input
+                  type="password"
+                  id="cert-passphrase-confirm"
+                  name="passphraseConfirm"
+                />
+              </div>
+            </div>
+
+            <div class="form-group checkbox">
+              <input
+                type="checkbox"
+                id="cert-auto-renew"
+                name="autoRenew"
+                checked
+              />
+              <label for="cert-auto-renew">Auto-Renew Before Expiry</label>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="button" id="cert-modal-cancel" data-close-modal>
+            Cancel
+          </button>
+          <button class="button primary" id="cert-modal-save">Create</button>
+        </div>
+      </div>
     </div>
 
     <!-- Certificate Details Modal -->
-    <div id="cert-details-modal" class="modal">
-        <!-- Content will be populated dynamically -->
+    <div id="cert-details-modal" class="modal hidden">
+      <!-- Content will be populated dynamically -->
     </div>
 
     <!-- Deployment action form will appear here when adding/editing -->
-    <div id="deployment-action-modal" class="modal">
-        <div class="modal-content large">
-          <!-- Content will be loaded dynamically -->
-        </div>
+    <div id="deployment-action-modal" class="modal hidden">
+      <div class="modal-content large">
+        <!-- Content will be loaded dynamically -->
+      </div>
     </div>
-    
+
     <!-- File Browser Modal -->
-    <div id="file-browser-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Browse for Location</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="file-browser-container">
-                    <div class="file-browser-toolbar">
-                        <button id="file-browser-up" class="button" title="Go up one level">
-                            <span>&#8593;</span> Up
-                        </button>
-                        <button id="file-browser-refresh" class="button" title="Refresh">
-                            <span>&#8635;</span> Refresh
-                        </button>
-                        <button id="file-browser-new-folder" class="button" title="New folder">
-                            <span>&#128193;</span> New Folder
-                        </button>
-                    </div>
-                    
-                    <div class="file-browser-path">
-                        <span>Current Path:</span>
-                        <input type="text" id="file-browser-current-path" readonly>
-                    </div>
-                    
-                    <div class="file-browser-locations">
-                    </div>
-                    
-                    <div class="file-browser-list" id="file-browser-list"></div>
-                    
-                    <div class="file-browser-footer">
-                        <div class="file-name-input">
-                            <label for="file-browser-filename">Filename:</label>
-                            <input type="text" id="file-browser-filename">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="button" id="file-browser-cancel">Cancel</button>
-                <button class="button primary" id="file-browser-select">Select</button>
-            </div>
+    <div id="file-browser-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Browse for Location</h2>
+          <span class="close-modal">&times;</span>
         </div>
+        <div class="modal-body">
+          <div class="file-browser-container">
+            <div class="file-browser-toolbar">
+              <button
+                id="file-browser-up"
+                class="button"
+                title="Go up one level"
+              >
+                <span>&#8593;</span> Up
+              </button>
+              <button id="file-browser-refresh" class="button" title="Refresh">
+                <span>&#8635;</span> Refresh
+              </button>
+              <button
+                id="file-browser-new-folder"
+                class="button"
+                title="New folder"
+              >
+                <span>&#128193;</span> New Folder
+              </button>
+            </div>
+
+            <div class="file-browser-path">
+              <span>Current Path:</span>
+              <input type="text" id="file-browser-current-path" readonly />
+            </div>
+
+            <div class="file-browser-locations"></div>
+
+            <div class="file-browser-list" id="file-browser-list"></div>
+
+            <div class="file-browser-footer">
+              <div class="file-name-input">
+                <label for="file-browser-filename">Filename:</label>
+                <input type="text" id="file-browser-filename" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="button" id="file-browser-cancel">Cancel</button>
+          <button class="button primary" id="file-browser-select">
+            Select
+          </button>
+        </div>
+      </div>
     </div>
-    
+
+    <!-- User Create/Edit Modal -->
+    <div id="user-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="user-modal-title">Create User</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="user-form">
+            <input type="hidden" id="edit-mode" name="editMode" value="false" />
+
+            <div class="form-group">
+              <label for="user-username">Username</label>
+              <input type="text" id="user-username" name="username" required />
+            </div>
+
+            <div class="form-group">
+              <label for="user-name">Display Name</label>
+              <input type="text" id="user-name" name="name" />
+            </div>
+
+            <div class="form-group">
+              <label for="user-role">Role</label>
+              <select id="user-role" name="role">
+                <option value="user">User</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+
+            <div id="password-fields">
+              <div class="form-group">
+                <label for="user-password">Password</label>
+                <input type="password" id="user-password" name="password" />
+              </div>
+
+              <div class="form-group">
+                <label for="user-password-confirm">Confirm Password</label>
+                <input
+                  type="password"
+                  id="user-password-confirm"
+                  name="passwordConfirm"
+                />
+              </div>
+            </div>
+
+            <div class="form-group checkbox">
+              <input type="checkbox" id="user-disabled" name="disabled" />
+              <label for="user-disabled">Account Disabled</label>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="button" id="user-modal-cancel">Cancel</button>
+          <button class="button primary" id="user-modal-save">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Token Create Modal -->
+    <div id="token-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Create API Token</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="token-form">
+            <div class="form-group">
+              <label for="token-name">Token Name</label>
+              <input
+                type="text"
+                id="token-name"
+                name="name"
+                required
+                placeholder="e.g. Deployment Script"
+              />
+            </div>
+
+            <div class="form-group admin-only">
+              <label for="token-username">User</label>
+              <select id="token-username" name="username">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="token-expiry">Expires In</label>
+              <select id="token-expiry" name="expires">
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+                <option value="180">180 days</option>
+                <option value="365">1 year</option>
+                <option value="0">Never expires</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Permissions</label>
+              <div class="token-scopes">
+                <h4>Certificates</h4>
+                <div class="scope-group">
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-certificates-read"
+                      name="scopes"
+                      value="certificates:read"
+                    />
+                    <label for="scope-certificates-read">Read</label>
+                  </div>
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-certificates-write"
+                      name="scopes"
+                      value="certificates:write"
+                    />
+                    <label for="scope-certificates-write">Write</label>
+                  </div>
+                </div>
+
+                <h4>CA Certificates</h4>
+                <div class="scope-group">
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-ca-read"
+                      name="scopes"
+                      value="ca:read"
+                    />
+                    <label for="scope-ca-read">Read</label>
+                  </div>
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-ca-write"
+                      name="scopes"
+                      value="ca:write"
+                    />
+                    <label for="scope-ca-write">Write</label>
+                  </div>
+                </div>
+
+                <h4>Certificate Renewal</h4>
+                <div class="scope-group">
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-renewal-read"
+                      name="scopes"
+                      value="renewal:read"
+                    />
+                    <label for="scope-renewal-read">Read</label>
+                  </div>
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-renewal-write"
+                      name="scopes"
+                      value="renewal:write"
+                    />
+                    <label for="scope-renewal-write">Write</label>
+                  </div>
+                </div>
+
+                <h4>System Settings</h4>
+                <div class="scope-group">
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-system-read"
+                      name="scopes"
+                      value="system:read"
+                    />
+                    <label for="scope-system-read">Read</label>
+                  </div>
+                  <div class="scope-checkbox">
+                    <input
+                      type="checkbox"
+                      id="scope-system-write"
+                      name="scopes"
+                      value="system:write"
+                    />
+                    <label for="scope-system-write">Write</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="button" id="token-modal-cancel">Cancel</button>
+          <button class="button primary" id="token-modal-save">
+            Create Token
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Created Success Modal -->
+    <div id="token-created-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>API Token Created</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="token-created-info">
+            <p class="warning">
+              <strong>Important:</strong> Copy this token now. You won't be able
+              to see it again!
+            </p>
+
+            <div class="form-group">
+              <label for="created-token-value">Token</label>
+              <div class="token-value-container">
+                <input type="text" id="created-token-value" readonly />
+                <button
+                  id="copy-token-btn"
+                  class="button small"
+                  title="Copy to clipboard"
+                >
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="token-metadata">
+              <div>
+                <strong>Name:</strong>
+                <span id="created-token-name"></span>
+              </div>
+              <div>
+                <strong>Expires:</strong>
+                <span id="created-token-expires"></span>
+              </div>
+              <div>
+                <strong>Scopes:</strong>
+                <div id="created-token-scopes" class="token-scopes-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="button primary" id="token-created-done">Done</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Notification container -->
     <div id="notifications-container"></div>
 
@@ -461,13 +1399,15 @@
     <script src="js/utils/domain-validator.js"></script>
     <script src="js/utils/ui-utils.js"></script>
     <script src="js/utils/docker-utils.js"></script>
-    <script src="js/utils/template-utils.js"></script>
     <script src="js/modules/logger.js"></script>
     <script src="js/cert-actions.js"></script>
-    <script src="js/logs-viewer.js"></script>
+    <script src="js/logs.js"></script>
     <script src="js/settings-ui.js"></script>
     <script src="js/file-browser.js"></script>
+    <script src="/js/deploy-actions-sortable.js"></script>
     <script src="js/deploy-actions.js"></script>
+    <script src="/js/activity-ui.js"></script>
+    <script src="js/user-management.js"></script>
     <script src="js/main.js"></script>
-</body>
+  </body>
 </html>

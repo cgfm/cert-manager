@@ -30,7 +30,6 @@ tags:
   - name: setup
     description: First-time setup operations
 paths:
-
   /auth/login:
     post:
       summary: Login with username and password
@@ -105,7 +104,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  
+
   /auth/user:
     get:
       summary: Get current user information
@@ -136,7 +135,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  
+
   /auth/change-password:
     post:
       summary: Change user's password
@@ -230,7 +229,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-    
+
     post:
       summary: Create a new user (admin only)
       operationId: createUser
@@ -382,7 +381,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-    
+
     delete:
       summary: Delete a user (admin only)
       operationId: deleteUser
@@ -463,7 +462,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  
+
   /setup/complete:
     post:
       summary: Complete the first-time setup
@@ -1105,6 +1104,174 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /certificates/{fingerprint}/history:
+    get:
+      summary: Get certificate previous versions
+      operationId: getCertificateHistory
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Certificate history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  fingerprint:
+                    type: string
+                  certificate:
+                    type: string
+                  previousVersions:
+                    type: object
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
+    get:
+      summary: Download a file from a previous certificate version
+      operationId: downloadPreviousVersionFile
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fileType
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File from previous version
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/download:
+    get:
+      summary: Download all files from a previous certificate version as ZIP
+      operationId: downloadPreviousVersionZip
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ZIP archive containing all files from previous version
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /certificates/{fingerprint}/check-renewal-passphrases:
+    get:
+      summary: Check if passphrases are needed for renewal
+      operationId: checkRenewalPassphrases
+      tags:
+        - certificates
+        - passphrases
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Passphrase requirements for renewal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  certificate:
+                    type: object
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  signingCA:
+                    type: object
+                    nullable: true
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  passphraseNeeded:
+                    type: boolean
+
+  /certificates/{fingerprint}/deploy-actions/{actionIndex}/toggle:
+    post:
+      summary: Toggle enabled state of a deployment action
+      operationId: toggleDeploymentAction
+      tags:
+        - certificates
+        - deployment
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: actionIndex
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Action toggled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  enabled:
+                    type: boolean
+
   /certificates/{fingerprint}/deploy-actions:
     get:
       summary: Get all deployment actions for a certificate
@@ -1301,7 +1468,12 @@ paths:
                       - $ref: "#/components/schemas/SshCopyAction"
                       - $ref: "#/components/schemas/CommandAction"
                       - $ref: "#/components/schemas/DockerRestartAction"
+                      - $ref: "#/components/schemas/NginxProxyManagerAction"
+                      - $ref: "#/components/schemas/SmbCopyAction"
+                      - $ref: "#/components/schemas/FtpCopyAction"
+                      - $ref: "#/components/schemas/ApiCallAction"
                       - $ref: "#/components/schemas/WebhookAction"
+                      - $ref: "#/components/schemas/EmailAction"
         "400":
           description: Invalid request
           content:
@@ -1347,6 +1519,10 @@ paths:
                     type: string
                   result:
                     type: object
+                  logs:
+                    type: array
+                    items:
+                      type: string
         "404":
           description: Certificate or action not found
           content:
@@ -1429,7 +1605,21 @@ paths:
           required: true
           schema:
             type: string
-            enum: [crt, key, chain, fullchain, pfx, p12, pem, p7b, csr, cer, der, ext]
+            enum:
+              [
+                crt,
+                key,
+                chain,
+                fullchain,
+                pfx,
+                p12,
+                pem,
+                p7b,
+                csr,
+                cer,
+                der,
+                ext,
+              ]
           description: Type of certificate file to download
       responses:
         "200":
@@ -2290,7 +2480,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  
+
   /logs/files:
     get:
       summary: Get list of available log files
@@ -2312,7 +2502,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  
+
   /logs/file/{filename}:
     get:
       summary: Get content of a specific log file
@@ -2369,7 +2559,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-              
+
     delete:
       summary: Clear a log file
       operationId: clearLogFile
@@ -2708,6 +2898,7 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   /settings/logging:
+    # Existing GET and POST operations remain unchanged
     get:
       summary: Get logging settings
       operationId: getLoggingSettings
@@ -2727,10 +2918,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-                
-    post:
-      summary: Update logging settings
-      operationId: updateLoggingSettings
+
+    # Change the POST method to PUT to match our implementation
+    put:
+      summary: Update all logging settings
+      operationId: updateAllLoggingSettings
       tags:
         - settings
         - logs
@@ -2739,7 +2931,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoggingSettingsUpdate"
+              type: object
+              properties:
+                logLevel:
+                  type: string
+                  enum: [error, warn, info, debug, fine, finest]
+                  description: Default log level
+                fileLogLevels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                    enum: [error, warn, info, debug, fine, finest]
+                  description: File-specific log levels
       responses:
         "200":
           description: Logging settings updated
@@ -2752,8 +2955,10 @@ paths:
                     type: boolean
                   message:
                     type: string
-                  settings:
-                    $ref: "#/components/schemas/LoggingSettings"
+                  logLevel:
+                    type: string
+                  fileLogLevels:
+                    type: object
         "400":
           description: Invalid request
           content:
@@ -2767,32 +2972,402 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /settings/logging/debug:
-    get:
-      summary: Debug information for logging settings
-      operationId: debugLoggingSettings
+  /settings/logging/default:
+    post:
+      summary: Update default log level
+      operationId: updateDefaultLogLevel
       tags:
         - settings
         - logs
-        - debug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - level
+              properties:
+                level:
+                  type: string
+                  enum: [error, warn, info, debug, fine, finest]
+                  description: Default log level
       responses:
         "200":
-          description: Debugging information about log settings
+          description: Default log level updated
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  defaultLevel:
+                  success:
+                    type: boolean
+                  message:
                     type: string
-                  fileLogLevels:
+                  logLevel:
+                    type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/logging/file:
+    post:
+      summary: Update file-specific log level
+      operationId: updateFileLogLevel
+      tags:
+        - settings
+        - logs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filename
+                - level
+              properties:
+                filename:
+                  type: string
+                  description: Filename to set log level for
+                level:
+                  type: string
+                  enum: [error, warn, info, debug, fine, finest]
+                  description: Log level for the file
+      responses:
+        "200":
+          description: File log level updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  filename:
+                    type: string
+                  level:
+                    type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/logging/file/{filename}:
+    delete:
+      summary: Remove file-specific log level
+      operationId: removeFileLogLevel
+      tags:
+        - settings
+        - logs
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Filename to remove log level for
+      responses:
+        "200":
+          description: File log level removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  filename:
+                    type: string
+        "404":
+          description: File log level not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment:
+    get:
+      summary: Get deployment settings
+      operationId: getDeploymentSettings
+      tags:
+        - settings
+        - deployment
+      responses:
+        "200":
+          description: Current deployment settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentSettings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Update all deployment settings
+      operationId: updateDeploymentSettings
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deployment:
+                  $ref: "#/components/schemas/DeploymentSettings"
+      responses:
+        "200":
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  deployment:
+                    $ref: "#/components/schemas/DeploymentSettings"
+        "400":
+          description: Invalid settings format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment/email:
+    put:
+      summary: Update email deployment settings
+      operationId: updateEmailSettings
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                smtp:
+                  $ref: "#/components/schemas/SmtpSettings"
+      responses:
+        "200":
+          description: Email settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  email:
                     type: object
-                  testResults:
-                    type: array
-                    items:
-                      type: object
-                  levelsHierarchy:
-                    type: object
+                    properties:
+                      smtp:
+                        $ref: "#/components/schemas/SmtpSettings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment/email/test:
+    post:
+      summary: Test email settings
+      operationId: testEmailSettings
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - smtp
+                - recipient
+              properties:
+                smtp:
+                  $ref: "#/components/schemas/SmtpSettings"
+                recipient:
+                  type: string
+                  description: Email address to send test message to
+      responses:
+        "200":
+          description: Test email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  messageId:
+                    type: string
+                    description: Email message ID
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Failed to send test email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment/nginx-proxy-manager:
+    put:
+      summary: Update Nginx Proxy Manager settings
+      operationId: updateNginxProxyManagerSettings
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NginxProxyManagerSettings"
+      responses:
+        "200":
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  nginxProxyManager:
+                    $ref: "#/components/schemas/NginxProxyManagerSettings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment/nginx-proxy-manager/test:
+    post:
+      summary: Test Nginx Proxy Manager connection
+      operationId: testNginxProxyManagerConnection
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NginxProxyManagerSettings"
+      responses:
+        "200":
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  certificates:
+                    type: integer
+                    description: Number of certificates found in NPM
+        "500":
+          description: Connection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/deployment/docker:
+    put:
+      summary: Update Docker deployment default settings
+      operationId: updateDockerSettings
+      tags:
+        - settings
+        - deployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DockerDefaultSettings"
+      responses:
+        "200":
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  dockerDefaults:
+                    $ref: "#/components/schemas/DockerDefaultSettings"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /public/logLevel:
     get:
@@ -2802,7 +3377,7 @@ paths:
       description: Returns the current log level without requiring authentication
       operationId: getLogLevel
       responses:
-        '200':
+        "200":
           description: Successful operation
           content:
             application/json:
@@ -2816,15 +3391,15 @@ paths:
                     type: string
                     enum: [error, warn, info, debug]
                     example: info
-        '500':
+        "500":
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
       x-controller: public
       x-operation: getLogLevel
-      
+
   /public/ping:
     get:
       tags:
@@ -2833,7 +3408,7 @@ paths:
       description: Simple endpoint to check if API is operational
       operationId: ping
       responses:
-        '200':
+        "200":
           description: Successful operation
           content:
             application/json:
@@ -2853,256 +3428,47 @@ paths:
       x-controller: public
       x-operation: ping
 
-  /certificates/{fingerprint}/check-renewal-passphrases:
+  /public/status:
     get:
-      summary: Check if certificate or signing CA need passphrases for renewal
-      operationId: checkRenewalPassphrases
       tags:
-        - certificates
-        - passphrases
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Certificate fingerprint
+        - Public
+      summary: Check application initialization status
+      description: Returns the current initialization status of the application
+      operationId: getSystemStatus
       responses:
         "200":
-          description: Passphrase requirements for renewal
+          description: System status information
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  success:
+                  ready:
                     type: boolean
-                  certificate:
-                    type: object
-                    properties:
-                      fingerprint:
-                        type: string
-                      name:
-                        type: string
-                      needsPassphrase:
-                        type: boolean
-                      hasPassphrase:
-                        type: boolean
-                  signingCA:
-                    type: object
-                    nullable: true
-                    properties:
-                      fingerprint:
-                        type: string
-                      name:
-                        type: string
-                      needsPassphrase:
-                        type: boolean
-                      hasPassphrase:
-                        type: boolean
-                  passphraseNeeded:
-                    type: boolean
-                    description: Whether any passphrase is needed for renewal
-        "404":
-          description: Certificate not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/history:
-    get:
-      summary: Get certificate version history
-      operationId: getCertificateHistory
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Certificate fingerprint
-      responses:
-        "200":
-          description: Certificate version history
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  fingerprint:
+                    description: Whether the system is fully initialized and ready
+                    example: true
+                  version:
                     type: string
-                  certificate:
-                    type: string
-                    description: Certificate name
-                  previousVersions:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CertificateVersion"
-        "404":
-          description: Certificate not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
-    get:
-      summary: Download a specific file from a previous certificate version
-      operationId: downloadPreviousVersionFile
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Certificate fingerprint
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Previous version fingerprint
-        - name: fileType
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Type of file to download (crt, key, etc.)
-      responses:
-        "200":
-          description: The requested file
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        "404":
-          description: Certificate, version, or file not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/download:
-    get:
-      summary: Download all files from a previous certificate version as ZIP
-      operationId: downloadPreviousVersionZip
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Certificate fingerprint
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Previous version fingerprint
-      responses:
-        "200":
-          description: ZIP archive containing all files from the previous version
-          content:
-            application/zip:
-              schema:
-                type: string
-                format: binary
-        "404":
-          description: Certificate or version not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/deploy-actions/{actionIndex}/toggle:
-    post:
-      summary: Toggle a deployment action enabled/disabled state
-      operationId: toggleDeploymentAction
-      tags:
-        - certificates
-        - deployment
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Certificate fingerprint
-        - name: actionIndex
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Index of the deployment action
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                enabled:
-                  type: boolean
-                  description: Whether the action should be enabled
-      responses:
-        "200":
-          description: Deployment action toggled successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
+                    description: Application version
+                    example: "1.2.3"
+                  initializationProgress:
+                    type: integer
+                    description: Progress percentage of initialization (0-100)
+                    example: 75
+                  setupNeeded:
                     type: boolean
-                  message:
+                    description: Whether initial setup is required
+                    example: false
+                  authRequired:
+                    type: boolean
+                    description: Whether authentication is required
+                    example: true
+                  error:
                     type: string
-                  action:
-                    $ref: "#/components/schemas/DeploymentAction"
-        "404":
-          description: Certificate or deployment action not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+                    description: Error message if initialization failed
+                    example: null
+      x-controller: public
+      x-operation: getSystemStatus
 
 components:
   schemas:
@@ -3119,7 +3485,7 @@ components:
           type: string
           enum: [user, admin]
           description: User's role
-    
+
     User:
       allOf:
         - $ref: "#/components/schemas/UserProfile"
@@ -3936,22 +4302,6 @@ components:
 
     DeploymentAction:
       type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          description: Action type identifier
-        name:
-          type: string
-          description: Optional display name for the action
-        description:
-          type: string
-          description: Optional description for the action
-        enabled:
-          type: boolean
-          default: true
-          description: Whether this action is enabled
       discriminator:
         propertyName: type
         mapping:
@@ -3965,6 +4315,130 @@ components:
           "api-call": "#/components/schemas/ApiCallAction"
           webhook: "#/components/schemas/WebhookAction"
           email: "#/components/schemas/EmailAction"
+      properties:
+        name:
+          type: string
+          description: Display name for the action
+        type:
+          type: string
+          description: Type of deployment action
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the action is enabled
+      required:
+        - type
+        - name
+
+    DeploymentActionToggleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        enabled:
+          type: boolean
+
+    DeploymentSettings:
+      type: object
+      properties:
+        email:
+          type: object
+          properties:
+            smtp:
+              $ref: "#/components/schemas/SmtpSettings"
+        nginxProxyManager:
+          $ref: "#/components/schemas/NginxProxyManagerSettings"
+        dockerDefaults:
+          $ref: "#/components/schemas/DockerDefaultSettings"
+      description: Global deployment settings
+
+    SmtpSettings:
+      type: object
+      properties:
+        host:
+          type: string
+          description: SMTP server hostname
+        port:
+          type: integer
+          default: 587
+          description: SMTP server port
+        secure:
+          type: boolean
+          default: false
+          description: Whether to use SSL/TLS
+        user:
+          type: string
+          description: SMTP username for authentication
+        password:
+          type: string
+          description: SMTP password for authentication
+          format: password
+        from:
+          type: string
+          description: Default sender email address
+      description: SMTP server settings for email actions
+
+    NginxProxyManagerSettings:
+      type: object
+      properties:
+        host:
+          type: string
+          description: Nginx Proxy Manager host
+        port:
+          type: integer
+          default: 81
+          description: Nginx Proxy Manager port
+        useHttps:
+          type: boolean
+          default: false
+          description: Whether to use HTTPS for connecting to NPM
+        rejectUnauthorized:
+          type: boolean
+          default: true
+          description: Whether to verify SSL certificates (set to false for self-signed certs)
+        username:
+          type: string
+          description: Nginx Proxy Manager username
+        password:
+          type: string
+          format: password
+          description: Nginx Proxy Manager password
+        accessToken:
+          type: string
+          format: password
+          description: NPM API access token
+        refreshToken:
+          type: string
+          format: password
+          description: NPM API refresh token
+        tokenExpiry:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the NPM token expires
+      description: Nginx Proxy Manager connection settings
+
+    DockerDefaultSettings:
+      type: object
+      properties:
+        socketPath:
+          type: string
+          default: /var/run/docker.sock
+          description: Docker socket path for Unix socket connections
+        host:
+          type: string
+          description: Docker host for TCP connections
+        port:
+          type: integer
+          default: 2375
+          description: Docker port for TCP connections
+        useTLS:
+          type: boolean
+          default: false
+          description: Whether to use TLS for Docker connection
+      description: Default settings for Docker deployment actions
 
     CertificateVersion:
       type: object
@@ -4026,4 +4500,3 @@ components:
               relativePath:
                 type: string
                 description: Relative path from certificate directory
-

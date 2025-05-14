@@ -1,0 +1,492 @@
+/* Log Settings Modal */
+.log-settings-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 800px;
+  height: 600px; /* Fixed height for the modal */
+}
+
+.log-settings-content form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* Prevent double scrollbars */
+}
+
+.form-group {
+  margin-bottom: 20px;
+  flex-shrink: 0; /* Prevent form groups from shrinking */
+}
+
+.form-group-header {
+    margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.file-log-level-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.file-log-level-row input {
+  flex: 2;
+}
+
+.file-log-level-row select {
+  flex: 1;
+  min-width: 100px;
+}
+
+.file-log-level-row button {
+  padding: 5px;
+  min-width: 30px;
+}
+
+/* Make the file log levels container scrollable */
+#file-log-levels-container {
+  max-height: 275px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px;
+}
+
+/* Style for the scrollbar */
+#file-log-levels-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+#file-log-levels-container::-webkit-scrollbar-track {
+  background: var(--background-light);
+  border-radius: 4px;
+}
+
+#file-log-levels-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+#file-log-levels-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Add spacing between the form elements */
+.form-group:not(:last-child) {
+  margin-bottom: 20px;
+  flex-shrink: 0; /* Prevent form groups from shrinking */
+}
+
+/* Logs Tab Styling */
+.logs-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.logs-header h2 {
+    margin: 0;
+    margin-right: auto;
+    font-size: 1.5rem;
+    color: var(--heading-color);
+    display: flex;
+    align-items: center;
+}
+
+.logs-header h2::before {
+    content: "\f05a"; /* Font Awesome info circle icon */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    margin-right: 10px;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.logs-status {
+    display: flex;
+    align-items: center;
+    background-color: var(--hover-bg);
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.logs-filtered-count {
+    margin-left: 5px;
+    opacity: 0.8;
+}
+
+.auto-refresh {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    background-color: var(--hover-bg);
+    border-radius: 16px;
+    font-size: 0.85rem;
+}
+
+.auto-refresh label {
+    margin: 0 8px 0 4px;
+}
+
+.auto-refresh select {
+    background-color: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 0.85rem;
+    padding: 0 4px;
+}
+
+.logs-header-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.logs-header-buttons .button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 16px;
+}
+
+.logs-header-buttons .button i {
+    font-size: 0.9rem;
+}
+
+.logs-controls {
+    display: flex;
+    justify-content: space-between;
+    background-color: var(--background-light);
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.logs-filter-group {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.logs-filter-group label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.logs-filter-group select,
+.logs-filter-group input {
+    min-width: 120px;
+}
+
+.logs-control-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+/* Make sure log container allows vertical space to be used efficiently */
+.logs-container {
+    height: 500px;
+    overflow-y: auto;
+    background-color: var(--card-bg);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.logs-output {
+    font-family: monospace;
+    display: grid;
+    line-height: 1.2;
+}
+
+.log-entry {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    line-height: 1.2;
+    display: grid;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+/* Fix header layout */
+.log-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin: 0 0 2px 0;
+    padding: 0;
+    height: auto;
+    line-height: 1.2;
+    /* Debug outline */
+    /* outline: 1px solid blue; */
+}
+
+/* Fix message layout */
+.log-message {
+    font-family: monospace;
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.2;
+    height: auto;
+    /* Debug outline */
+    /* outline: 1px solid green; */
+}
+
+/* Fix meta data if present */
+.log-meta {
+    margin-top: 2px;
+    padding: 3px;
+    background-color: var(--background-dark);
+    border-radius: 3px;
+    font-size: 0.8em;
+    line-height: 1.2;
+    height: auto;
+}
+
+.log-timestamp {
+    white-space: nowrap;
+    font-family: monospace;
+}
+
+.log-level {
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    font-weight: 500;
+    min-width: 40px;
+    text-align: center;
+}
+
+.log-error {
+    color: var(--color-error);
+    background-color: var(--color-error-bg);
+}
+
+.log-warning {
+    color: var(--color-warning);
+    background-color: var(--color-warning-bg);
+}
+
+.log-info {
+    color: var(--color-info);
+    background-color: var(--color-info-bg);
+}
+
+.log-debug {
+    color: var(--color-muted);
+    background-color: var(--color-muted-bg);
+}
+
+.log-fine {
+    color: var(--color-success);
+    background-color: var(--color-success-bg);
+}
+
+.log-finest {
+    color: var(--color-secondary);
+    background-color: var(--color-secondary-bg);
+}
+
+.log-message {
+    font-family: monospace;
+    margin: 2px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-meta {
+    margin-top: 2px; /* Reduced margin */
+    padding: 3px; /* Smaller padding */
+    background-color: var(--background-dark);
+    border-radius: 3px;
+    font-size: 0.8em; /* Smaller font */
+}
+
+.meta-item {
+    display: flex;
+    margin-bottom: 1px; /* Minimal margin between items */
+}
+
+.meta-key {
+    font-weight: 600;
+    margin-right: 5px;
+    min-width: 100px;
+}
+
+.logs-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--background-light);
+    border-radius: 5px;
+}
+
+.auto-refresh {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: var(--background-light);
+    border-radius: 5px;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .logs-container {
+        background-color: var(--background-dark);
+    }
+    
+    .log-meta {
+        background-color: var(--background);
+    }
+}
+
+/* Make the filename more compact */
+.log-filename {
+    font-style: italic;
+    opacity: 0.8;
+    font-size: 0.9em;
+    margin-left: 5px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* Styling for JSON data in logs */
+.json-in-log {
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    margin: 2px 0;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-color);
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.json-caret {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    border-bottom-right-radius: 3px;
+}
+
+.json-content {
+    padding: 6px 8px 6px 24px; /* Extra padding on left for caret */
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    line-height: 1.3;
+    max-height: 4.5em; /* Approximately 3 lines */
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.json-in-log.expanded .json-content {
+    max-height: none !important; /* Use important to override any inline styles */
+    overflow: visible;
+}
+
+.json-in-log.expanded {
+    max-height: none;
+    cursor: default;
+}
+
+.json-content::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 15px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.05));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.json-in-log.expanded .json-content::after {
+    opacity: 0;
+}
+
+/* Fix the duplicate log-message styles */
+.log-message {
+    font-family: monospace;
+    margin: 2px 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.2;
+    /* Remove duplicate style declaration */
+}
+
+/* Add styling for the instance name */
+.log-instance {
+    font-style: italic;
+    color: var(--accent-color);
+    opacity: 0.9;
+    padding-left: 4px;
+}
+
+.log-instance::before {
+    content: "(";
+}
+
+.log-instance::after {
+    content: ")";
+}
+
+#log-settings-form .form-actions{
+    margin-top: 0;
+}

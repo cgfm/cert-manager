@@ -73,22 +73,6 @@
   margin-top: 1rem;
 }
 
-/* Loading spinner */
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--bg-light);
-  border-radius: 50%;
-  border-top: 3px solid var(--primary-color);
-  animation: spin 1s linear infinite;
-  margin-bottom: 1.5rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 /* Empty state variations */
 .empty-state.certificates .empty-state-icon {
   background-color: var(--primary-lighter, #e3f2fd);
@@ -110,8 +94,7 @@
   color: var(--warning-color, #ffa000);
 }
 
-/* Certificate and CA Certificate List Styles */
-.certificate-list,
+/* CA Certificate List Styles */
 .ca-certificate-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -341,4 +324,57 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  padding: 20px 0;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--bg-light);
+  border-radius: 50%;
+  border-top: 3px solid var(--primary-color);
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+.loading-spinner.small {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+.loading-spinner.large {
+  width: 60px;
+  height: 60px;
+  border-width: 5px;
+}
+
+.loading-text {
+  margin-top: 12px;
+  text-align: center;
+  color: var(--text-muted, #666666);
+  font-size: 14px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .loading-spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: var(--primary-color, #3498db);
 }

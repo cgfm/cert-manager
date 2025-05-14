@@ -1,4 +1,5 @@
 {
+  "configDir": "/config",
   "certPath": "/certs",
   "enableHttps": false,
   "httpsPort": 4443,
@@ -6,9 +7,9 @@
   "httpsKeyPath": null,
   "openSSLPath": "openssl",
   "caValidityPeriod": {
-      "rootCA": 3650,
-      "intermediateCA": 1825,
-      "standard": 90
+    "rootCA": 3650,
+    "intermediateCA": 1825,
+    "standard": 90
   },
   "autoRenewByDefault": true,
   "renewDaysBeforeExpiry": 30,
@@ -20,5 +21,44 @@
   "signStandardCertsWithCA": false,
   "enableAutoRenewalJob": true,
   "renewalSchedule": "0 0 * * *",
-  "enableFileWatch": true
+  "enableFileWatch": true,
+  "deployment": {
+    "email": {
+      "smtp": {
+        "host": "mail.infomaniak.com",
+        "port": 465,
+        "secure": true,
+        "user": "chrischan@ikmail.com",
+        "password": "flhbJy3fT!&9BIroj^Jsvtg!D05Fjagayit6Cm^*",
+        "from": "Certificate Manager <chrischan@aikq.de>"
+      }
+    },
+    "nginxProxyManager": {
+      "host": "nginxpm.seneca.local",
+      "port": 443,
+      "useHttps": true,
+      "rejectUnauthorized": false,
+      "username": "chrischan-service@aikq.de",
+      "password": "••••••••"
+    },
+    "dockerDefaults": {
+      "socketPath": "/var/run/docker.sock",
+      "host": "",
+      "port": 2375,
+      "useTLS": false
+    }
+  },
+  "fileLogLevels": {
+    "services/openssl-wrapper.js": "fine",
+    "models/CertificateManager.js": "fine",
+    "models/Certificate.js": "fine",
+    "api/routes/certificates.js": "fine"
+  },
+  "port": 3000,
+  "security": {
+    "disableAuth": false,
+    "authMode": "basic",
+    "jwtSecret": "0cb58a686ba3dc83d15a74367ff2d745dab2f133654dd9e556393609fc6509b7095b11e590a9e75e631cbfc28020e965eb3e74a2502f15f2aa3cb86e6fb5c31b",
+    "tokenExpiration": "8h"
+  }
 }

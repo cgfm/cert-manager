@@ -17,6 +17,8 @@
 const express = require('express');
 const logger = require('../../services/logger');
 
+const FILENAME = 'api/routes/renewal.js';
+
 function initRenewalRouter(services) {
     const router = express.Router();
     const { renewalService } = services;
@@ -27,7 +29,7 @@ function initRenewalRouter(services) {
             const status = renewalService.getStatus();
             res.json(status);
         } catch (error) {
-            logger.error('Error getting renewal service status:', error);
+            logger.error('Error getting renewal service status:', error, FILENAME);
             res.status(500).json({
                 message: 'Failed to get renewal service status',
                 error: error.message,
@@ -46,7 +48,7 @@ function initRenewalRouter(services) {
             const result = await renewalService.checkForRenewals(options);
             res.json(result);
         } catch (error) {
-            logger.error('Error triggering renewal check:', error);
+            logger.error('Error triggering renewal check:', error, FILENAME);
             res.status(500).json({
                 message: 'Failed to check for renewals',
                 error: error.message,
@@ -64,7 +66,7 @@ function initRenewalRouter(services) {
                 message: 'File watcher restarted successfully'
             });
         } catch (error) {
-            logger.error('Error restarting file watcher:', error);
+            logger.error('Error restarting file watcher:', error, FILENAME);
             res.status(500).json({
                 message: 'Failed to restart file watcher',
                 error: error.message,
@@ -97,7 +99,7 @@ function initRenewalRouter(services) {
                 });
             }
         } catch (error) {
-            logger.error('Error updating renewal schedule:', error);
+            logger.error('Error updating renewal schedule:', error, FILENAME);
             res.status(500).json({
                 message: 'Failed to update renewal schedule',
                 error: error.message,

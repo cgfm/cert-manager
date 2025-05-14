@@ -4,86 +4,6 @@
  */
 
 /**
- * Initialize certificate action handlers
- */
-function setupCertificateActions() {
-  Logger.debug("Setting up certificate action handlers");
-
-  // Create certificate button
-  document
-    .getElementById("create-cert-btn")
-    ?.addEventListener("click", showCreateCertificateModal);
-  document
-    .getElementById("create-ca-btn")
-    ?.addEventListener("click", showCreateCAModal);
-
-  // Certificate type selection
-  document
-    .getElementById("cert-type")
-    ?.addEventListener("change", handleCertificateTypeChange);
-
-  // Passphrase checkbox toggle
-  document
-    .getElementById("cert-passphrase")
-    ?.addEventListener("change", togglePassphraseFields);
-
-  // Certificate modal form submission
-  document
-    .getElementById("cert-modal-save")
-    ?.addEventListener("click", saveCertificate);
-  document
-    .getElementById("cert-modal-cancel")
-    ?.addEventListener("click", hideCertificateModal);
-
-  // Certificate details actions
-  document
-    .getElementById("close-cert-details")
-    ?.addEventListener("click", hideCertificateDetailsModal);
-  document
-    .getElementById("delete-cert-btn")
-    ?.addEventListener("click", confirmDeleteCertificate);
-  document
-    .getElementById("renew-cert-btn")
-    ?.addEventListener("click", renewSelectedCertificate);
-
-  // Deployment actions
-  if (typeof initializeDeploymentActionButton === "function") {
-    initializeDeploymentActionButton(
-      document.getElementById("add-deployment-action-btn")
-    );
-  } else {
-    Logger.error("initializeDeploymentActionButton function not found");
-  }
-
-  // Certificate list filters
-  document
-    .getElementById("cert-search")
-    ?.addEventListener("input", filterCertificates);
-  document
-    .getElementById("filter-valid")
-    ?.addEventListener("change", filterCertificates);
-  document
-    .getElementById("filter-expiring")
-    ?.addEventListener("change", filterCertificates);
-  document
-    .getElementById("filter-expired")
-    ?.addEventListener("change", filterCertificates);
-
-  // Refresh buttons
-  document
-    .getElementById("refresh-certs")
-    ?.addEventListener("click", () => loadCertificates(true));
-  document
-    .getElementById("refresh-ca")
-    ?.addEventListener("click", () => loadCACertificates(true));
-  document
-    .getElementById("refresh-dashboard")
-    ?.addEventListener("click", loadDashboard);
-
-  Logger.info("Certificate action handlers initialized successfully");
-}
-
-/**
  * Show the certificate create/edit modal
  * @param {boolean} isCA - Whether to create a CA certificate
  */
@@ -94,6 +14,8 @@ function showCreateCertificateModal(isCA = false) {
   const title = document.getElementById("cert-modal-title");
   const saveBtn = document.getElementById("cert-modal-save");
   const form = document.getElementById("certificate-form");
+
+  document.getElementById("cert-type").addEventListener("change", handleCertificateTypeChange);
 
   // Reset form
   form.reset();
@@ -114,10 +36,132 @@ function showCreateCertificateModal(isCA = false) {
     Logger.debug("Setting up modal for standard certificate creation");
   }
 
-  // Show the modal
-  modal.classList.remove("hidden");
-  document.getElementById("modal-backdrop").classList.remove("hidden");
+  // Populate CA selection dropdown - Load available CA certificates
+  populateSigningCADropdown();
+
+  // Show the modal using UIUtils instead of direct manipulation
+  UIUtils.openModal("certificate-modal");
   Logger.info(`Certificate ${isCA ? "CA" : "creation"} modal displayed`);
+}
+
+/**
+ * Populate the signing CA dropdown with available CA certificates
+ */
+async function populateSigningCADropdown() {
+  const signingCASelect = document.getElementById("signing-ca");
+
+  if (!signingCASelect) {
+    Logger.error("Signing CA select element not found");
+    return;
+  }
+
+  // Clear existing options except the first one (None)
+  while (signingCASelect.options.length > 1) {
+    signingCASelect.remove(1);
+  }
+
+  // Get the selected certificate type
+  const certType = document.getElementById("cert-type").value;
+
+  try {
+    // Only load CAs if we're not creating a root CA
+    if (certType !== "rootCA") {
+      Logger.debug("Loading CA certificates for signing dropdown");
+
+      // Fetch CA certificates
+      let caCertificates = [];
+
+      // Use state if available
+      if (window.state && window.state.caCertificates) {
+        caCertificates = window.state.caCertificates;
+        Logger.debug(`Found ${caCertificates.length} CA certificates in state`);
+      }
+      if (caCertificates.length === 0) {
+        // Otherwise fetch from API
+        const response = await fetch("/api/ca");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CA certificates: ${response.status}`);
+        }
+        caCertificates = await response.json();
+        Logger.debug(`Fetched ${caCertificates.length} CA certificates from API`);
+      }
+
+      // Debug: log all certificates to see their structure
+      Logger.debug('Available CA certificates:', caCertificates);
+
+      // Filter CAs based on certificate type
+      // For intermediate CAs, only show root CAs
+      // For standard certificates, show both root and intermediate CAs
+      const filteredCAs = certType === "intermediateCA"
+        ? caCertificates.filter(ca => ca.certType === "rootCA")
+        : caCertificates;
+
+      Logger.debug(`Filtered to ${filteredCAs.length} CA certificates`);
+
+      // Add options to the select
+      filteredCAs.forEach(ca => {
+        Logger.debug(`Adding CA to dropdown: ${ca.name} (${ca.fingerprint})`);
+        const option = document.createElement("option");
+        option.value = ca.fingerprint;
+        option.textContent = ca.name || `CA (${ca.fingerprint.substring(0, 8)}...)`;
+        signingCASelect.appendChild(option);
+      });
+
+      Logger.debug(`Added ${filteredCAs.length} CA certificates to signing dropdown`);
+    }
+
+    // Show/hide the signing CA section based on certificate type
+    const signingCASection = document.getElementById("signing-ca-section");
+    if (signingCASection) {
+      if (certType === "rootCA") {
+        signingCASection.classList.add("hidden");
+      } else {
+        signingCASection.classList.remove("hidden");
+      }
+    }
+  } catch (error) {
+    Logger.error("Error populating signing CA dropdown:", error);
+  }
+}
+
+/**
+ * Handle certificate type change
+ */
+function handleCertificateTypeChange() {
+  const certType = document.getElementById("cert-type").value;
+  Logger.debug(`Certificate type changed to: ${certType}`);
+
+  const standardFields = document.getElementById("standard-cert-fields");
+  const caFields = document.getElementById("ca-cert-fields");
+  const signingCASection = document.getElementById("signing-ca-section");
+
+  if (certType === "rootCA" || certType === "intermediateCA") {
+    standardFields.classList.add("hidden");
+    caFields.classList.remove("hidden");
+    Logger.debug("Showing CA certificate fields");
+
+    // For root CAs, hide signing CA section
+    if (signingCASection) {
+      if (certType === "rootCA") {
+        signingCASection.classList.add("hidden");
+      } else {
+        signingCASection.classList.remove("hidden");
+        // Update the CA dropdown when switching to intermediate CA
+        populateSigningCADropdown();
+      }
+    }
+  } else {
+    standardFields.classList.remove("hidden");
+    caFields.classList.add("hidden");
+
+    if (signingCASection) {
+      signingCASection.classList.remove("hidden");
+      // Update the CA dropdown for standard certificates
+      populateSigningCADropdown();
+    }
+
+    Logger.debug("Showing standard certificate fields");
+  }
 }
 
 /**
@@ -131,29 +175,8 @@ function showCreateCAModal() {
  * Hide the certificate modal
  */
 function hideCertificateModal() {
-  document.getElementById("certificate-modal").classList.add("hidden");
-  document.getElementById("modal-backdrop").classList.add("hidden");
-}
-
-/**
- * Handle certificate type change
- */
-function handleCertificateTypeChange() {
-  const certType = document.getElementById("cert-type").value;
-  Logger.debug(`Certificate type changed to: ${certType}`);
-
-  const standardFields = document.getElementById("standard-cert-fields");
-  const caFields = document.getElementById("ca-cert-fields");
-
-  if (certType === "rootCA" || certType === "intermediateCA") {
-    standardFields.classList.add("hidden");
-    caFields.classList.remove("hidden");
-    Logger.debug("Showing CA certificate fields");
-  } else {
-    standardFields.classList.remove("hidden");
-    caFields.classList.add("hidden");
-    Logger.debug("Showing standard certificate fields");
-  }
+  // Use UIUtils instead of direct manipulation
+  UIUtils.closeModal("certificate-modal");
 }
 
 /**
@@ -206,20 +229,20 @@ async function saveCertificate() {
   }
 
   const certType = document.getElementById("cert-type").value;
+
+  // Validate based on certificate type
   if (certType === "standard") {
     const commonName = document.getElementById("cert-common-name").value;
     if (!commonName) {
-      UIUtils.showError("Common name (domain) is required");
+      UIUtils.showError("Common name is required");
       Logger.warn("Certificate save failed: common name is required");
       return;
     }
 
-    // Fix: Use the correct method name
+    // Validate domain using DomainValidator
     if (!DomainValidator.isValidDomain(commonName)) {
-      UIUtils.showError("Invalid domain name format");
-      Logger.warn(
-        `Certificate save failed: invalid domain format: ${commonName}`
-      );
+      UIUtils.showError("Invalid common name format");
+      Logger.warn(`Certificate save failed: invalid common name format: ${commonName}`);
       return;
     }
   }
@@ -232,14 +255,14 @@ async function saveCertificate() {
     ).value;
 
     if (!passphrase) {
-      UIUtils.showError("Passphrase is required");
-      Logger.warn("Certificate save failed: passphrase required but missing");
+      UIUtils.showError("Passphrase is required when enabled");
+      Logger.warn("Certificate save failed: passphrase required but not provided");
       return;
     }
 
     if (passphrase !== confirmPassphrase) {
       UIUtils.showError("Passphrases do not match");
-      Logger.warn("Certificate save failed: passphrase confirmation mismatch");
+      Logger.warn("Certificate save failed: passphrases don't match");
       return;
     }
   }
@@ -249,18 +272,31 @@ async function saveCertificate() {
   const data = {};
 
   for (const [key, value] of formData.entries()) {
-    data[key] = value;
+    // Convert boolean values properly
+    if (key === 'autoRenew') {
+      data[key] = value === 'on' || value === 'true';
+    } else {
+      data[key] = value;
+    }
   }
 
-  // Process alternative names
+  // Process alternative names - convert to domains array for sans structure
   if (data.altNames) {
-    // Fix: Use the correct method name
     data.domains = data.altNames
       .split(/[\r\n]+/)
       .map((domain) => domain.trim())
       .filter((domain) => domain && DomainValidator.isValidDomain(domain));
 
     delete data.altNames;
+  }
+
+  // Handle signing CA information
+  if (data.signingCA) {
+    data.signWithCA = true;
+    data.caFingerprint = data.signingCA;
+  } else {
+    data.signWithCA = false;
+    data.caFingerprint = null;
   }
 
   // Show loading
@@ -283,13 +319,8 @@ async function saveCertificate() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      Logger.error(
-        `Failed to ${isEdit ? "update" : "create"} certificate: ${errorText}`
-      );
-      throw new Error(
-        `Failed to ${isEdit ? "update" : "create"} certificate: ${errorText}`
-      );
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Server error: ${response.status}`);
     }
 
     const result = await response.json();
@@ -308,11 +339,8 @@ async function saveCertificate() {
     );
 
     // If creating a certificate, show its details
-    if (!isEdit && result.id) {
-      Logger.debug(
-        `Showing details for newly created certificate: ${result.id}`
-      );
-      showCertificateDetails(result.id);
+    if (!isEdit && result.fingerprint) {
+      showCertificateDetails(result.fingerprint);
     }
   } catch (error) {
     Logger.error(`Error saving certificate: ${error.message}`);
@@ -324,7 +352,7 @@ async function saveCertificate() {
  * Show certificate details modal using template approach
  * @param {string} fingerprint - Certificate fingerprint
  */
-async function showCertificateDetails(fingerprint) {
+async function showCertificateDetails(fingerprint, activeTab = null, ca = false) {
   Logger.debug("Showing certificate details for:", fingerprint);
 
   if (!fingerprint) {
@@ -336,10 +364,11 @@ async function showCertificateDetails(fingerprint) {
     // Show loading state first
     UIUtils.showModal("cert-details-modal", {
       title: "Certificate Details",
-      content: '<div class="loading-spinner"></div>',
+      content: UIUtils.createLoadingSpinner("Loading certificate details...", "medium").outerHTML,
       buttons: [
         { text: "Close", id: "close-cert-details-btn", action: "close" },
       ],
+      data: { certId: fingerprint } // Make sure to set the certId here as well
     });
 
     // Clean and encode the fingerprint for API use
@@ -353,6 +382,7 @@ async function showCertificateDetails(fingerprint) {
     }
 
     const certificate = await response.json();
+    certificate.allGroups = getAllCertificateGroups();
 
     // Store in state for other functions to use
     state.currentCertificate = certificate;
@@ -376,6 +406,7 @@ async function showCertificateDetails(fingerprint) {
     // Update the modal with certificate details
     UIUtils.updateModal("cert-details-modal", {
       extendedHeader: processedHtmlHeader,
+      title: `Certificate Details`,
       content: processedHtml,
       data: { certId: fingerprint },
       buttons: [
@@ -392,7 +423,7 @@ async function showCertificateDetails(fingerprint) {
           action: "custom",
           class: "danger",
         },
-        { text:"", class: "button-spacer" },
+        { text: "", class: "button-spacer" },
         { text: "Close", id: "close-cert-details-btn", action: "close" },
       ],
     });
@@ -401,22 +432,44 @@ async function showCertificateDetails(fingerprint) {
     const modalContent = document.querySelector(
       "#cert-details-modal .modal-content"
     );
-    
+
     // Wait a short time to ensure the DOM is fully updated
     setTimeout(() => {
       try {
-        // Initialize tabs and handlers
+        Logger.debug("Initializing certificate details UI components");
         initializeCertificateDetailsTabs(modalContent);
-        
-        // Verify if required elements exist
-        const domainsTableBody = document.getElementById('domains-table-body');
-        if (!domainsTableBody) {
-          Logger.warn('Domains table body not found in the DOM');
-        }
-        
+
         // Load additional data for tabs
         loadCertificateTabData(certificate);
-        
+
+        // Also explicitly add event listeners for the problematic buttons
+        const addActionBtn = document.getElementById('add-deployment-action-btn');
+        if (addActionBtn) {
+          Logger.debug("Attaching click handler to Add Action button");
+          addActionBtn.onclick = function () {
+            if (typeof showDeploymentActionForm === 'function') {
+              showDeploymentActionForm();
+            } else {
+              Logger.error("showDeploymentActionForm function not found");
+              UIUtils.showToast("Deployment action form functionality not available", "error");
+            }
+          };
+        }
+
+        const createBackupBtn = document.getElementById('create-backup-btn');
+        if (createBackupBtn) {
+          Logger.debug("Attaching click handler to Create Backup button");
+          createBackupBtn.onclick = function () {
+            createCertificateBackup(fingerprint);
+          };
+        }
+
+        if (activeTab) {
+          const tabButton = document.querySelector(`button[data-tab="${activeTab}"]`);
+          if (tabButton) {
+            tabButton.click();
+          }
+        }
         Logger.info(`Displayed details for certificate: ${certificate.name}`);
       } catch (error) {
         Logger.error('Error initializing certificate details UI:', error);
@@ -453,51 +506,91 @@ async function showCertificateDetails(fingerprint) {
  * Process certificate template with certificate data
  * @param {string} template - HTML template
  * @param {Object} certificate - Certificate data
- * @returns {string} Processed HTML
+ * @returns {string} - Processed HTML
  */
 function processCertificateTemplate(template, certificate) {
-  // Calculate status
-  let status = "unknown";
-  let statusClass = "status-unknown";
-
-  if (certificate.isExpired) {
-    status = "expired";
-    statusClass = "status-expired";
-  } else if (certificate.isExpiringSoon) {
-    status = "expiring";
-    statusClass = "status-warning";
-  } else {
-    status = "valid";
-    statusClass = "status-valid";
+  // Make sure we have valid certificate data
+  if (!certificate) {
+    Logger.error("Cannot process template with null certificate");
+    return "Error: No certificate data available";
   }
 
-  // Format dates
-  const expiryDate = certificate.validTo
-    ? DateUtils.formatDate(certificate.validTo)
-    : "N/A";
-  const issueDate = certificate.validFrom
-    ? DateUtils.formatDate(certificate.validFrom)
-    : "N/A";
+  // Format dates for display
+  const issueDate = certificate.validFrom ? new Date(certificate.validFrom).toLocaleString() : 'N/A';
+  const expiryDate = certificate.validTo ? new Date(certificate.validTo).toLocaleString() : 'N/A';
 
-  // Extract main domain
-  const domain =
-    certificate.domains && certificate.domains.length > 0
-      ? certificate.domains[0]
-      : certificate.name;
+  // Get primary domain (first in the list) - Use sans structure
+  const domain = certificate.sans?.domains && certificate.sans.domains.length > 0
+    ? certificate.sans.domains[0]
+    : certificate.name || 'N/A';
+
+  // Calculate days until expiry
+  const daysUntilExpiry = certificate.daysUntilExpiry || 'N/A';
+
+  // Format certificate type
+  const certType = formatCertificateType(certificate.certType || 'unknown');
+
+  // Add CA information if the certificate is signed by a CA
+  let caInfo = 'Self-signed';
+  if (certificate.config?.signWithCA && certificate.config?.caFingerprint) {
+    caInfo = certificate.config?.caName || `CA (${certificate.config.caFingerprint.substring(0, 8)}...)`;
+  }
+
+  // Ensure keyType and keySize are properly formatted
+  const keyType = certificate.keyType || 'RSA';
+  const keySize = certificate.keySize || '2048';
+
+  // Ensure we have a description (even if empty)
+  const description = certificate.description || '';
+
+  let statusClass = "status-unknown";
+  let statusText = "Unknown";
+
+  if (certificate.isExpired) {
+    statusClass = "status-expired";
+    statusText = "Expired";
+  } else if (certificate.isExpiringSoon) {
+    statusClass = "status-warning";
+    statusText = "Expiring Soon";
+  } else {
+    statusClass = "status-valid";
+    statusText = "Valid";
+  }
+
+  if (!certificate.allGroups) {
+    // Get all unique groups from the certificates collection
+    certificate.allGroups = getAllCertificateGroups();
+  }
 
   // Prepare data for template
   const data = {
-    certificate: certificate,
-    statusClass: statusClass,
-    statusText: status,
-    domain: domain,
-    expiryDate: expiryDate,
-    issueDate: issueDate,
-    daysUntilExpiry: certificate.daysUntilExpiry || "N/A",
+    certificate,
+    domain,
+    issueDate,
+    expiryDate,
+    daysUntilExpiry,
+    certType,
+    caInfo,
+    statusClass,
+    statusText,
+    showCA: certificate.config?.signWithCA,
+    keyType: String(keyType),
+    keySize: String(keySize),
+    sigAlg: certificate.sigAlg || 'N/A',
+    description: description // Add description to template data
   };
 
-  // Process template with data
+  // Process the template using our template engine
   return UIUtils.safeTemplate(template, data);
+}
+
+// Helper function to get all unique certificate groups
+function getAllCertificateGroups() {
+  return [...new Set(
+    state.certificates
+      .filter(cert => cert.group && cert.group.trim())
+      .map(cert => cert.group.trim())
+  )].sort();
 }
 
 /**
@@ -511,13 +604,15 @@ function setupCertificateEditFunctionality() {
 
   if (editDetailsBtn && cancelEditBtn && saveDetailsBtn) {
     editDetailsBtn.addEventListener("click", () => {
-      document.getElementById("cert-details-view").classList.add("hidden");
+      document.getElementById("cert-details-table").classList.add("hidden");
       document.getElementById("cert-details-edit").classList.remove("hidden");
+      document.getElementById("edit-cert-details-btn").classList.add("hidden");
     });
 
     cancelEditBtn.addEventListener("click", () => {
       document.getElementById("cert-details-edit").classList.add("hidden");
-      document.getElementById("cert-details-view").classList.remove("hidden");
+      document.getElementById("cert-details-table").classList.remove("hidden");
+      document.getElementById("edit-cert-details-btn").classList.remove("hidden");
     });
 
     saveDetailsBtn.addEventListener("click", () => saveCertificateDetails());
@@ -542,7 +637,7 @@ function addCertificateButtonHandlers(fingerprint) {
   document.getElementById("renew-cert-btn")?.addEventListener("click", () => {
     if (state.currentCertificate) {
       UIUtils.closeModal("cert-details-modal");
-      renewCertificate(state.currentCertificate.fingerprint);
+      startCertificateRenewal(state.currentCertificate.fingerprint);
     }
   });
 
@@ -592,6 +687,7 @@ function loadCertificateTabData(certificate) {
     loadCertificateDomains(certificate);
     loadCertificateDeploymentActions(certificate);
     loadCertificateBackups(certificate);
+    loadCertificateHistory(certificate.fingerprint);
     initializeSettingsForm(certificate);
   }, 100);
 }
@@ -673,21 +769,21 @@ function initializeSettingsForm(certificate) {
   fetchGlobalSettings()
     .then((globalSettings) => {
       // Set placeholders with global settings
-      validityInput.placeholder = `Default: ${
-        globalSettings.validity || 365
-      } days`;
-      renewBeforeInput.placeholder = `Default: ${
-        globalSettings.renewBefore || 30
-      } days`;
+      validityInput.placeholder = `Default: ${globalSettings.validity || 365
+        } days`;
+      renewBeforeInput.placeholder = `Default: ${globalSettings.renewBefore || 30
+        } days`;
 
       // Add a note about global settings
       const settingsNote = document.createElement("p");
       settingsNote.className = "settings-note";
       settingsNote.textContent = "Empty fields will use global default values.";
 
-      const formGroups = document.querySelectorAll(".form-group");
-      if (formGroups.length > 0) {
-        formGroups[formGroups.length - 1].after(settingsNote);
+      if (document.querySelectorAll(".settings-note").length == 0) {
+        const formGroups = document.querySelectorAll(".form-group");
+        if (formGroups.length > 0) {
+          formGroups[formGroups.length - 1].after(settingsNote);
+        }
       }
     })
     .catch((error) => {
@@ -715,52 +811,6 @@ async function fetchGlobalSettings() {
       keySize: 2048,
     };
   }
-}
-
-/**
- * Prepare data object for the template
- * @param {Object} certificate - Certificate details
- * @returns {Object} - Prepared data object
- */
-function prepareTemplateData(certificate) {
-  // Calculate status
-  let status = "unknown";
-  let statusClass = "status-unknown";
-
-  if (certificate.isExpired) {
-    status = "expired";
-    statusClass = "status-expired";
-  } else if (certificate.isExpiringSoon) {
-    status = "expiring";
-    statusClass = "status-warning";
-  } else {
-    status = "valid";
-    statusClass = "status-valid";
-  }
-
-  // Format dates
-  const expiryDate = certificate.validTo
-    ? DateUtils.formatDate(certificate.validTo)
-    : "N/A";
-  const issueDate = certificate.validFrom
-    ? DateUtils.formatDate(certificate.validFrom)
-    : "N/A";
-
-  // Extract main domain
-  const domain =
-    certificate.domains && certificate.domains.length > 0
-      ? certificate.domains[0]
-      : certificate.name;
-
-  return {
-    certificate,
-    statusClass,
-    statusText: status,
-    domain,
-    expiryDate,
-    issueDate,
-    daysUntilExpiry: certificate.daysUntilExpiry || "N/A",
-  };
 }
 
 /**
@@ -810,7 +860,7 @@ function initializeCertificateDetailsTabs(container) {
 
   // Initialize certificate conversion
   initializeCertificateConversion();
-  
+
   // Initialize close button
   container
     .querySelector(".close-modal")
@@ -827,14 +877,38 @@ function initializeCertificateDetailsTabs(container) {
   if (editDetailsBtn && cancelEditBtn && saveDetailsBtn) {
     editDetailsBtn.addEventListener("click", () => {
       Logger.debug("Switching to certificate edit mode");
-      container.querySelector("#cert-details-view").classList.add("hidden");
-      container.querySelector("#cert-details-edit").classList.remove("hidden");
+
+      // Add a check to ensure these elements exist before accessing their classList
+      const detailsTable = container.querySelector("#cert-details-table");
+      const detailsEdit = container.querySelector("#cert-details-edit");
+      const detailsEditButton = container.querySelector("#edit-cert-details-btn");
+
+      if (detailsTable && detailsEdit) {
+        detailsTable.classList.add("hidden");
+        detailsEditButton.classList.add("hidden");
+        detailsEdit.classList.remove("hidden");
+      } else {
+        Logger.error("Certificate details elements not found", {
+          detailsTableExists: !!detailsTable,
+          detailsEditExists: !!detailsEdit
+        });
+      }
     });
 
     cancelEditBtn.addEventListener("click", () => {
       Logger.debug("Canceling certificate edit mode");
-      container.querySelector("#cert-details-edit").classList.add("hidden");
-      container.querySelector("#cert-details-view").classList.remove("hidden");
+
+      const detailsEdit = container.querySelector("#cert-details-edit");
+      const detailsTable = container.querySelector("#cert-details-table");
+      const detailsEditButton = container.querySelector("#edit-cert-details-btn");
+
+      if (detailsEdit && detailsTable) {
+        detailsEdit.classList.add("hidden");
+        detailsTable.classList.remove("hidden");
+        detailsEditButton.classList.remove("hidden");
+      } else {
+        Logger.error("Certificate details elements not found when canceling edit mode");
+      }
     });
 
     saveDetailsBtn.addEventListener("click", () => {
@@ -864,7 +938,7 @@ function initializeCertificateDetailsTabs(container) {
         Logger.debug(
           `Initiating certificate renewal: ${state.currentCertificate.name}`
         );
-        renewCertificate(state.currentCertificate.fingerprint);
+        startCertificateRenewal(state.currentCertificate.fingerprint);
       } else {
         Logger.warn("Cannot renew - no current certificate in state");
       }
@@ -908,7 +982,7 @@ function initializeCertificateDetailsTabs(container) {
   const cancelAddDomainBtn = container.querySelector('#cancel-add-domain-btn');
   const saveDomainBtn = container.querySelector('#save-domain-btn');
   const saveAndRenewDomainBtn = container.querySelector('#save-and-renew-domain-btn');
-  
+
   if (addDomainBtn) {
     addDomainBtn.addEventListener('click', () => {
       const addDomainForm = document.getElementById('add-domain-form');
@@ -917,7 +991,7 @@ function initializeCertificateDetailsTabs(container) {
       }
     });
   }
-  
+
   if (cancelAddDomainBtn) {
     cancelAddDomainBtn.addEventListener('click', () => {
       const addDomainForm = document.getElementById('add-domain-form');
@@ -927,13 +1001,13 @@ function initializeCertificateDetailsTabs(container) {
       }
     });
   }
-  
+
   if (saveDomainBtn) {
     saveDomainBtn.addEventListener('click', () => {
       addCertificateSubject(false);
     });
   }
-  
+
   if (saveAndRenewDomainBtn) {
     saveAndRenewDomainBtn.addEventListener('click', () => {
       addCertificateSubject(true);
@@ -964,6 +1038,7 @@ async function saveCertificateDetails(certificate) {
       return;
     }
 
+    // Only collect fields that can be updated without renewal
     const updatedCertificate = {
       name: nameField.value.trim(),
       description: descriptionField.value.trim(),
@@ -985,7 +1060,7 @@ async function saveCertificateDetails(certificate) {
     const response = await fetch(
       `/api/certificates/${encodeAPIFingerprint(certificate.fingerprint)}`,
       {
-        method: "PATCH",
+        method: "PATCH", // Use PATCH for partial updates
         headers: {
           "Content-Type": "application/json",
         },
@@ -999,9 +1074,13 @@ async function saveCertificateDetails(certificate) {
 
     // Update the current certificate in state
     const updatedData = await response.json();
+
+    // Merge just the fields that were updated
     state.currentCertificate = {
-      ...certificate,
-      ...updatedData,
+      ...state.currentCertificate,
+      name: updatedData.name || state.currentCertificate.name,
+      description: updatedData.description || state.currentCertificate.description,
+      group: updatedData.group
     };
 
     // Update the certificate in the certificates list
@@ -1009,20 +1088,36 @@ async function saveCertificateDetails(certificate) {
 
     // Switch back to view mode
     document.getElementById("cert-details-edit").classList.add("hidden");
-    document.getElementById("cert-details-view").classList.remove("hidden");
+    document.getElementById("cert-details-table").classList.remove("hidden");
+    document.getElementById("edit-cert-details-btn").classList.remove("hidden");
 
     // Update the view with new data
     document.getElementById("cert-name-display").textContent = updatedData.name;
     document.querySelector(".cert-name").textContent = updatedData.name;
 
+    // Update description in the details view if it exists
+    const descriptionDisplay = document.getElementById("cert-description-display");
+    if (descriptionDisplay) {
+      descriptionDisplay.textContent = updatedData.description || "";
+    }
+
     UIUtils.showToast("Certificate details updated", "success");
 
-    // Refresh the certificates list if it's visible
+    // Refresh the certificates list if it's visible, preserving the current view mode
     if (document.getElementById("certificates-list")) {
-      renderCertificatesListDetailed(state.certificates);
+      // Check which view mode is currently active
+      const currentViewMode = getCurrentViewMode();
+
+      // Update the certificates in state
+      if (typeof loadCertificates === 'function') {
+        await loadCertificates(true);
+      }
+
+      // Render using the appropriate view mode
+      renderCertificatesByViewMode(currentViewMode);
     }
   } catch (error) {
-    console.error("Error saving certificate details:", error);
+    Logger.error("Error saving certificate details:", error);
     UIUtils.showToast(`Failed to save changes: ${error.message}`, "error");
   } finally {
     // Restore button state
@@ -1032,6 +1127,71 @@ async function saveCertificateDetails(certificate) {
       saveBtn.disabled = false;
     }
   }
+}
+
+
+/**
+ * Get the currently active view mode
+ * @returns {string} - 'list', 'block', or 'hierarchy'
+ */
+function getCurrentViewMode() {
+  // Look for the active view button
+  const listViewBtn = document.querySelector('.view-btn[data-view="list"]');
+  const blockViewBtn = document.querySelector('.view-btn[data-view="block"]');
+  const hierarchyViewBtn = document.querySelector('.view-btn[data-view="hierarchy"]');
+
+  if (listViewBtn?.create - cert - btncreate - cert - btn.contains('active')) {
+    return 'list';
+  } else if (blockViewBtn?.classList.contains('active')) {
+    return 'block';
+  } else if (hierarchyViewBtn?.classList.contains('active')) {
+    return 'hierarchy';
+  }
+
+  // Default to list view if we can't determine
+  return 'list';
+}
+
+/**
+ * Render certificates using the specified view mode
+ * @param {string} viewMode - The view mode to use ('list', 'block', or 'hierarchy')
+ */
+function renderCertificatesByViewMode(viewMode) {
+  const container = document.getElementById("certificates-list");
+  if (!container) return;
+
+  // Clear the container
+  container.innerHTML = '';
+
+  switch (viewMode) {
+    case 'block':
+      if (typeof renderBlockView === 'function') {
+        renderBlockView(state.certificates, container);
+      } else {
+        renderCertificatesListDetailed(state.certificates);
+      }
+      break;
+    case 'hierarchy':
+      if (typeof renderHierarchyView === 'function') {
+        renderHierarchyView(state.certificates, container);
+      } else {
+        renderCertificatesListDetailed(state.certificates);
+      }
+      break;
+    case 'list':
+    default:
+      renderCertificatesListDetailed(state.certificates);
+      break;
+  }
+
+  // Update the active state of view buttons
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    if (btn.getAttribute('data-view') === viewMode) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }
 
 /**
@@ -1346,125 +1506,125 @@ function getDisplayName(fileType) {
  * @param {boolean} applyImmediately - Whether to apply immediately and renew
  */
 async function addCertificateSubject(applyImmediately) {
-    const fingerprint = document
-        .getElementById("cert-details-modal")
-        .getAttribute("data-cert-id");
-    const subjectValue = document.getElementById("domain-value").value.trim();
+  const fingerprint = document
+    .getElementById("cert-details-modal")
+    .getAttribute("data-cert-id");
+  const subjectValue = document.getElementById("domain-value").value.trim();
 
-    if (!subjectValue) {
-        UIUtils.showToast("Please enter a domain or IP address", "warning");
+  if (!subjectValue) {
+    UIUtils.showToast("Please enter a domain or IP address", "warning");
+    return;
+  }
+
+  try {
+    // Auto-detect if the input is an IP address or domain name
+    let subjectType = 'domain';
+    let isValid = false;
+
+    // Special case for localhost
+    if (subjectValue.toLowerCase() === 'localhost') {
+      isValid = true;
+    }
+    // Check if it's an IPv4 or IPv6 address
+    else if (DomainValidator.isValidIPv4(subjectValue) || DomainValidator.isValidIPv6(subjectValue)) {
+      subjectType = 'ip';
+      isValid = true;
+    }
+    // Check if it's a valid domain
+    else if (DomainValidator.isValidDomain(subjectValue) || DomainValidator.isValidWildcardDomain(subjectValue)) {
+      subjectType = 'domain';
+      isValid = true;
+    }
+
+    if (!isValid) {
+      UIUtils.showToast("Invalid domain name or IP address format", "error");
+      return;
+    }
+
+    // Check for duplicates in the current certificate
+    const currentCert = getCurrentCertificate();
+    if (currentCert) {
+      const duplicate = checkDuplicateInCertificate(subjectValue, currentCert);
+      if (duplicate.exists) {
+        UIUtils.showToast(`This ${subjectType} already exists in ${duplicate.where}`, "warning");
         return;
+      }
     }
 
-    try {
-        // Auto-detect if the input is an IP address or domain name
-        let subjectType = 'domain';
-        let isValid = false;
-        
-        // Special case for localhost
-        if (subjectValue.toLowerCase() === 'localhost') {
-            isValid = true;
-        } 
-        // Check if it's an IPv4 or IPv6 address
-        else if (DomainValidator.isValidIPv4(subjectValue) || DomainValidator.isValidIPv6(subjectValue)) {
-            subjectType = 'ip';
-            isValid = true;
-        } 
-        // Check if it's a valid domain
-        else if (DomainValidator.isValidDomain(subjectValue) || DomainValidator.isValidWildcardDomain(subjectValue)) {
-            subjectType = 'domain';
-            isValid = true;
-        }
-        
-        if (!isValid) {
-            UIUtils.showToast("Invalid domain name or IP address format", "error");
-            return;
-        }
-        
-        // Check for duplicates in the current certificate
-        const currentCert = getCurrentCertificate();
-        if (currentCert) {
-            const duplicate = checkDuplicateInCertificate(subjectValue, currentCert);
-            if (duplicate.exists) {
-                UIUtils.showToast(`This ${subjectType} already exists in ${duplicate.where}`, "warning");
-                return;
-            }
-        }
+    // Show loading with detected type
+    UIUtils.showToast(`Adding ${subjectType === 'ip' ? 'IP address' : 'domain'}...`, "info");
 
-        // Show loading with detected type
-        UIUtils.showToast(`Adding ${subjectType === 'ip' ? 'IP address' : 'domain'}...`, "info");
+    // Encode fingerprint for API use
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
 
-        // Encode fingerprint for API use
-        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+    // Send API request to add domain/IP
+    const response = await fetch(`/api/certificates/${encodedFingerprint}/san`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        value: subjectValue,
+        type: subjectType,
+        idle: !applyImmediately
+      }),
+    });
 
-        // Send API request to add domain/IP
-        const response = await fetch(`/api/certificates/${encodedFingerprint}/san`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                value: subjectValue,
-                type: subjectType,
-                idle: !applyImmediately
-            }),
-        });
+    // Handle specific status codes
+    if (response.status === 409) {
+      // It's a duplicate entry
+      const errorData = await response.json();
+      const entityType = subjectType === 'ip' ? 'IP address' : 'domain';
+      const status = errorData.existsIn === 'active' ? 'active' : 'pending renewal';
 
-        // Handle specific status codes
-        if (response.status === 409) {
-            // It's a duplicate entry
-            const errorData = await response.json();
-            const entityType = subjectType === 'ip' ? 'IP address' : 'domain';
-            const status = errorData.existsIn === 'active' ? 'active' : 'pending renewal';
-            
-            UIUtils.showToast(`This ${entityType} is already in the ${status} list`, "warning");
-            
-            // Clear input and close form anyway
-            document.getElementById("domain-value").value = "";
-            document.getElementById("add-domain-form").classList.add('hidden');
-            clearDomainValidationFeedback();
-            return;
-        }
+      UIUtils.showToast(`This ${entityType} is already in the ${status} list`, "warning");
 
-        if (!response.ok) {
-            // Handle other errors
-            let errorMessage = `HTTP error: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.message || errorMessage;
-            } catch (e) {
-                // Couldn't parse JSON error, use default
-            }
-            throw new Error(errorMessage);
-        }
-
-        const result = await response.json();
-
-        // Clear input
-        document.getElementById("domain-value").value = "";
-        document.getElementById("add-domain-form").classList.add('hidden');
-        clearDomainValidationFeedback();
-
-        // If applying immediately, show a different message
-        if (applyImmediately) {
-            UIUtils.showToast(
-                `${subjectType === 'ip' ? 'IP address' : 'Domain'} added and certificate renewal started`,
-                "success"
-            );
-            
-            // Start the renewal process
-            applyIdleSubjectsAndRenew(fingerprint);
-        } else {
-            UIUtils.showToast(result.message || `${subjectType === 'ip' ? 'IP address' : 'Domain'} added successfully (pending renewal)`, "success");
-
-            // Reload domains list
-            const certificate = await fetchCertificateDetails(fingerprint);
-            loadCertificateDomains(certificate);
-        }
-    } catch (error) {
-        console.error("Error adding subject:", error);
-        UIUtils.showError(`Failed to add domain or IP: ${error.message}`);
+      // Clear input and close form anyway
+      document.getElementById("domain-value").value = "";
+      document.getElementById("add-domain-form").classList.add('hidden');
+      clearDomainValidationFeedback();
+      return;
     }
+
+    if (!response.ok) {
+      // Handle other errors
+      let errorMessage = `HTTP error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // Couldn't parse JSON error, use default
+      }
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+
+    // Clear input
+    document.getElementById("domain-value").value = "";
+    document.getElementById("add-domain-form").classList.add('hidden');
+    clearDomainValidationFeedback();
+
+    // If applying immediately, show a different message
+    if (applyImmediately) {
+      UIUtils.showToast(
+        `${subjectType === 'ip' ? 'IP address' : 'Domain'} added and certificate renewal started`,
+        "success"
+      );
+
+      // Start the renewal process
+      applyIdleSubjectsAndRenew(fingerprint);
+    } else {
+      UIUtils.showToast(result.message || `${subjectType === 'ip' ? 'IP address' : 'Domain'} added successfully (pending renewal)`, "success");
+
+      // Reload domains list
+      const certificate = await fetchCertificateDetails(fingerprint);
+      loadCertificateDomains(certificate);
+    }
+  } catch (error) {
+    console.error("Error adding subject:", error);
+    UIUtils.showError(`Failed to add domain or IP: ${error.message}`);
+  }
 }
 
 /**
@@ -1500,41 +1660,41 @@ function loadDeploymentActions(fingerprint) {
  * @param {boolean} isIdle - Whether the subject is idle
  */
 async function removeCertificateSubject(fingerprint, type, value, isIdle) {
-    try {
-        // Show loading
-        UIUtils.showToast(`Removing ${type}...`, "info");
+  try {
+    // Show loading
+    UIUtils.showToast(`Removing ${type}...`, "info");
 
-        // URL encode the value and type for safety
-        const encodedValue = encodeURIComponent(value);
-        const encodedType = encodeURIComponent(type);
-        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
-        
-        // Send API request to remove domain/IP
-        const response = await fetch(
-            `/api/certificates/${encodedFingerprint}/san/${encodedType}/${encodedValue}?idle=${isIdle}`,
-            {
-                method: "DELETE",
-                headers: {
-                    "Content-Type": "application/json",
-                }
-            }
-        );
+    // URL encode the value and type for safety
+    const encodedValue = encodeURIComponent(value);
+    const encodedType = encodeURIComponent(type);
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Failed to remove ${type}: ${response.status}`);
+    // Send API request to remove domain/IP
+    const response = await fetch(
+      `/api/certificates/${encodedFingerprint}/san/${encodedType}/${encodedValue}?idle=${isIdle}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
         }
+      }
+    );
 
-        const result = await response.json();
-
-        UIUtils.showToast(result.message || `${type === 'ip' ? 'IP' : 'Domain'} removed successfully`, "success");
-
-        // Reload domains list
-        const certificate = await fetchCertificateDetails(fingerprint);
-        loadCertificateDomains(certificate);
-    } catch (error) {
-        UIUtils.showError(`Failed to remove ${type}: ${error.message}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Failed to remove ${type}: ${response.status}`);
     }
+
+    const result = await response.json();
+
+    UIUtils.showToast(result.message || `${type === 'ip' ? 'IP' : 'Domain'} removed successfully`, "success");
+
+    // Reload domains list
+    const certificate = await fetchCertificateDetails(fingerprint);
+    loadCertificateDomains(certificate);
+  } catch (error) {
+    UIUtils.showError(`Failed to remove ${type}: ${error.message}`);
+  }
 }
 
 /**
@@ -1542,96 +1702,96 @@ async function removeCertificateSubject(fingerprint, type, value, isIdle) {
  * @param {string} fingerprint - Certificate fingerprint
  */
 async function applyIdleSubjectsAndRenew(fingerprint) {
-    try {
-        // Show loading
-        UIUtils.showToast("Applying changes and renewing certificate...", "info");
-        
-        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
-        
-        // Send API request
-        const response = await fetch(`/api/certificates/${encodedFingerprint}/san/apply`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            }
-        });
+  try {
+    // Show loading
+    UIUtils.showToast("Applying changes and renewing certificate...", "info");
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Failed to apply changes: ${response.status}`);
-        }
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
 
-        const result = await response.json();
+    // Send API request
+    const response = await fetch(`/api/certificates/${encodedFingerprint}/san/apply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      }
+    });
 
-        UIUtils.showToast(result.message || "Changes applied and certificate renewed successfully", "success");
-
-        // Reload certificate details
-        await showCertificateDetails(fingerprint);
-    } catch (error) {
-        UIUtils.showError(`Failed to apply changes: ${error.message}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Failed to apply changes: ${response.status}`);
     }
+
+    const result = await response.json();
+
+    UIUtils.showToast(result.message || "Changes applied and certificate renewed successfully", "success");
+
+    // Reload certificate details
+    await showCertificateDetails(fingerprint);
+  } catch (error) {
+    UIUtils.showError(`Failed to apply changes: ${error.message}`);
+  }
 }
 
 /**
  * Initialize domain/IP management in the certificate details modal
  */
 function initializeDomainManagement() {
-    const addDomainBtn = document.getElementById('add-domain-btn');
-    const cancelAddDomainBtn = document.getElementById('cancel-add-domain-btn');
-    const saveDomainBtn = document.getElementById('save-domain-btn');
-    const applyImmediatelyCheckbox = document.getElementById('apply-immediately');
-    
-    if (addDomainBtn) {
-        addDomainBtn.addEventListener('click', () => {
-            const addDomainForm = document.getElementById('add-domain-form');
-            if (addDomainForm) {
-                addDomainForm.classList.remove('hidden');
-                document.getElementById('domain-value').focus();
-            }
-        });
-    }
-    
-    if (cancelAddDomainBtn) {
-        cancelAddDomainBtn.addEventListener('click', () => {
-            const addDomainForm = document.getElementById('add-domain-form');
-            if (addDomainForm) {
-                addDomainForm.classList.add('hidden');
-                document.getElementById('domain-value').value = '';
-                clearDomainValidationFeedback();
-                if (applyImmediatelyCheckbox) {
-                    applyImmediatelyCheckbox.checked = false;
-                }
-            }
-        });
-    }
-    
-    if (saveDomainBtn) {
-        saveDomainBtn.addEventListener('click', () => {
-            const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
-            addCertificateSubject(applyImmediately);
-        });
-    }
-    
-    // Add live validation for domain input
-    const domainValue = document.getElementById('domain-value');
-    if (domainValue) {
-        // Handle Enter key in domain value input
-        domainValue.addEventListener('keyup', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
-                addCertificateSubject(applyImmediately);
-            } else {
-                // Provide live validation feedback
-                validateDomainInput(domainValue.value.trim());
-            }
-        });
-        
-        // Also validate on blur for better UX
-        domainValue.addEventListener('blur', () => {
-            validateDomainInput(domainValue.value.trim());
-        });
-    }
+  const addDomainBtn = document.getElementById('add-domain-btn');
+  const cancelAddDomainBtn = document.getElementById('cancel-add-domain-btn');
+  const saveDomainBtn = document.getElementById('save-domain-btn');
+  const applyImmediatelyCheckbox = document.getElementById('apply-immediately');
+
+  if (addDomainBtn) {
+    addDomainBtn.addEventListener('click', () => {
+      const addDomainForm = document.getElementById('add-domain-form');
+      if (addDomainForm) {
+        addDomainForm.classList.remove('hidden');
+        document.getElementById('domain-value').focus();
+      }
+    });
+  }
+
+  if (cancelAddDomainBtn) {
+    cancelAddDomainBtn.addEventListener('click', () => {
+      const addDomainForm = document.getElementById('add-domain-form');
+      if (addDomainForm) {
+        addDomainForm.classList.add('hidden');
+        document.getElementById('domain-value').value = '';
+        clearDomainValidationFeedback();
+        if (applyImmediatelyCheckbox) {
+          applyImmediatelyCheckbox.checked = false;
+        }
+      }
+    });
+  }
+
+  if (saveDomainBtn) {
+    saveDomainBtn.addEventListener('click', () => {
+      const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
+      addCertificateSubject(applyImmediately);
+    });
+  }
+
+  // Add live validation for domain input
+  const domainValue = document.getElementById('domain-value');
+  if (domainValue) {
+    // Handle Enter key in domain value input
+    domainValue.addEventListener('keyup', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const applyImmediately = applyImmediatelyCheckbox && applyImmediatelyCheckbox.checked;
+        addCertificateSubject(applyImmediately);
+      } else {
+        // Provide live validation feedback
+        validateDomainInput(domainValue.value.trim());
+      }
+    });
+
+    // Also validate on blur for better UX
+    domainValue.addEventListener('blur', () => {
+      validateDomainInput(domainValue.value.trim());
+    });
+  }
 }
 
 /**
@@ -1640,122 +1800,122 @@ function initializeDomainManagement() {
  * @returns {boolean} True if valid, false otherwise
  */
 function validateDomainInput(value) {
-    if (!value) {
-        clearDomainValidationFeedback();
-        return false;
+  if (!value) {
+    clearDomainValidationFeedback();
+    return false;
+  }
+
+  const inputElement = document.getElementById('domain-value');
+  const feedbackElement = document.getElementById('domain-input-feedback');
+
+  // Create feedback element if it doesn't exist
+  if (!feedbackElement && inputElement) {
+    const feedback = document.createElement('div');
+    feedback.id = 'domain-input-feedback';
+    feedback.className = 'input-feedback';
+    inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
+  }
+
+  // Check if the current certificate is loaded
+  const currentCert = getCurrentCertificate();
+
+  // Check for duplicates in the current certificate
+  if (currentCert) {
+    const duplicate = checkDuplicateInCertificate(value, currentCert);
+    if (duplicate.exists) {
+      // Show duplicate warning
+      if (feedbackElement) {
+        feedbackElement.textContent = `Already exists in ${duplicate.where}`;
+        feedbackElement.className = 'input-feedback duplicate-feedback';
+      }
+
+      if (inputElement) {
+        inputElement.classList.remove('is-valid', 'is-invalid');
+        inputElement.classList.add('is-duplicate');
+      }
+
+      return false;
     }
-    
-    const inputElement = document.getElementById('domain-value');
-    const feedbackElement = document.getElementById('domain-input-feedback');
-    
-    // Create feedback element if it doesn't exist
-    if (!feedbackElement && inputElement) {
-        const feedback = document.createElement('div');
-        feedback.id = 'domain-input-feedback';
-        feedback.className = 'input-feedback';
-        inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
-    }
-    
-    // Check if the current certificate is loaded
-    const currentCert = getCurrentCertificate();
-    
-    // Check for duplicates in the current certificate
-    if (currentCert) {
-        const duplicate = checkDuplicateInCertificate(value, currentCert);
-        if (duplicate.exists) {
-            // Show duplicate warning
-            if (feedbackElement) {
-                feedbackElement.textContent = `Already exists in ${duplicate.where}`;
-                feedbackElement.className = 'input-feedback duplicate-feedback';
-            }
-            
-            if (inputElement) {
-                inputElement.classList.remove('is-valid', 'is-invalid');
-                inputElement.classList.add('is-duplicate');
-            }
-            
-            return false;
-        }
-    }
-    
-    // Regular validation logic
-    let isValid = false;
-    let type = '';
-    let feedbackMessage = '';
-    let feedbackClass = '';
-    
-    // Special case for localhost
-    if (value.toLowerCase() === 'localhost') {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: localhost';
-        feedbackClass = 'valid-feedback';
-    } 
-    // Check if it's an IPv4 or IPv6 address
-    else if (DomainValidator.isValidIPv4(value)) {
-        isValid = true;
-        type = 'ip';
-        feedbackMessage = 'Valid: IPv4 Address';
-        feedbackClass = 'valid-feedback';
-    }
-    else if (DomainValidator.isValidIPv6(value)) {
-        isValid = true;
-        type = 'ip';
-        feedbackMessage = 'Valid: IPv6 Address';
-        feedbackClass = 'valid-feedback';
-    }
-    // Check if it's a wildcard domain
-    else if (DomainValidator.isValidWildcardDomain(value)) {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: Wildcard Domain';
-        feedbackClass = 'valid-feedback';
-    }
-    // Check if it's a regular domain
-    else if (DomainValidator.isValidDomain(value)) {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: Domain Name';
-        feedbackClass = 'valid-feedback';
-    }
-    // Invalid input
-    else {
-        isValid = false;
-        feedbackMessage = 'Invalid domain name or IP address format';
-        feedbackClass = 'invalid-feedback';
-    }
-    
-    // Update the feedback element
-    const updatedFeedback = document.getElementById('domain-input-feedback');
-    if (updatedFeedback) {
-        updatedFeedback.textContent = feedbackMessage;
-        updatedFeedback.className = `input-feedback ${feedbackClass}`;
-    }
-    
-    // Update input field styling
-    if (inputElement) {
-        inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
-        inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
-    }
-    
-    return isValid;
+  }
+
+  // Regular validation logic
+  let isValid = false;
+  let type = '';
+  let feedbackMessage = '';
+  let feedbackClass = '';
+
+  // Special case for localhost
+  if (value.toLowerCase() === 'localhost') {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: localhost';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's an IPv4 or IPv6 address
+  else if (DomainValidator.isValidIPv4(value)) {
+    isValid = true;
+    type = 'ip';
+    feedbackMessage = 'Valid: IPv4 Address';
+    feedbackClass = 'valid-feedback';
+  }
+  else if (DomainValidator.isValidIPv6(value)) {
+    isValid = true;
+    type = 'ip';
+    feedbackMessage = 'Valid: IPv6 Address';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's a wildcard domain
+  else if (DomainValidator.isValidWildcardDomain(value)) {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: Wildcard Domain';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's a regular domain
+  else if (DomainValidator.isValidDomain(value)) {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: Domain Name';
+    feedbackClass = 'valid-feedback';
+  }
+  // Invalid input
+  else {
+    isValid = false;
+    feedbackMessage = 'Invalid domain name or IP address format';
+    feedbackClass = 'invalid-feedback';
+  }
+
+  // Update the feedback element
+  const updatedFeedback = document.getElementById('domain-input-feedback');
+  if (updatedFeedback) {
+    updatedFeedback.textContent = feedbackMessage;
+    updatedFeedback.className = `input-feedback ${feedbackClass}`;
+  }
+
+  // Update input field styling
+  if (inputElement) {
+    inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
+    inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
+  }
+
+  return isValid;
 }
 
 /**
  * Clear domain validation feedback
  */
 function clearDomainValidationFeedback() {
-    const inputElement = document.getElementById('domain-value');
-    const feedbackElement = document.getElementById('domain-input-feedback');
-    
-    if (inputElement) {
-        inputElement.classList.remove('is-valid', 'is-invalid');
-    }
-    
-    if (feedbackElement) {
-        feedbackElement.textContent = '';
-        feedbackElement.className = 'input-feedback';
-    }
+  const inputElement = document.getElementById('domain-value');
+  const feedbackElement = document.getElementById('domain-input-feedback');
+
+  if (inputElement) {
+    inputElement.classList.remove('is-valid', 'is-invalid');
+  }
+
+  if (feedbackElement) {
+    feedbackElement.textContent = '';
+    feedbackElement.className = 'input-feedback';
+  }
 }
 
 /**
@@ -1763,61 +1923,67 @@ function clearDomainValidationFeedback() {
  * @param {Object} certificate - Certificate object
  */
 function loadCertificateDomains(certificate) {
-    Logger.debug(`Loading domain list for certificate: ${certificate.name}`);
+  Logger.debug(`Loading domain list for certificate: ${certificate.name}`);
 
-    const container = document.getElementById("domains-table-body");
-    if (!container) {
-        Logger.error("Domains table body container not found");
-        return;
+  const container = document.getElementById("domains-table-body");
+  if (!container) {
+    Logger.error("Domains table body container not found");
+    return;
+  }
+
+  // Use the new loading spinner with message
+  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading domains...", "small");
+
+  // Get domains and IPs from the updated sans structure
+  const activeDomains = certificate.sans?.domains || [];
+  const activeIPs = certificate.sans?.ips || [];
+  const idleDomains = certificate.sans?.idleDomains || [];
+  const idleIPs = certificate.sans?.idleIps || [];
+
+  // Show/hide the pending renewal banner
+  const pendingRenewalBanner = document.getElementById('pending-renewal-banner');
+  if (pendingRenewalBanner) {
+    if (idleDomains.length > 0 || idleIPs.length > 0) {
+      pendingRenewalBanner.classList.remove('hidden');
+    } else {
+      pendingRenewalBanner.classList.add('hidden');
     }
+  }
 
-    // Get domains and IPs (both active and idle)
-    const activeDomains = certificate.domains || [];
-    const activeIPs = certificate.ips || [];
-    const idleDomains = certificate.idleDomains || [];
-    const idleIPs = certificate.idleIps || [];
-    
-    // Show/hide the pending renewal banner
-    const pendingRenewalBanner = document.getElementById('pending-renewal-banner');
-    if (pendingRenewalBanner) {
-        if (idleDomains.length > 0 || idleIPs.length > 0) {
-            pendingRenewalBanner.classList.remove('hidden');
-        } else {
-            pendingRenewalBanner.classList.add('hidden');
-        }
-    }
+  // Combined list of all entries for display
+  const allEntries = [
+    ...activeDomains.map(domain => ({ value: domain, type: 'domain', status: 'active' })),
+    ...activeIPs.map(ip => ({ value: ip, type: 'ip', status: 'active' })),
+    ...idleDomains.map(domain => ({ value: domain, type: 'domain', status: 'idle' })),
+    ...idleIPs.map(ip => ({ value: ip, type: 'ip', status: 'idle' }))
+  ];
 
-    // Combined list of all entries for display
-    const allEntries = [
-        ...activeDomains.map(domain => ({ value: domain, type: 'domain', status: 'active' })),
-        ...activeIPs.map(ip => ({ value: ip, type: 'ip', status: 'active' })),
-        ...idleDomains.map(domain => ({ value: domain, type: 'domain', status: 'idle' })),
-        ...idleIPs.map(ip => ({ value: ip, type: 'ip', status: 'idle' }))
-    ];
+  // Remove the loading spinner
+  UIUtils.removeLoadingSpinner(loadingSpinner);
 
-    if (allEntries.length === 0) {
-        Logger.warn(`No domains or IPs configured for certificate: ${certificate.name}`);
-        container.innerHTML = `<tr><td colspan="4" class="empty-cell">No domains or IPs configured.</td></tr>`;
-        return;
-    }
+  if (allEntries.length === 0) {
+    Logger.warn(`No domains or IPs configured for certificate: ${certificate.name}`);
+    container.innerHTML = `<tr><td colspan="4" class="empty-cell">No domains or IPs configured.</td></tr>`;
+    return;
+  }
 
-    Logger.debug(
-        `Found ${allEntries.length} entries for certificate: ${certificate.name}`
-    );
+  Logger.debug(
+    `Found ${allEntries.length} entries for certificate: ${certificate.name}`
+  );
 
-    let html = "";
-    allEntries.forEach((entry, index) => {
-        const { value, type, status } = entry;
-        const isIdle = status === 'idle';
-        
-        html += `
+  let html = "";
+  allEntries.forEach((entry, index) => {
+    const { value, type, status } = entry;
+    const isIdle = status === 'idle';
+
+    html += `
         <tr class="domain-row ${isIdle ? 'idle-row' : ''}">
             <td>${UIUtils.escapeHTML(value)}</td>
             <td>${type === 'ip' ? 'IP Address' : 'Domain'}</td>
             <td class="text-center">
-                ${isIdle ? 
-                    '<span class="status-badge idle" title="This entry will be applied on next renewal"><i class="fas fa-hourglass-half"></i> Pending</span>' : 
-                    '<span class="status-badge active" title="Active"><i class="fas fa-check-circle"></i> Active</span>'}
+                ${isIdle ?
+        '<span class="status-badge idle" title="This entry will be applied on next renewal"><i class="fas fa-hourglass-half"></i> Pending</span>' :
+        '<span class="status-badge active" title="Active"><i class="fas fa-check-circle"></i> Active</span>'}
             </td>
             <td>
                 <button class="button small danger remove-domain-btn" 
@@ -1829,34 +1995,32 @@ function loadCertificateDomains(certificate) {
             </td>
         </tr>
         `;
+  });
+
+  container.innerHTML = html;
+
+  // Add event listeners for remove buttons
+  container.querySelectorAll(".remove-domain-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      const value = this.getAttribute("data-value");
+      const type = this.getAttribute("data-type");
+      const isIdle = this.getAttribute("data-idle") === "true";
+
+      if (confirm(`Are you sure you want to remove ${type} ${value}?`)) {
+        removeCertificateSubject(certificate.fingerprint, type, value, isIdle);
+      }
     });
+  });
 
-    container.innerHTML = html;
-
-    // Add event listeners for remove buttons
-    container.querySelectorAll(".remove-domain-btn").forEach((btn) => {
-        btn.addEventListener("click", function () {
-            const value = this.getAttribute("data-value");
-            const type = this.getAttribute("data-type");
-            const idle = this.getAttribute("data-idle") === 'true';
-            
-            if (confirm(`Are you sure you want to remove this ${type === 'ip' ? 'IP address' : 'domain'}?`)) {
-                removeCertificateSubject(certificate.fingerprint, type, value, idle);
-            }
-        });
+  // Add event listener for apply and renew button
+  const applyAndRenewBtn = document.getElementById('apply-and-renew-btn');
+  if (applyAndRenewBtn) {
+    applyAndRenewBtn.addEventListener('click', () => {
+      applyIdleSubjectsAndRenew(certificate.fingerprint);
     });
+  }
 
-    // Add event listener for apply and renew button
-    const applyAndRenewBtn = document.getElementById('apply-and-renew-btn');
-    if (applyAndRenewBtn) {
-        applyAndRenewBtn.addEventListener('click', () => {
-            if (confirm('This will apply all pending domains/IPs and renew the certificate. Continue?')) {
-                applyIdleSubjectsAndRenew(certificate.fingerprint);
-            }
-        });
-    }
-
-    Logger.info(`Domains loaded for certificate: ${certificate.name}`);
+  Logger.info(`Domains loaded for certificate: ${certificate.name}`);
 }
 
 /**
@@ -1923,47 +2087,207 @@ async function saveCertificateSettings() {
     }
 
     UIUtils.showToast("Certificate settings saved successfully", "success");
-   
+
     // Reload certificate details to reflect changes
     await loadCertificateDetails(fingerprint);
-                      
+
   } catch (error) {
     UIUtils.showError(`Failed to save settings: ${error.message}`);
   }
 }
 
 /**
- * Load certificate details from server
+ * Loads and displays certificate details
  * @param {string} fingerprint - Certificate fingerprint
- * @returns {Promise<Object>} - Certificate details
+ * @param {boolean} showInModal - Whether to show in modal
+ * @returns {Promise<Object>} Certificate data
  */
-async function loadCertificateDetails(fingerprint) {
+async function loadCertificateDetails(fingerprint, showInModal = false) {
   try {
-    const response = await fetch(
-      `/api/certificates/${encodeAPIFingerprint(fingerprint)}`
-    );
+    Logger.debug(`Loading certificate details for: ${fingerprint}`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to load certificate details: ${response.status}`);
+    // Show loading indicator
+    if (showInModal) {
+      UIUtils.showLoadingModal('Loading certificate details...');
+    } else {
+      document.getElementById('cert-details-loading').classList.remove('hidden');
+      document.getElementById('cert-details-content').classList.add('hidden');
     }
 
-    const certificate = await response.json();
+    // Fetch certificate details from API
+    const response = await fetch(`/api/certificates/${fingerprint}`);
+    const data = await response.json();
 
-    // Update state
-    state.currentCertificate = certificate;
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to load certificate details');
+    }
 
-    // Update UI with certificate details
-    renderCertificateDetailsFromTemplate(
-      certificate,
-      document.querySelector("#cert-details-modal .modal-content")
-    );
+    // Cache the certificate data
+    CertificateCache.set(fingerprint, data.certificate);
 
-    return certificate;
+    if (showInModal) {
+      UIUtils.closeModal('loading-modal');
+      renderCertificateDetailsModal(data.certificate);
+    } else {
+      document.getElementById('cert-details-loading').classList.add('hidden');
+      document.getElementById('cert-details-content').classList.remove('hidden');
+      renderCertificateDetails(data.certificate);
+    }
+
+    return data.certificate;
   } catch (error) {
-    console.error("Error loading certificate details:", error);
-    UIUtils.showError(`Failed to load certificate details: ${error.message}`);
+    Logger.error('Error loading certificate details:', error);
+
+    if (showInModal) {
+      UIUtils.closeModal('loading-modal');
+      UIUtils.showToast(`Failed to load certificate details: ${error.message}`, 'error');
+    } else {
+      document.getElementById('cert-details-loading').classList.add('hidden');
+      UIUtils.showError('Failed to load certificate details: ' + error.message);
+    }
+
     throw error;
   }
+}
+
+
+/**
+ * Render certificate details into the details panel
+ * @param {Object} certificate - Certificate data
+ */
+function renderCertificateDetails(certificate) {
+  // Check if certificate is valid
+  if (!certificate || !certificate.fingerprint) {
+    UIUtils.showError('Invalid certificate data');
+    return;
+  }
+
+  // Get elements
+  const nameElement = document.getElementById('cert-details-name');
+  const fingerprintElement = document.getElementById('cert-details-fingerprint');
+  const validityElement = document.getElementById('cert-details-validity');
+  const statusBadgeElement = document.getElementById('cert-details-status');
+  const domainsElement = document.getElementById('cert-details-domains');
+  const ipsElement = document.getElementById('cert-details-ips');
+  const issuerElement = document.getElementById('cert-details-issuer');
+  const certTypeElement = document.getElementById('cert-details-type');
+  const autoRenewElement = document.getElementById('cert-details-auto-renew');
+  const caSignedElement = document.getElementById('cert-details-ca-signed');
+
+  // Fill in certificate details
+  nameElement.textContent = certificate.name || 'Unnamed Certificate';
+  fingerprintElement.textContent = certificate.fingerprint || 'Unknown';
+
+  // Format validity dates
+  const validFrom = certificate.validFrom ? new Date(certificate.validFrom).toLocaleString() : 'Unknown';
+  const validTo = certificate.validTo ? new Date(certificate.validTo).toLocaleString() : 'Unknown';
+  validityElement.textContent = `${validFrom} to ${validTo}`;
+
+  // Set status badge
+  if (certificate.isExpired) {
+    statusBadgeElement.className = 'status-badge status-expired';
+    statusBadgeElement.textContent = 'Expired';
+  } else if (certificate.isExpiringSoon) {
+    statusBadgeElement.className = 'status-badge status-warning';
+    statusBadgeElement.textContent = 'Expiring Soon';
+  } else {
+    statusBadgeElement.className = 'status-badge status-active';
+    statusBadgeElement.textContent = 'Valid';
+  }
+
+  // Display domains and IPs
+  domainsElement.innerHTML = '';
+  if (certificate.domains && certificate.domains.length > 0) {
+    certificate.domains.forEach(domain => {
+      const domainItem = document.createElement('span');
+      domainItem.className = 'domain-item';
+      domainItem.textContent = domain;
+      domainsElement.appendChild(domainItem);
+    });
+  } else {
+    domainsElement.textContent = 'None';
+  }
+
+  ipsElement.innerHTML = '';
+  if (certificate.ips && certificate.ips.length > 0) {
+    certificate.ips.forEach(ip => {
+      const ipItem = document.createElement('span');
+      ipItem.className = 'ip-item';
+      ipItem.textContent = ip;
+      ipsElement.appendChild(ipItem);
+    });
+  } else {
+    ipsElement.textContent = 'None';
+  }
+
+  // Show issuer and type
+  issuerElement.textContent = certificate.issuer || 'Self-signed';
+  certTypeElement.textContent = formatCertificateType(certificate.certType);
+
+  // Show configuration details
+  autoRenewElement.textContent = certificate.autoRenew ? 'Yes' : 'No';
+  caSignedElement.textContent = certificate.signWithCA ? 'Yes' : 'No';
+
+  // Add additional details based on certificate type
+  updateCertificateDetailsForm(certificate);
+
+  // Show renewal options if certificate has idle domains/IPs
+  const renewOptionsContainer = document.getElementById('cert-renewal-options');
+  if (renewOptionsContainer) {
+    if (certificate.needsRenewal) {
+      renewOptionsContainer.classList.remove('hidden');
+      updateRenewalOptions(certificate);
+    } else {
+      renewOptionsContainer.classList.add('hidden');
+    }
+  }
+}
+
+/**
+ * Format certificate type for display
+ * @param {string} certType - Raw certificate type
+ * @returns {string} Formatted certificate type for display
+ */
+function formatCertificateType(certType) {
+  if (!certType) return 'Unknown';
+
+  switch (certType.toLowerCase()) {
+    case 'rootca':
+      return 'Root CA';
+    case 'intermediateca':
+      return 'Intermediate CA';
+    case 'standard':
+      return 'Standard';
+    case 'server':
+      return 'Server';
+    case 'client':
+      return 'Client';
+    case 'usercert':
+      return 'User Certificate';
+    case 'codesigning':
+      return 'Code Signing';
+    default:
+      // Capitalize first letter of each word
+      return certType
+        .split(/[_-]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+  }
+}
+
+/**
+* Render certificate details in a modal
+* @param {Object} certificate - Certificate data
+*/
+function renderCertificateDetailsModal(certificate) {
+  // Implementation for modal view of certificate details
+  // Similar to renderCertificateDetails but for modal display
+  UIUtils.openModal('certificate-details-modal', () => {
+    document.getElementById('modal-cert-name').textContent = certificate.name || 'Unnamed Certificate';
+    document.getElementById('modal-cert-fingerprint').textContent = certificate.fingerprint || 'Unknown';
+
+    // Add other details as needed
+  });
 }
 
 /**
@@ -1985,8 +2309,8 @@ function loadCertificateBackups(fingerprint) {
   const container = document.getElementById("cert-backups-list");
   if (!container) return;
 
-  // Show loading indicator
-  container.innerHTML = '<div class="loading-spinner small"></div>';
+  // Show loading spinner with message
+  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading backups...", "small");
 
   // Fetch backups with proper encoding
   const encodedFingerprint = encodeAPIFingerprint(fingerprint);
@@ -1999,6 +2323,9 @@ function loadCertificateBackups(fingerprint) {
       return response.json();
     })
     .then((backups) => {
+      // Remove the loading spinner
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+
       if (!backups || backups.length === 0) {
         container.innerHTML =
           '<p class="empty-message">No backups available.</p>';
@@ -2059,6 +2386,9 @@ function loadCertificateBackups(fingerprint) {
       });
     })
     .catch((error) => {
+      // Remove the loading spinner
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+
       console.error("Error loading backups:", error);
       container.innerHTML = UIUtils.safeTemplate(
         `
@@ -2073,11 +2403,13 @@ function loadCertificateBackups(fingerprint) {
 
 /**
  * Create a certificate backup
+ * @param {string} fingerprint - Certificate fingerprint
  */
-async function createCertificateBackup() {
-  const fingerprint = document
-    .getElementById("cert-details-modal")
-    .getAttribute("data-cert-id");
+function createCertificateBackup(fingerprint) {
+  if (!fingerprint) {
+    const modal = document.getElementById("cert-details-modal");
+    fingerprint = modal?.getAttribute("data-cert-id");
+  }
 
   if (!fingerprint) {
     UIUtils.showToast("Certificate ID is missing", "error");
@@ -2087,21 +2419,32 @@ async function createCertificateBackup() {
   try {
     UIUtils.showToast("Creating backup...", "info");
 
-    const response = await fetch(`/api/certificates/${fingerprint}/backups`, {
+    // Encode fingerprint for API use
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+
+    fetch(`/api/certificates/${encodedFingerprint}/backups`, {
       method: "POST",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create backup: ${errorText}`);
-    }
-
-    // Reload backups list
-    loadCertificateBackups(fingerprint);
-
-    UIUtils.showToast("Backup created successfully", "success");
+    })
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => {
+            throw new Error(`Failed to create backup: ${text}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Reload backups list
+        loadCertificateBackups(fingerprint);
+        UIUtils.showToast("Backup created successfully", "success");
+      })
+      .catch(error => {
+        UIUtils.showToast(`Error: ${error.message}`, "error");
+        Logger.error("Failed to create backup:", error);
+      });
   } catch (error) {
     UIUtils.showError(`Failed to create backup: ${error.message}`);
+    Logger.error("Error creating backup:", error);
   }
 }
 
@@ -2242,77 +2585,83 @@ async function downloadCertificateFile(fingerprint, fileType) {
  * @param {Object} certificate - Certificate object
  */
 function loadCertificateFiles(certificate) {
-    const container = document.getElementById('cert-files-list');
-    if (!container) {
-        console.error('Certificate files container not found');
-        return;
-    }
-    
-    const paths = certificate.paths || {};
-    
-    // Create array of file data
-    const files = [];
-    
-    // Add all certificate files with proper display names and file types
-    // We use path keys without the 'Path' suffix as that's what the API expects
-    if (paths.crt) {
-        files.push({ type: 'Certificate', path: paths.crt, fileType: 'crt', description: 'X.509 Certificate (PEM format)' });
-    }
-    
-    if (paths.key) {
-        files.push({ type: 'Private Key', path: paths.key, fileType: 'key', description: 'Private key file' });
-    }
-    
-    if (paths.pem) {
-        files.push({ type: 'PEM Certificate', path: paths.pem, fileType: 'pem', description: 'PEM encoded certificate' });
-    }
-    
-    if (paths.p12) {
-        files.push({ type: 'PKCS#12', path: paths.p12, fileType: 'p12', description: 'PKCS#12 bundle (.p12)' });
-    }
-    
-    if (paths.pfx) {
-        files.push({ type: 'PFX', path: paths.pfx, fileType: 'pfx', description: 'PFX certificate bundle' });
-    }
-    
-    if (paths.csr) {
-        files.push({ type: 'CSR', path: paths.csr, fileType: 'csr', description: 'Certificate Signing Request' });
-    }
-    
-    if (paths.ext) {
-        files.push({ type: 'Extensions', path: paths.ext, fileType: 'ext', description: 'OpenSSL extensions file' });
-    }
-    
-    if (paths.cer) {
-        files.push({ type: 'CER Certificate', path: paths.cer, fileType: 'cer', description: 'Windows CER format' });
-    }
-    
-    if (paths.der) {
-        files.push({ type: 'DER Certificate', path: paths.der, fileType: 'der', description: 'DER encoded certificate' });
-    }
-    
-    if (paths.p7b) {
-        files.push({ type: 'PKCS#7', path: paths.p7b, fileType: 'p7b', description: 'PKCS#7 certificate bundle' });
-    }
-    
-    if (paths.chain) {
-        files.push({ type: 'Certificate Chain', path: paths.chain, fileType: 'chain', description: 'Certificate chain without end entity' });
-    }
-    
-    if (paths.fullchain) {
-        files.push({ type: 'Full Chain', path: paths.fullchain, fileType: 'fullchain', description: 'Complete certificate chain' });
-    }
-    
-    if (files.length === 0) {
-        container.innerHTML = UIUtils.safeTemplate(`
+  const container = document.getElementById('cert-files-list');
+  if (!container) {
+    console.error('Certificate files container not found');
+    return;
+  }
+
+  // Use the new loading spinner with message
+  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading certificate files...", "small");
+
+  // Use the direct _paths property (without Path suffixes)
+  const paths = certificate.paths || {};
+
+  // Create array of file data
+  const files = [];
+
+  // Add all certificate files with proper display names and file types
+  if (paths.crtPath) {
+    files.push({ type: 'Certificate', path: paths.crtPath, fileType: 'crt', description: 'X.509 Certificate (PEM format)' });
+  }
+
+  if (paths.keyPath) {
+    files.push({ type: 'Private Key', path: paths.keyPath, fileType: 'key', description: 'Private key file' });
+  }
+
+  if (paths.pemPath) {
+    files.push({ type: 'PEM Certificate', path: paths.pemPath, fileType: 'pem', description: 'PEM encoded certificate' });
+  }
+
+  if (paths.p12Path) {
+    files.push({ type: 'PKCS#12', path: paths.p12Path, fileType: 'p12', description: 'PKCS#12 bundle (.p12)' });
+  }
+
+  if (paths.pfxPath) {
+    files.push({ type: 'PFX', path: paths.pfxPath, fileType: 'pfx', description: 'PFX certificate bundle' });
+  }
+
+  if (paths.csrPath) {
+    files.push({ type: 'CSR', path: paths.csrPath, fileType: 'csr', description: 'Certificate Signing Request' });
+  }
+
+  if (paths.extPath) {
+    files.push({ type: 'Extensions', path: paths.extPath, fileType: 'ext', description: 'OpenSSL extensions file' });
+  }
+
+  if (paths.cerPath) {
+    files.push({ type: 'CER Certificate', path: paths.cerPath, fileType: 'cer', description: 'Windows CER format' });
+  }
+
+  if (paths.derPath) {
+    files.push({ type: 'DER Certificate', path: paths.derPath, fileType: 'der', description: 'DER encoded certificate' });
+  }
+
+  if (paths.p7bPath) {
+    files.push({ type: 'PKCS#7', path: paths.p7bPath, fileType: 'p7b', description: 'PKCS#7 certificate bundle' });
+  }
+
+  if (paths.chainPath) {
+    files.push({ type: 'Certificate Chain', path: paths.chainPath, fileType: 'chain', description: 'Certificate chain without end entity' });
+  }
+
+  if (paths.fullchainPath) {
+    files.push({ type: 'Full Chain', path: paths.fullchainPath, fileType: 'fullchain', description: 'Complete certificate chain' });
+  }
+
+  // Remove the loading spinner
+  UIUtils.removeLoadingSpinner(loadingSpinner);
+
+  if (files.length === 0) {
+    container.innerHTML = UIUtils.safeTemplate(`
             <p class="empty-message">No certificate files available.</p>
         `, {});
-        return;
-    }
-    
-    // Create table rows
-    const rows = files.map(file => {
-        return UIUtils.safeTemplate(`
+    return;
+  }
+
+  // Create table rows
+  const rows = files.map(file => {
+    return UIUtils.safeTemplate(`
             <tr>
                 <td>\${type}</td>
                 <td class="file-path"><code>\${path}</code></td>
@@ -2321,10 +2670,10 @@ function loadCertificateFiles(certificate) {
                 </td>
             </tr>
         `, file);
-    }).join('');
-    
-    // Render the table with download all button
-    container.innerHTML = UIUtils.safeTemplate(`
+  }).join('');
+
+  // Render the table with download all button
+  container.innerHTML = UIUtils.safeTemplate(`
         <table class="cert-files-table">
             <thead>
                 <tr>
@@ -2337,27 +2686,23 @@ function loadCertificateFiles(certificate) {
                 \${rows|noEscape}
             </tbody>
         </table>
-        <div class="file-actions">
-            <button id="download-all-files-btn" class="button">Download All Files</button>
-        </div>
     `, { rows });
-    
-    // Add event listeners to the download buttons
-    document.querySelectorAll('.download-file-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const filePath = this.getAttribute('data-path');
-            const fileType = this.getAttribute('data-type');
-            downloadCertificateFile(certificate.fingerprint, fileType);
-        });
-    });
 
-    // Add event listener to download all button
-    const downloadAllBtn = document.getElementById('download-all-files-btn');
-    if (downloadAllBtn) {
-        downloadAllBtn.addEventListener('click', () => {
-            downloadAllCertificateFiles(certificate);
-        });
-    }
+  // Add event listeners to the download buttons
+  document.querySelectorAll('.download-file-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const fileType = this.getAttribute('data-type');
+      downloadCertificateFile(certificate.fingerprint, fileType);
+    });
+  });
+
+  // Add event listener to download all button
+  const downloadAllBtn = document.getElementById('download-all-files-btn');
+  if (downloadAllBtn) {
+    downloadAllBtn.addEventListener('click', () => {
+      downloadCertificateZip(certificate.fingerprint);
+    });
+  }
 }
 
 /**
@@ -2366,18 +2711,18 @@ function loadCertificateFiles(certificate) {
  * @param {string} fileType - Type of file to download
  */
 function downloadCertificateFile(certId, fileType) {
-    // Encode fingerprint for API use
-    const encodedId = encodeAPIFingerprint(certId);
-    
-    Logger.debug(`Downloading certificate file: ${fileType} for ${certId}`);
-    
-    // Create a download link and trigger it
-    const downloadLink = document.createElement('a');
-    downloadLink.href = `/api/certificates/${encodedId}/download/${fileType}`;
-    downloadLink.download = ''; // Let the server determine filename
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+  // Encode fingerprint for API use
+  const encodedId = encodeAPIFingerprint(certId);
+
+  Logger.debug(`Downloading certificate file: ${fileType} for ${certId}`);
+
+  // Create a download link and trigger it
+  const downloadLink = document.createElement('a');
+  downloadLink.href = `/api/certificates/${encodedId}/download/${fileType}`;
+  downloadLink.download = ''; // Let the server determine filename
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
 }
 
 /**
@@ -2401,27 +2746,9 @@ function updateCertificateActionButtons(certificate) {
  * Hide the certificate details modal
  */
 function hideCertificateDetailsModal() {
-  const modal = document.getElementById("cert-details-modal");
-  if (modal) {
-    modal.classList.remove("visible");
-    modal.classList.add("hidden");
-    document.getElementById("modal-backdrop").classList.add("hidden");
-    state.currentCertificate = null;
-  }
-}
-
-/**
- * Filter certificates based on search and status filters
- */
-function filterCertificates() {
-  const searchFilter = document
-    .getElementById("cert-search")
-    .value.toLowerCase();
-  const showValid = document.getElementById("filter-valid").checked;
-  const showExpiring = document.getElementById("filter-expiring").checked;
-  const showExpired = document.getElementById("filter-expired").checked;
-
-  renderCertificatesListDetailed(state.certificates);
+  // Use UIUtils instead of direct manipulation
+  UIUtils.closeModal("cert-details-modal");
+  state.currentCertificate = null;
 }
 
 /**
@@ -2462,11 +2789,30 @@ async function deleteCertificate(certId) {
 
     Logger.info(`Certificate deleted successfully: ${certId}`);
 
-    // Hide the modal
+    // Hide the certificate details modal if it's open
     hideCertificateDetailsModal();
 
-    // Reload certificates
-    await loadCertificates();
+    // Remove the certificate from state
+    if (window.state && window.state.certificates) {
+      window.state.certificates = window.state.certificates.filter(cert =>
+        cert.fingerprint !== certId
+      );
+    }
+
+    // Reload the certificates list
+    await loadCertificates(true); // Force a refresh from server
+
+    // If we're on the certificates tab, re-render the list
+    if (document.getElementById('certificates-list')) {
+      renderCertificatesListDetailed(window.state.certificates);
+    }
+
+    // If we're on the CA tab and this was a CA certificate, reload that list too
+    if (document.getElementById('ca-list')) {
+      if (typeof loadCACertificates === 'function') {
+        loadCACertificates(true);
+      }
+    }
 
     UIUtils.showNotification("Certificate deleted successfully", "success");
   } catch (error) {
@@ -2484,70 +2830,254 @@ function renewSelectedCertificate() {
     return;
   }
 
-  renewCertificate(state.currentCertificate.fingerprint);
+  startCertificateRenewal(state.currentCertificate.fingerprint);
 }
 
 /**
- * Renew a certificate
- * @param {string} certId - Certificate fingerprint
+ * Start the certificate renewal process with passphrase handling
+ * @param {string|object} certificate - Certificate fingerprint or object
+ * @param {Object} options - Renewal options
  */
-async function renewCertificate(certId) {
-  Logger.debug(`Starting certificate renewal for: ${certId}`);
+async function startCertificateRenewal(certificate, options = {}) {
+  // Extract fingerprint if certificate is an object
+  const fingerprint = typeof certificate === 'object' ? certificate.fingerprint : certificate;
+
+  if (!fingerprint) {
+    UIUtils.showError("No certificate provided for renewal");
+    return;
+  }
 
   try {
-    if (!certId) {
-      Logger.error("Certificate ID is required for renewal");
-      throw new Error("Certificate ID is required");
+    Logger.debug(`Starting renewal process for certificate: ${fingerprint}`);
+
+    // First, check if we need passphrases
+    const checkResponse = await fetch(`/api/certificates/${encodeAPIFingerprint(fingerprint)}/check-renewal-passphrases`);
+    const checkData = await checkResponse.json();
+
+    if (!checkResponse.ok) {
+      throw new Error(`Failed to check passphrase requirements: ${checkData.message || 'Unknown error'}`);
     }
 
-    UIUtils.showNotification("Renewing certificate...", "info");
+    // If we need passphrase(s), show the modal to collect them
+    if (checkData.passphraseNeeded) {
+      showPassphrasePrompt(checkData, (passphrases) => {
+        // Continue renewal with collected passphrases
+        performCertificateRenewal(fingerprint, {
+          ...options,
+          ...passphrases
+        });
+      });
+    } else {
+      // No passphrases needed, proceed directly
+      performCertificateRenewal(fingerprint, options);
+    }
+  } catch (error) {
+    Logger.error("Error starting certificate renewal:", error);
+    UIUtils.showError(`Failed to start renewal: ${error.message}`);
+  }
+}
 
-    // Properly encode the fingerprint
-    const encodedId = encodeAPIFingerprint(certId);
+/**
+* Show modal to collect passphrases for certificate renewal
+* @param {Object} passphraseData - Data about required passphrases
+* @param {Function} callback - Function to call with collected passphrases
+*/
+function showPassphrasePrompt(passphraseData, callback) {
+  Logger.debug(`Showing passphrase prompt for renewal`);
 
-    Logger.debug(`Sending renewal request for certificate: ${encodedId}`);
-    const response = await fetch(`/api/certificates/${encodedId}/renew`, {
+  const certificate = passphraseData.certificate;
+  const signingCA = passphraseData.signingCA;
+
+  // Create modal HTML content (without the button row)
+  const modalContent = `
+      <div class="passphrase-modal-content">
+          <p>One or more passphrases are needed to renew this certificate:</p>
+          
+          ${certificate?.needsPassphrase && !certificate?.hasPassphrase ? `
+              <div class="passphrase-section">
+                  <h3>Certificate Passphrase</h3>
+                  <p>Enter the passphrase for <strong>${UIUtils.escapeHTML(certificate.name || 'Certificate')}</strong></p>
+                  <div class="input-group">
+                      <input type="password" id="cert-passphrase" class="form-control" placeholder="Certificate Passphrase">
+                      <div class="input-append">
+                          <button class="toggle-password-btn" type="button" tabindex="-1" data-target="cert-passphrase">
+                              <i class="fas fa-eye"></i>
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          ` : ''}
+          
+          ${signingCA?.needsPassphrase && !signingCA?.hasPassphrase ? `
+              <div class="passphrase-section">
+                  <h3>Signing CA Passphrase</h3>
+                  <p>Enter the passphrase for <strong>${UIUtils.escapeHTML(signingCA.name || 'CA Certificate')}</strong> (used to sign this certificate)</p>
+                  <div class="input-group">
+                      <input type="password" id="ca-passphrase" class="form-control" placeholder="CA Passphrase">
+                      <div class="input-append">
+                          <button class="toggle-password-btn" type="button" tabindex="-1" data-target="ca-passphrase">
+                              <i class="fas fa-eye"></i>
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          ` : ''}
+          
+          <div class="passphrase-options">
+              <label class="checkbox-container">
+                  <input type="checkbox" id="store-passphrases">
+                  <span class="checkmark"></span>
+                  Store passphrases for future renewals
+              </label>
+          </div>
+      </div>
+  `;
+
+  // Show modal using UIUtils with proper button configurations
+  UIUtils.showModal("passphrase-modal", {
+    title: "Certificate Renewal",
+    content: modalContent,
+    closable: true,
+    buttons: [
+      { 
+        text: "Cancel", 
+        id: "cancel-passphrase-btn", 
+        action: "close" 
+      },
+      { 
+        text: "Continue Renewal", 
+        id: "submit-passphrase-btn", 
+        class: "primary", 
+        action: "custom" 
+      }
+    ],
+    onShow: () => {
+      // Set up toggle password visibility handlers
+      document.querySelectorAll(".toggle-password-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const targetId = btn.getAttribute("data-target");
+          const input = document.getElementById(targetId);
+          const icon = btn.querySelector("i");
+      
+          if (input && icon) {
+            if (input.type === "password") {
+              input.type = "text";
+              icon.classList.remove("fa-eye");
+              icon.classList.add("fa-eye-slash");
+            } else {
+              input.type = "password";
+              icon.classList.remove("fa-eye-slash");
+              icon.classList.add("fa-eye");
+            }
+          }
+        });
+      });
+    }
+  });
+  
+  // Add event listener for the submit button
+  const modal = document.getElementById('passphrase-modal');
+  if (modal) {
+    modal.addEventListener('buttonClick', (event) => {
+      if (event.detail.buttonId === 'submit-passphrase-btn') {
+        // Collect passphrases
+        const passphrases = {
+          storePassphrases: document.getElementById("store-passphrases")?.checked || false
+        };
+    
+        // Get certificate passphrase if field exists
+        const certPassphraseInput = document.getElementById("cert-passphrase");
+        if (certPassphraseInput) {
+          passphrases.passphrase = certPassphraseInput.value;
+        }
+    
+        // Get CA passphrase if field exists
+        const caPassphraseInput = document.getElementById("ca-passphrase");
+        if (caPassphraseInput) {
+          passphrases.signingCAPassphrase = caPassphraseInput.value;
+        }
+    
+        // Call callback with collected passphrases
+        callback(passphrases);
+      }
+    });
+  }
+}
+
+/**
+* Perform actual certificate renewal with collected passphrases
+* @param {string} fingerprint - Certificate fingerprint
+* @param {Object} options - Renewal options
+*/
+async function performCertificateRenewal(fingerprint, options = {}) {
+  Logger.debug(`Performing certificate renewal with options:`, options);
+
+  try {
+    // Create a loader container if it doesn't exist
+    let loaderContainer = document.getElementById("renewal-loader");
+    if (!loaderContainer) {
+      loaderContainer = document.createElement("div");
+      loaderContainer.id = "renewal-loader";
+      document.body.appendChild(loaderContainer);
+    }
+    
+    const loader = UIUtils.showLoader(loaderContainer, "Renewing certificate...");
+
+    // Prepare request body
+    const requestBody = {
+      days: options.days || 365,
+      storePassphrases: !!options.storePassphrases
+    };
+
+    // Add certificate passphrase if provided
+    if (options.passphrase) {
+      requestBody.passphrase = options.passphrase;
+    }
+
+    // Add signing CA passphrase if provided
+    if (options.signingCAPassphrase) {
+      requestBody.signingCAPassphrase = options.signingCAPassphrase;
+    }
+
+    // Make renewal API request
+    const response = await fetch(`/api/certificates/${encodeAPIFingerprint(fingerprint)}/renew`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
+      body: JSON.stringify(requestBody)
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      // Try to get a structured error message
-      let errorMessage;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || `HTTP error: ${response.status}`;
-      } catch (parseError) {
-        errorMessage =
-          (await response.text()) || `HTTP error: ${response.status}`;
-      }
-      Logger.error(`Certificate renewal failed: ${errorMessage}`);
-      throw new Error(`Failed to renew certificate: ${errorMessage}`);
+      throw new Error(data.message || `Error: ${response.status}`);
     }
 
-    const result = await response.json();
-    Logger.info(`Certificate renewal process started for: ${certId}`);
+    // Handle successful renewal
+    loader.hide();
+    UIUtils.showToast("Certificate renewed successfully", "success");
 
-    // Reload certificates
-    await loadCertificates();
-
-    // If details modal is open, reload it
-    if (
-      state.currentCertificate &&
-      state.currentCertificate.fingerprint === certId
-    ) {
-      await loadCertificateDetails(certId);
+    // Refresh certificate list and details
+    if (typeof loadCertificates === 'function') {
+      await loadCertificates(true);
     }
 
-    UIUtils.showNotification(
-      "Certificate renewal process started. Check logs for progress.",
-      "success"
-    );
+    // If we're currently viewing this certificate, refresh the details
+    const currentCert = window.state?.currentCertificate;
+    if (currentCert && currentCert.fingerprint === fingerprint) {
+      showCertificateDetails(fingerprint);
+    }
   } catch (error) {
-    Logger.error(`Error renewing certificate: ${error.message}`, error);
-    UIUtils.showError(`Failed to renew certificate: ${error.message}`);
+    // Find and hide the loader
+    const loaderContainer = document.getElementById("renewal-loader");
+    if (loaderContainer) {
+      loaderContainer.innerHTML = '';
+      loaderContainer.style.display = 'none';
+    }
+    
+    Logger.error("Certificate renewal failed:", error);
+    UIUtils.showError(`Certificate renewal failed: ${error.message}`);
   }
 }
 
@@ -2706,7 +3236,7 @@ function renderCertificatesListDetailed(certificates) {
   document.querySelectorAll(".renew-cert-btn").forEach((btn) => {
     btn.addEventListener("click", function () {
       const certId = this.getAttribute("data-cert-id");
-      renewCertificate(certId);
+      startCertificateRenewal(certId);
     });
   });
 }
@@ -2717,22 +3247,22 @@ function renderCertificatesListDetailed(certificates) {
  */
 function showCertificateDownloadOptions(certificate) {
   Logger.debug(`Showing download options for certificate: ${certificate.name}`);
-  
+
   // Create modal element
   const modal = document.createElement("div");
   modal.className = "download-options-modal";
-  
+
   // Show loading state initially
   modal.innerHTML = `
     <div class="download-options-content">
       <h3>Download Certificate Files</h3>
-      <div class="loading-spinner small"></div>
+      ${UIUtils.createLoadingSpinner("Loading file information...", "small").outerHTML}
     </div>
   `;
-  
+
   // Add to document
   document.body.appendChild(modal);
-  
+
   // Get certificate fingerprint
   const fingerprint = certificate.fingerprint;
   if (!fingerprint) {
@@ -2750,7 +3280,7 @@ function showCertificateDownloadOptions(certificate) {
     });
     return;
   }
-  
+
   // Fetch files from the API endpoint
   const encodedFingerprint = encodeAPIFingerprint(fingerprint);
   fetch(`/api/certificates/${encodedFingerprint}/files`)
@@ -2762,7 +3292,7 @@ function showCertificateDownloadOptions(certificate) {
     })
     .then(files => {
       Logger.debug(`Received ${files.length} certificate files for download options`);
-      
+
       // Map file types to display names
       const fileTypeDisplayNames = {
         'crt': 'Certificate (.crt)',
@@ -2778,13 +3308,13 @@ function showCertificateDownloadOptions(certificate) {
         'fullchain': 'Full Certificate Chain (.pem)',
         'cer': 'X.509 Certificate (.cer)'
       };
-      
+
       // Build download options HTML
       let optionsHtml = "";
       files.forEach(file => {
         const displayName = fileTypeDisplayNames[file.type] || `${file.type.toUpperCase()} File`;
         const fileSize = UIUtils.formatFileSize(file.size);
-        
+
         optionsHtml += UIUtils.safeTemplate(`
           <div class="download-option">
             <div class="download-option-info">
@@ -2795,7 +3325,7 @@ function showCertificateDownloadOptions(certificate) {
           </div>
         `, {});
       });
-      
+
       // Always add "All Files" option
       optionsHtml += `
         <div class="download-option highlight">
@@ -2805,7 +3335,7 @@ function showCertificateDownloadOptions(certificate) {
           <button class="button small primary download-option-btn" data-type="all">Download</button>
         </div>
       `;
-      
+
       // Update modal content
       modal.innerHTML = UIUtils.safeTemplate(`
         <div class="download-options-content">
@@ -2818,28 +3348,28 @@ function showCertificateDownloadOptions(certificate) {
           </div>
         </div>
       `, {});
-      
+
       // Add event listeners
       modal.querySelectorAll(".download-option-btn").forEach(btn => {
-        btn.addEventListener("click", function() {
+        btn.addEventListener("click", function () {
           const type = this.getAttribute("data-type");
-          
+
           if (type === "all") {
             downloadAllCertificateFiles(certificate);
           } else {
             downloadCertificateFile(fingerprint, type);
           }
-          
+
           // Close modal after download starts
           document.body.removeChild(modal);
         });
       });
-      
+
       // Close button
       document.getElementById("close-download-options").addEventListener("click", () => {
         document.body.removeChild(modal);
       });
-      
+
       // Close when clicking outside
       modal.addEventListener("click", event => {
         if (event.target === modal) {
@@ -2849,7 +3379,7 @@ function showCertificateDownloadOptions(certificate) {
     })
     .catch(error => {
       Logger.error(`Error loading download options: ${error.message}`, error);
-      
+
       // Show error in modal
       modal.innerHTML = UIUtils.safeTemplate(`
         <div class="download-options-content">
@@ -2860,12 +3390,12 @@ function showCertificateDownloadOptions(certificate) {
           </div>
         </div>
       `, {});
-      
+
       document.getElementById("close-download-options").addEventListener("click", () => {
         document.body.removeChild(modal);
       });
     });
-  
+
   // Add CSS for the modal (same as before)
   const style = document.createElement("style");
   style.textContent = `
@@ -2931,20 +3461,20 @@ function initializeCertificateConversion() {
   const convertBtn = document.getElementById('convert-cert-btn');
   const passwordGroupInline = document.getElementById('convert-password-group-inline');
   const passwordGroupStandalone = document.getElementById('convert-password-group');
-  
+
   if (!convertFormatSelect || !convertBtn) {
     return; // Elements not found
   }
-  
+
   // Function to check if we're on a small screen
   const isSmallScreen = () => window.innerWidth <= 600;
-  
+
   // Function to update password field visibility
   const updatePasswordFields = (selectedFormat) => {
     // Define formats that require password
     const formatsRequiringPassword = ['p12', 'pfx'];
     const needsPassword = formatsRequiringPassword.includes(selectedFormat);
-    
+
     // Update inline password field
     if (passwordGroupInline) {
       if (needsPassword && !isSmallScreen()) {
@@ -2953,7 +3483,7 @@ function initializeCertificateConversion() {
         passwordGroupInline.classList.add('hidden');
       }
     }
-    
+
     // Update standalone password field
     if (passwordGroupStandalone) {
       if (needsPassword && isSmallScreen()) {
@@ -2962,38 +3492,38 @@ function initializeCertificateConversion() {
         passwordGroupStandalone.classList.add('hidden');
       }
     }
-    
+
     // Clear password when not needed
     const inlinePasswordField = document.getElementById('convert-password-inline');
     if (inlinePasswordField) {
       inlinePasswordField.value = '';
     }
-    
+
     const passwordField = document.getElementById('convert-password');
     if (passwordField) {
       passwordField.value = '';
     }
   };
-  
+
   // Enable/disable convert button based on selection
-  convertFormatSelect.addEventListener('change', function() {
+  convertFormatSelect.addEventListener('change', function () {
     const selectedFormat = this.value;
     convertBtn.disabled = !selectedFormat;
-    
+
     // Update password fields visibility
     updatePasswordFields(selectedFormat);
   });
-  
+
   // Handle window resize to update layout
   window.addEventListener('resize', () => {
     updatePasswordFields(convertFormatSelect.value);
   });
-  
+
   // Handle the convert button click
-  convertBtn.addEventListener('click', function() {
+  convertBtn.addEventListener('click', function () {
     const format = convertFormatSelect.value;
     if (!format) return;
-    
+
     // Get password from either the inline or standalone input
     let password = '';
     if (isSmallScreen()) {
@@ -3001,9 +3531,9 @@ function initializeCertificateConversion() {
     } else {
       password = document.getElementById('convert-password-inline')?.value || '';
     }
-    
+
     const formatsRequiringPassword = ['p12', 'pfx'];
-    
+
     // Validate password for formats that require it
     if (formatsRequiringPassword.includes(format) && !password) {
       if (isSmallScreen()) {
@@ -3019,18 +3549,18 @@ function initializeCertificateConversion() {
       }
       return;
     }
-    
+
     // Get the current certificate fingerprint
     const certId = document.getElementById('cert-details-modal').getAttribute('data-cert-id');
     if (!certId) {
       UIUtils.showToast('Certificate ID not found', 'error');
       return;
     }
-    
+
     // Call the conversion function
     convertCertificate(certId, format, password);
   });
-  
+
   // Initialize state based on current screen size
   updatePasswordFields(convertFormatSelect.value);
 }
@@ -3050,19 +3580,18 @@ async function convertCertificate(certId, format, password = '') {
       convertBtn.textContent = 'Converting...';
       convertBtn.disabled = true;
     }
-    
+
     // Prepare request body
-    const body = { 
-      format,
-      options: {}
+    const body = {
+      format: format
     };
-    
+
     // Add password if provided
     if (password) {
-      body.options.password = password;
+      body.password = password;
     }
-    
-    // Call API
+
+    // Call API with properly encoded fingerprint
     const response = await fetch(`/api/certificates/${encodeAPIFingerprint(certId)}/convert`, {
       method: 'POST',
       headers: {
@@ -3070,54 +3599,49 @@ async function convertCertificate(certId, format, password = '') {
       },
       body: JSON.stringify(body)
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to convert certificate: ${response.status}`);
-    }
-    
-    // Check if it's a direct file download or a JSON response
-    const contentType = response.headers.get('Content-Type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      // It's a JSON response, likely with a URL or message
-      const result = await response.json();
-      
-      if (result.url) {
-        // Trigger download using the URL
-        const a = document.createElement('a');
-        a.href = result.url;
-        a.download = result.filename || `certificate.${format}`;
-        a.click();
-      } else {
-        // Show success message
-        UIUtils.showToast(result.message || 'Certificate converted successfully', 'success');
+      // Try to extract detailed error message if available
+      let errorMessage = `HTTP error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // If we can't parse JSON, use the status text
+        errorMessage = response.statusText || errorMessage;
       }
-    } else {
-      // Direct file download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      
-      // Get filename from Content-Disposition header if available
-      let filename = `certificate.${format}`;
-      const disposition = response.headers.get('Content-Disposition');
-      if (disposition && disposition.includes('filename=')) {
-        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-        const matches = filenameRegex.exec(disposition);
-        if (matches && matches[1]) {
-          filename = matches[1].replace(/['"]/g, '');
-        }
-      }
-      
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      throw new Error(`Failed to convert certificate: ${errorMessage}`);
     }
-    
-    UIUtils.showToast('Certificate converted successfully', 'success');
+
+    const result = await response.json();
+
+    // Handle successful conversion
+    if (result.success) {
+      UIUtils.showToast('Certificate converted successfully', 'success');
+
+      // Reload certificate files to show the new format
+      if (state.currentCertificate) {
+        const certificate = await fetchCertificateDetails(certId);
+        loadCertificateFiles(certificate);
+      }
+
+      // Reset the format select and password field
+      const formatSelect = document.getElementById('convert-format');
+      if (formatSelect) formatSelect.value = '';
+
+      const passwordField = document.getElementById('convert-password');
+      if (passwordField) passwordField.value = '';
+
+      const inlinePasswordField = document.getElementById('convert-password-inline');
+      if (inlinePasswordField) inlinePasswordField.value = '';
+
+      // Hide password fields
+      const passwordGroup = document.getElementById('convert-password-group');
+      if (passwordGroup) passwordGroup.classList.add('hidden');
+
+      const inlinePasswordGroup = document.getElementById('convert-password-group-inline');
+      if (inlinePasswordGroup) inlinePasswordGroup.classList.add('hidden');
+    }
   } catch (error) {
     console.error('Error converting certificate:', error);
     UIUtils.showToast(`Failed to convert certificate: ${error.message}`, 'error');
@@ -3140,42 +3664,42 @@ function initializeGroupManagement() {
   const newGroupInput = document.getElementById('new-group-name');
   const cancelNewGroupBtn = document.getElementById('cancel-new-group-btn');
   const confirmNewGroupBtn = document.getElementById('confirm-new-group-btn');
-  
+
   if (!groupSelect) return;
-  
+
   // Show new group input when "Create new group" is selected
-  groupSelect.addEventListener('change', function() {
+  groupSelect.addEventListener('change', function () {
     if (this.value === '__new__') {
       newGroupContainer.classList.remove('hidden');
       newGroupInput.focus();
       this.classList.add('hidden'); // Hide the select while creating a new group
     }
   });
-  
+
   // Cancel creating new group
   if (cancelNewGroupBtn) {
-    cancelNewGroupBtn.addEventListener('click', function() {
+    cancelNewGroupBtn.addEventListener('click', function () {
       newGroupContainer.classList.add('hidden');
       groupSelect.classList.remove('hidden');
       groupSelect.value = ''; // Reset to "None"
       newGroupInput.value = ''; // Clear input
     });
   }
-  
+
   // Confirm new group
   if (confirmNewGroupBtn) {
-    confirmNewGroupBtn.addEventListener('click', function() {
+    confirmNewGroupBtn.addEventListener('click', function () {
       const newGroupName = newGroupInput.value.trim();
-      
+
       if (!newGroupName) {
         UIUtils.showInputError(newGroupInput, 'Group name cannot be empty');
         return;
       }
-      
+
       // Check if this group already exists
       const existingOption = Array.from(groupSelect.options)
         .find(option => option.text.toLowerCase() === newGroupName.toLowerCase() && option.value !== '__new__');
-      
+
       if (existingOption) {
         // Group already exists, just select it
         groupSelect.value = existingOption.value;
@@ -3184,14 +3708,14 @@ function initializeGroupManagement() {
         const newOption = document.createElement('option');
         newOption.value = newGroupName;
         newOption.text = newGroupName;
-        
+
         // Insert before the "Create new group" option
         const newGroupOption = groupSelect.querySelector('option[value="__new__"]');
         groupSelect.insertBefore(newOption, newGroupOption);
-        
+
         // Select the new group
         groupSelect.value = newGroupName;
-        
+
         // Add to global state if we're tracking all groups
         if (state.certificateGroups && Array.isArray(state.certificateGroups)) {
           if (!state.certificateGroups.includes(newGroupName)) {
@@ -3200,17 +3724,17 @@ function initializeGroupManagement() {
           }
         }
       }
-      
+
       // Hide the new group input
       newGroupContainer.classList.add('hidden');
       groupSelect.classList.remove('hidden');
       newGroupInput.value = '';
     });
   }
-  
+
   // Allow pressing Enter to confirm new group
   if (newGroupInput) {
-    newGroupInput.addEventListener('keyup', function(event) {
+    newGroupInput.addEventListener('keyup', function (event) {
       if (event.key === 'Enter') {
         event.preventDefault();
         confirmNewGroupBtn.click();
@@ -3231,7 +3755,7 @@ async function loadCertificateGroups() {
     if (!response.ok) {
       throw new Error(`Failed to load certificate groups: ${response.status}`);
     }
-    
+
     const data = await response.json();
     state.certificateGroups = data.groups || [];
     return state.certificateGroups;
@@ -3239,7 +3763,7 @@ async function loadCertificateGroups() {
     console.error('Error loading certificate groups:', error);
     // In case of error, extract groups from existing certificates
     const groups = new Set();
-    
+
     if (state.certificates && Array.isArray(state.certificates)) {
       state.certificates.forEach(cert => {
         if (cert.group) {
@@ -3247,7 +3771,7 @@ async function loadCertificateGroups() {
         }
       });
     }
-    
+
     state.certificateGroups = Array.from(groups).sort();
     return state.certificateGroups;
   }
@@ -3260,13 +3784,13 @@ async function loadCertificateGroups() {
  */
 function populateGroupSelect(selectElement, currentGroup = '') {
   if (!selectElement) return;
-  
+
   // Clear existing options but keep the default and "create new" option
   const defaultOption = selectElement.querySelector('option[value=""]');
   const newGroupOption = selectElement.querySelector('option[value="__new__"]');
-  
+
   selectElement.innerHTML = '';
-  
+
   if (defaultOption) {
     selectElement.appendChild(defaultOption);
   } else {
@@ -3275,22 +3799,22 @@ function populateGroupSelect(selectElement, currentGroup = '') {
     option.textContent = 'None';
     selectElement.appendChild(option);
   }
-  
+
   // Add all groups
   if (state.certificateGroups && Array.isArray(state.certificateGroups)) {
     state.certificateGroups.forEach(group => {
       const option = document.createElement('option');
       option.value = group;
       option.textContent = group;
-      
+
       if (group === currentGroup) {
         option.selected = true;
       }
-      
+
       selectElement.appendChild(option);
     });
   }
-  
+
   // Add "Create new group" option
   if (newGroupOption) {
     selectElement.appendChild(newGroupOption);
@@ -3313,24 +3837,34 @@ async function loadCertificates(forceRefresh = false) {
     if (!forceRefresh && state.certificates && state.certificates.length > 0) {
       return state.certificates;
     }
-    
+
     // Show loading state if certificates list exists
     const certListElement = document.getElementById('certificates-list');
     if (certListElement) {
-      certListElement.innerHTML = '<div class="loading-spinner"></div>';
+      const loadingSpinner = UIUtils.showLoadingSpinner(certListElement, "Loading certificates...", "medium");
     }
 
     const response = await fetch('/api/certificates');
+    const data = await response.json();
     
+    if (data.initializing) {
+      // Show a loading message in the UI
+      showLoadingState("Certificate manager is still initializing...");
+      
+      // Try again in a few seconds
+      setTimeout(loadCertificates, 3000);
+      return;
+    }
+
     if (!response.ok) {
       throw new Error(`Failed to load certificates: ${response.status}`);
     }
-    
+
     const certificates = await response.json();
-    
+
     // Store certificates in state
     state.certificates = certificates;
-    
+
     // Extract all unique groups
     const groups = new Set();
     certificates.forEach(cert => {
@@ -3338,14 +3872,23 @@ async function loadCertificates(forceRefresh = false) {
         groups.add(cert.group.trim());
       }
     });
-    
+
     // Store groups in state
     state.certificateGroups = Array.from(groups).sort();
-    
+
+    // Remove the loading spinner if it exists
+    if (certListElement) {
+      // Find and remove the loading spinner
+      const loadingContainer = certListElement.querySelector('.loading-container');
+      if (loadingContainer) {
+        certListElement.removeChild(loadingContainer);
+      }
+    }
+
     return certificates;
   } catch (error) {
     console.error('Error loading certificates:', error);
-    
+
     // Show error in certificates list if it exists
     const certListElement = document.getElementById('certificates-list');
     if (certListElement) {
@@ -3357,9 +3900,20 @@ async function loadCertificates(forceRefresh = false) {
         </div>
       `;
     }
-    
+
     throw error;
   }
+}
+
+function showLoadingState(message) {
+  const container = document.getElementById('certificates-container');
+  container.innerHTML = `
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>${message}</p>
+      <p>You can start using other parts of the application while certificates are loading.</p>
+    </div>
+  `;
 }
 
 /**
@@ -3369,33 +3923,33 @@ async function loadCertificates(forceRefresh = false) {
  * @returns {Object} Result indicating if it exists and where
  */
 function checkDuplicateInCertificate(value, certificate) {
-    if (!value || !certificate) return { exists: false };
-    
-    const domains = certificate.domains || [];
-    const idleDomains = certificate.idleDomains || [];
-    const ips = certificate.ips || [];
-    const idleIps = certificate.idleIps || [];
-    
-    // Normalize value for comparison
-    const normalizedValue = value.trim().toLowerCase();
-    
-    if (domains.some(d => d.toLowerCase() === normalizedValue)) {
-        return { exists: true, where: 'active domains' };
-    }
-    
-    if (idleDomains.some(d => d.toLowerCase() === normalizedValue)) {
-        return { exists: true, where: 'pending domains' };
-    }
-    
-    if (ips.some(ip => ip.toLowerCase() === normalizedValue)) {
-        return { exists: true, where: 'active IPs' };
-    }
-    
-    if (idleIps.some(ip => ip.toLowerCase() === normalizedValue)) {
-        return { exists: true, where: 'pending IPs' };
-    }
-    
-    return { exists: false };
+  if (!value || !certificate) return { exists: false };
+
+  const domains = certificate.domains || [];
+  const idleDomains = certificate.idleDomains || [];
+  const ips = certificate.ips || [];
+  const idleIps = certificate.idleIps || [];
+
+  // Normalize value for comparison
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (domains.some(d => d.toLowerCase() === normalizedValue)) {
+    return { exists: true, where: 'active domains' };
+  }
+
+  if (idleDomains.some(d => d.toLowerCase() === normalizedValue)) {
+    return { exists: true, where: 'pending domains' };
+  }
+
+  if (ips.some(ip => ip.toLowerCase() === normalizedValue)) {
+    return { exists: true, where: 'active IPs' };
+  }
+
+  if (idleIps.some(ip => ip.toLowerCase() === normalizedValue)) {
+    return { exists: true, where: 'pending IPs' };
+  }
+
+  return { exists: false };
 }
 
 /**
@@ -3404,134 +3958,509 @@ function checkDuplicateInCertificate(value, certificate) {
  * @returns {boolean} True if valid, false otherwise
  */
 function validateDomainInput(value) {
-    if (!value) {
-        clearDomainValidationFeedback();
-        return false;
+  if (!value) {
+    clearDomainValidationFeedback();
+    return false;
+  }
+
+  const inputElement = document.getElementById('domain-value');
+  const feedbackElement = document.getElementById('domain-input-feedback');
+
+  // Create feedback element if it doesn't exist
+  if (!feedbackElement && inputElement) {
+    const feedback = document.createElement('div');
+    feedback.id = 'domain-input-feedback';
+    feedback.className = 'input-feedback';
+    inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
+  }
+
+  // Check if the current certificate is loaded
+  const currentCert = getCurrentCertificate();
+
+  // Check for duplicates in the current certificate
+  if (currentCert) {
+    const duplicate = checkDuplicateInCertificate(value, currentCert);
+    if (duplicate.exists) {
+      // Show duplicate warning
+      if (feedbackElement) {
+        feedbackElement.textContent = `Already exists in ${duplicate.where}`;
+        feedbackElement.className = 'input-feedback duplicate-feedback';
+      }
+
+      if (inputElement) {
+        inputElement.classList.remove('is-valid', 'is-invalid');
+        inputElement.classList.add('is-duplicate');
+      }
+
+      return false;
     }
-    
-    const inputElement = document.getElementById('domain-value');
-    const feedbackElement = document.getElementById('domain-input-feedback');
-    
-    // Create feedback element if it doesn't exist
-    if (!feedbackElement && inputElement) {
-        const feedback = document.createElement('div');
-        feedback.id = 'domain-input-feedback';
-        feedback.className = 'input-feedback';
-        inputElement.parentNode.insertBefore(feedback, inputElement.nextSibling);
-    }
-    
-    // Check if the current certificate is loaded
-    const currentCert = getCurrentCertificate();
-    
-    // Check for duplicates in the current certificate
-    if (currentCert) {
-        const duplicate = checkDuplicateInCertificate(value, currentCert);
-        if (duplicate.exists) {
-            // Show duplicate warning
-            if (feedbackElement) {
-                feedbackElement.textContent = `Already exists in ${duplicate.where}`;
-                feedbackElement.className = 'input-feedback duplicate-feedback';
-            }
-            
-            if (inputElement) {
-                inputElement.classList.remove('is-valid', 'is-invalid');
-                inputElement.classList.add('is-duplicate');
-            }
-            
-            return false;
-        }
-    }
-    
-    // Regular validation logic
-    let isValid = false;
-    let type = '';
-    let feedbackMessage = '';
-    let feedbackClass = '';
-    
-    // Special case for localhost
-    if (value.toLowerCase() === 'localhost') {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: localhost';
-        feedbackClass = 'valid-feedback';
-    } 
-    // Check if it's an IPv4 or IPv6 address
-    else if (DomainValidator.isValidIPv4(value)) {
-        isValid = true;
-        type = 'ip';
-        feedbackMessage = 'Valid: IPv4 Address';
-        feedbackClass = 'valid-feedback';
-    }
-    else if (DomainValidator.isValidIPv6(value)) {
-        isValid = true;
-        type = 'ip';
-        feedbackMessage = 'Valid: IPv6 Address';
-        feedbackClass = 'valid-feedback';
-    }
-    // Check if it's a wildcard domain
-    else if (DomainValidator.isValidWildcardDomain(value)) {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: Wildcard Domain';
-        feedbackClass = 'valid-feedback';
-    }
-    // Check if it's a regular domain
-    else if (DomainValidator.isValidDomain(value)) {
-        isValid = true;
-        type = 'domain';
-        feedbackMessage = 'Valid: Domain Name';
-        feedbackClass = 'valid-feedback';
-    }
-    // Invalid input
-    else {
-        isValid = false;
-        feedbackMessage = 'Invalid domain name or IP address format';
-        feedbackClass = 'invalid-feedback';
-    }
-    
-    // Update the feedback element
-    const updatedFeedback = document.getElementById('domain-input-feedback');
-    if (updatedFeedback) {
-        updatedFeedback.textContent = feedbackMessage;
-        updatedFeedback.className = `input-feedback ${feedbackClass}`;
-    }
-    
-    // Update input field styling
-    if (inputElement) {
-        inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
-        inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
-    }
-    
-    return isValid;
+  }
+
+  // Regular validation logic
+  let isValid = false;
+  let type = '';
+  let feedbackMessage = '';
+  let feedbackClass = '';
+
+  // Special case for localhost
+  if (value.toLowerCase() === 'localhost') {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: localhost';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's an IPv4 or IPv6 address
+  else if (DomainValidator.isValidIPv4(value)) {
+    isValid = true;
+    type = 'ip';
+    feedbackMessage = 'Valid: IPv4 Address';
+    feedbackClass = 'valid-feedback';
+  }
+  else if (DomainValidator.isValidIPv6(value)) {
+    isValid = true;
+    type = 'ip';
+    feedbackMessage = 'Valid: IPv6 Address';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's a wildcard domain
+  else if (DomainValidator.isValidWildcardDomain(value)) {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: Wildcard Domain';
+    feedbackClass = 'valid-feedback';
+  }
+  // Check if it's a regular domain
+  else if (DomainValidator.isValidDomain(value)) {
+    isValid = true;
+    type = 'domain';
+    feedbackMessage = 'Valid: Domain Name';
+    feedbackClass = 'valid-feedback';
+  }
+  // Invalid input
+  else {
+    isValid = false;
+    feedbackMessage = 'Invalid domain name or IP address format';
+    feedbackClass = 'invalid-feedback';
+  }
+
+  // Update the feedback element
+  const updatedFeedback = document.getElementById('domain-input-feedback');
+  if (updatedFeedback) {
+    updatedFeedback.textContent = feedbackMessage;
+    updatedFeedback.className = `input-feedback ${feedbackClass}`;
+  }
+
+  // Update input field styling
+  if (inputElement) {
+    inputElement.classList.remove('is-valid', 'is-invalid', 'is-duplicate');
+    inputElement.classList.add(isValid ? 'is-valid' : 'is-invalid');
+  }
+
+  return isValid;
 }
 
 /**
  * Helper function to get the current certificate from state or modal
  */
 function getCurrentCertificate() {
-    if (window.state && window.state.currentCertificate) {
-        return window.state.currentCertificate;
+  if (window.state && window.state.currentCertificate) {
+    return window.state.currentCertificate;
+  }
+
+  // If state isn't available, try to get the fingerprint from the modal
+  const modal = document.getElementById("cert-details-modal");
+  if (modal) {
+    const fingerprint = modal.getAttribute("data-cert-id");
+    if (fingerprint && window.state && window.state.certificates) {
+      return window.state.certificates.find(cert => cert.fingerprint === fingerprint);
     }
-    
-    // If state isn't available, try to get the fingerprint from the modal
-    const modal = document.getElementById("cert-details-modal");
-    if (modal) {
-        const fingerprint = modal.getAttribute("data-cert-id");
-        if (fingerprint && window.state && window.state.certificates) {
-            return window.state.certificates.find(cert => cert.fingerprint === fingerprint);
+  }
+
+  return null;
+}
+
+/**
+ * Delete a CA certificate
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+async function deleteCAcertificate(fingerprint) {
+  Logger.debug(`Attempting to delete CA certificate: ${fingerprint}`);
+
+  try {
+    // First check if this CA has any dependent certificates
+    const checkResponse = await fetch(`/api/ca/${fingerprint}/children`);
+    if (!checkResponse.ok) {
+      throw new Error(`Failed to check CA dependencies: ${checkResponse.status}`);
+    }
+
+    const checkData = await checkResponse.json();
+
+    let confirmMessage = 'Are you sure you want to delete this CA certificate?';
+    if (checkData.children && checkData.children.length > 0) {
+      confirmMessage = `This CA is used to sign ${checkData.children.length} certificate(s). If you delete it, those certificates will not be trusted. Are you sure you want to proceed?`;
+    }
+
+    // Ask for confirmation
+    if (!confirm(confirmMessage)) {
+      return; // User cancelled
+    }
+
+    // Proceed with deletion
+    const response = await fetch(`/api/ca/${fingerprint}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      Logger.error(`Failed to delete CA certificate: ${errorText}`);
+      throw new Error(`Failed to delete CA certificate: ${errorText}`);
+    }
+
+    Logger.info(`CA certificate deleted successfully: ${fingerprint}`);
+
+    // Hide the CA details modal if it's open
+    if (typeof hideCADetailsModal === 'function') {
+      hideCADetailsModal();
+    }
+
+    // Remove the certificate from state
+    if (window.state && window.state.caCertificates) {
+      window.state.caCertificates = window.state.caCertificates.filter(cert =>
+        cert.fingerprint !== fingerprint
+      );
+    }
+
+    // Reload the CA certificates list
+    if (typeof loadCACertificates === 'function') {
+      await loadCACertificates(true); // Force a refresh from server
+    }
+
+    // Regular certificates might be affected by CA deletion, so reload them too
+    await loadCertificates(true);
+
+    // If we're on the CA tab, re-render the list
+    if (document.getElementById('ca-list') && typeof renderCAList === 'function') {
+      renderCAList(window.state.caCertificates);
+    }
+
+    // If we're on the certificates tab, re-render that list too
+    if (document.getElementById('certificates-list')) {
+      renderCertificatesListDetailed(window.state.certificates);
+    }
+
+    UIUtils.showNotification("CA certificate deleted successfully", "success");
+  } catch (error) {
+    Logger.error(`Error deleting CA certificate: ${error.message}`, error);
+    UIUtils.showError(error.message);
+  }
+}
+
+/**
+ * Load certificate version history
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+function loadCertificateHistory(fingerprint) {
+  // Handle case where a full certificate object is passed
+  if (typeof fingerprint === "object" && fingerprint !== null) {
+    fingerprint = fingerprint.fingerprint;
+  }
+
+  // Ensure fingerprint is valid
+  if (!fingerprint) {
+    Logger.error("Cannot load certificate history: missing fingerprint");
+    return;
+  }
+
+  const container = document.getElementById("cert-history-list");
+  const emptyMessage = document.getElementById("empty-history-message");
+
+  if (!container) {
+    return;
+  }
+
+  // Show loading spinner with message
+  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading version history...", "small");
+
+  // Fetch history with proper encoding
+  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+
+  fetch(`/api/certificates/${encodedFingerprint}/history`)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load certificate history: ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      // Remove loading spinner
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+
+      // Handle empty history
+      if (!data.previousVersions || data.previousVersions.length === 0) {
+        if (emptyMessage) {
+          emptyMessage.classList.remove('hidden');
         }
-    }
-    
-    return null;
+        container.innerHTML = '';
+        return;
+      }
+
+      // Hide empty message if we have versions
+      if (emptyMessage) {
+        emptyMessage.classList.add('hidden');
+      }
+
+      // Sort versions by version number (newest first)
+      const versions = data.previousVersions.sort((a, b) => (b.version || 0) - (a.version || 0));
+
+      // Create HTML for each version
+      let html = '<div class="history-list-content">';
+      versions.forEach((version) => {
+        // Format dates
+        const archivedDate = version.archivedAt ? new Date(version.archivedAt).toLocaleString() : 'Unknown';
+        const validFrom = version.validFrom ? new Date(version.validFrom).toLocaleString() : 'Unknown';
+        const validTo = version.validTo ? new Date(version.validTo).toLocaleString() : 'Unknown';
+
+        // Group archived files by type
+        const fileTypes = {};
+        if (version.archivedFiles && Array.isArray(version.archivedFiles)) {
+          version.archivedFiles.forEach(file => {
+            if (file.type) {
+              fileTypes[file.type] = true;
+            }
+          });
+        }
+
+        // Create file type badges
+        const fileTypeBadges = Object.keys(fileTypes).map(type =>
+          `<span class="file-type-badge" data-type="${type}">${type}</span>`
+        ).join('');
+
+        html += `
+          <div class="history-item" data-fingerprint="${version.fingerprint}">
+            <div class="history-item-header">
+              <div class="history-item-title">
+                <span class="version-badge">v${version.version || '?'}</span>
+                <span class="version-fingerprint" title="${version.fingerprint}">${version.fingerprint ? version.fingerprint.substring(0, 8) + '...' : 'Unknown'}</span>
+              </div>
+              <div class="history-item-actions">
+                <button class="button small download-version-btn" data-fingerprint="${version.fingerprint}">
+                  <i class="fas fa-download"></i> Download
+                </button>
+              </div>
+            </div>
+            <div class="history-item-details">
+              <div class="history-item-detail">
+                <span class="detail-label">Archived:</span>
+                <span class="detail-value">${archivedDate}</span>
+              </div>
+              <div class="history-item-detail">
+                <span class="detail-label">Valid period:</span>
+                <span class="detail-value">${validFrom} to ${validTo}</span>
+              </div>
+              <div class="history-item-detail">
+                <span class="detail-label">Files:</span>
+                <span class="detail-value file-types-list">${fileTypeBadges || 'None'}</span>
+              </div>
+              <div class="history-item-files hidden">
+                <div class="file-list-loader">
+                  <div class="loading-spinner mini"></div>
+                  <span>Loading files...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+
+      // Update the container
+      container.innerHTML = html;
+
+      // Add event listeners to download buttons
+      document.querySelectorAll('.download-version-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const versionFingerprint = btn.getAttribute('data-fingerprint');
+          downloadCertificateVersion(fingerprint, versionFingerprint);
+        });
+      });
+
+      // Add event listeners to expand/collapse version details
+      document.querySelectorAll('.history-item-header').forEach((header) => {
+        header.addEventListener('click', (event) => {
+          // Skip if clicking on the download button
+          if (event.target.closest('.download-version-btn')) {
+            return;
+          }
+
+          const historyItem = header.closest('.history-item');
+          const filesSection = historyItem.querySelector('.history-item-files');
+
+          // Toggle files section
+          if (filesSection.classList.contains('hidden')) {
+            // Load file details if needed
+            if (filesSection.querySelector('.file-list-loader')) {
+              // Get the version fingerprint
+              const versionFingerprint = historyItem.getAttribute('data-fingerprint');
+
+              // Show available files
+              loadVersionFiles(fingerprint, versionFingerprint, filesSection);
+            }
+
+            filesSection.classList.remove('hidden');
+          } else {
+            filesSection.classList.add('hidden');
+          }
+        });
+      });
+    })
+    .catch((error) => {
+      Logger.error('Error loading certificate history:', error);
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+      container.innerHTML = `
+        <div class="error-state">
+          <p>Failed to load certificate history: ${error.message}</p>
+          <button class="button small retry-btn">Retry</button>
+        </div>
+      `;
+
+      // Add retry button handler
+      container.querySelector('.retry-btn')?.addEventListener('click', () => {
+        loadCertificateHistory(fingerprint);
+      });
+    });
+}
+
+/**
+ * Load files for a specific version
+ * @param {string} certFingerprint - Certificate fingerprint
+ * @param {string} versionFingerprint - Version fingerprint
+ * @param {HTMLElement} container - Container to render files in
+ */
+function loadVersionFiles(certFingerprint, versionFingerprint, container) {
+  // Handle case where a certificate object is passed
+  if (typeof certFingerprint === "object" && certFingerprint !== null) {
+    certFingerprint = certFingerprint.fingerprint;
+  }
+
+  // Skip if no container or fingerprints
+  if (!container || !certFingerprint || !versionFingerprint) {
+    return;
+  }
+
+  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
+  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
+
+  // Show available files based on version data (from the history API)
+  const historyItem = container.closest('.history-item');
+  if (!historyItem) return;
+
+  const fileTypes = Array.from(historyItem.querySelectorAll('.file-type-badge'))
+    .map(badge => badge.getAttribute('data-type'))
+    .filter(Boolean);
+
+  // Create file list HTML
+  let filesHtml = '<div class="archived-files-list">';
+
+  if (fileTypes.length === 0) {
+    filesHtml += '<div class="no-files-message">No archived files available</div>';
+  } else {
+    filesHtml += '<div class="file-grid">';
+    fileTypes.forEach(fileType => {
+      filesHtml += `
+        <div class="file-item">
+          <div class="file-icon"><i class="fas fa-file-certificate"></i></div>
+          <div class="file-info">
+            <div class="file-name">${fileType}</div>
+          </div>
+          <button class="file-action-btn" data-file-type="${fileType}">
+            <i class="fas fa-download"></i>
+          </button>
+        </div>
+      `;
+    });
+    filesHtml += '</div>';
+
+    // Add download all button
+    filesHtml += `
+      <div class="download-all-section">
+        <button class="button small download-all-btn">
+          <i class="fas fa-download"></i> Download All Files
+        </button>
+      </div>
+    `;
+  }
+
+  filesHtml += '</div>';
+
+  // Update container
+  container.innerHTML = filesHtml;
+
+  // Add event listeners to file download buttons
+  container.querySelectorAll('.file-action-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fileType = btn.getAttribute('data-file-type');
+      if (fileType) {
+        downloadVersionFile(certFingerprint, versionFingerprint, fileType);
+      }
+    });
+  });
+
+  // Add event listener to download all button
+  container.querySelector('.download-all-btn')?.addEventListener('click', () => {
+    downloadCertificateVersion(certFingerprint, versionFingerprint);
+  });
+}
+
+/**
+ * Download a specific version file
+ * @param {string} certFingerprint - Certificate fingerprint
+ * @param {string} versionFingerprint - Version fingerprint
+ * @param {string} fileType - File type to download
+ */
+function downloadVersionFile(certFingerprint, versionFingerprint, fileType) {
+  // Encode fingerprints for API use
+  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
+  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
+
+  // Create URL for file download
+  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/files/${fileType}`;
+
+  // Create and trigger download link
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = ''; // Browser will use the server's suggested filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Download a complete version archive
+ * @param {string} certFingerprint - Certificate fingerprint
+ * @param {string} versionFingerprint - Version fingerprint
+ */
+function downloadCertificateVersion(certFingerprint, versionFingerprint) {
+  // Encode fingerprints for API use
+  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
+  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
+
+  // Create URL for archive download
+  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/download`;
+
+  // Create and trigger download link
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = ''; // Browser will use the server's suggested filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 // Export functions for global scope
 window.confirmDeleteCertificate = confirmDeleteCertificate;
 window.deleteCertificate = deleteCertificate;
-window.filterCertificates = filterCertificates;
 window.renderCertificatesListDetailed = renderCertificatesListDetailed;
-window.renewCertificate = renewCertificate;
+window.startCertificateRenewal = startCertificateRenewal;
 window.showCreateCertificateModal = showCreateCertificateModal;
 window.showCreateCAModal = showCreateCAModal;
 window.showCertificateDetails = showCertificateDetails;
-window.setupCertificateActions = setupCertificateActions;

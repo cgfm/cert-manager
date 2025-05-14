@@ -418,10 +418,10 @@ function renderFileList(items) {
       "&mdash;";
     
     tableHtml += `
-      <tr class="file-item ${item.isDirectory ? 'directory' : 'file'}" 
-          data-path="${escapeHtml(item.path)}" 
+      <tr class="file-browser-file-item ${item.isDirectory ? 'directory' : 'file'}" 
+          data-path="${UIUtils.escapeHTML(item.path)}" 
           data-is-dir="${item.isDirectory}">
-        <td>${icon} ${escapeHtml(item.name)}</td>
+        <td>${icon} ${UIUtils.escapeHTML(item.name)}</td>
         <td>${type}</td>
         <td>${size}</td>
         <td>${modified}</td>
@@ -437,7 +437,7 @@ function renderFileList(items) {
   container.innerHTML = tableHtml;
 
   // Add event listeners
-  document.querySelectorAll(".file-item").forEach((item) => {
+  document.querySelectorAll(".file-browser-file-item").forEach((item) => {
     // Single click handler
     item.addEventListener("click", function() {
       const path = this.getAttribute("data-path");
@@ -460,20 +460,6 @@ function renderFileList(items) {
       handleItemDoubleClick(this);
     });
   });
-}
-
-/**
- * Helper function to escape HTML special characters
- * @param {string} unsafe - Unsafe string
- * @returns {string} Safe HTML string
- */
-function escapeHtml(unsafe) {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 /**
@@ -588,7 +574,7 @@ function selectPath(path) {
   fileBrowserState.selectedPath = path;
   
   // Update UI selection state
-  document.querySelectorAll('.file-item').forEach(item => {
+  document.querySelectorAll('.file-browser-file-item').forEach(item => {
     item.classList.remove('selected');
     if (item.getAttribute('data-path') === path) {
       item.classList.add('selected');
@@ -640,7 +626,7 @@ function setupFileBrowserUI(directoryMode) {
   }
   
   // Show/hide filename input based on mode
-  const filenameInput = document.querySelector(".file-name-input");
+  const filenameInput = document.querySelector(".file-browser-file-name-input");
   if (filenameInput) {
     filenameInput.style.display = directoryMode ? "none" : "flex";
   }
@@ -851,7 +837,7 @@ function createFileBrowserModal() {
             <div class="loading">Loading...</div>
           </div>
           <div class="file-browser-footer">
-            <div class="file-name-input">
+            <div class="file-browser-file-name-input">
               <label for="file-browser-filename">Filename:</label>
               <input type="text" id="file-browser-filename">
             </div>
@@ -1109,14 +1095,14 @@ function updateUIState(currentPath) {
       // Enable select button if we have a filename or selected path
       const hasFilename = filenameField.value && filenameField.value.trim() !== '';
       const hasSelectedPath = fileBrowserState.selectedPath && 
-                              !document.querySelector(`.file-item[data-path="${fileBrowserState.selectedPath}"][data-is-dir="true"]`);
+                              !document.querySelector(`.file-browser-file-item[data-path="${fileBrowserState.selectedPath}"][data-is-dir="true"]`);
       
       selectButton.disabled = !(hasFilename || hasSelectedPath);
     }
     
     // Only update filename when a file is explicitly selected
     if (filenameField && fileBrowserState.selectedPath) {
-      const selectedItem = document.querySelector(`.file-item[data-path="${fileBrowserState.selectedPath}"]`);
+      const selectedItem = document.querySelector(`.file-browser-file-item[data-path="${fileBrowserState.selectedPath}"]`);
       if (selectedItem && selectedItem.getAttribute("data-is-dir") !== "true") {
         const separator = fileBrowserState.selectedPath.includes('\\') ? '\\' : '/';
         const pathParts = fileBrowserState.selectedPath.split(separator);

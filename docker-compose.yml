@@ -17,5 +17,10 @@ services:
       - CERT_MANAGER_CERT_PATH=/certs
       - VSCODE_DISABLE_CACHE=true
       - DOCKER_HOST_OS=windows
+      #- DISABLE_AUTH=true
+      #- DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-}
     restart: unless-stopped
+    dns:
+      - 192.168.178.252
+      - 192.168.178.251
     #user: "${UID:-1000}:${GID:-1000}"

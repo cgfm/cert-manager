@@ -7,13 +7,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../../services/logger');
 
-// Fix the middleware import path - use try/catch to make it optional
-let authMiddleware = { isAuthenticated: (req, res, next) => next() };
-try {
-  authMiddleware = require('../middleware/auth');
-} catch (error) {
-  logger.warn('Auth middleware not found, proceeding without authentication');
-}
+const FILENAME = 'api/routes/docker.js';
 
 /**
  * Docker router factory
@@ -25,7 +19,7 @@ function dockerRouter(deps) {
   const { dockerService } = deps;
   
   if (!dockerService) {
-    logger.error('Docker service not provided to docker routes');
+    logger.error('Docker service not provided to docker routes', null, FILENAME);
     return router; // Return empty router
   }
   
@@ -34,7 +28,7 @@ function dockerRouter(deps) {
    * @description Get list of available Docker containers
    * @access Private
    */
-  router.get('/containers', authMiddleware.isAuthenticated, async (req, res) => {
+  router.get('/containers', async (req, res) => {
     try {
       // Check if Docker is available
       if (!dockerService.isAvailable) {
@@ -64,7 +58,7 @@ function dockerRouter(deps) {
         containers: containerList
       });
     } catch (error) {
-      logger.error('Error fetching Docker containers:', error);
+      logger.error('Error fetching Docker containers:', error, FILENAME);
       res.status(500).json({ 
         error: `Failed to fetch Docker containers: ${error.message}`,
         dockerAvailable: dockerService.isAvailable
@@ -77,7 +71,7 @@ function dockerRouter(deps) {
    * @description Restart a Docker container
    * @access Private
    */
-  router.post('/containers/:id/restart', authMiddleware.isAuthenticated, async (req, res) => {
+  router.post('/containers/:id/restart', async (req, res) => {
     const containerId = req.params.id;
     
     try {
@@ -88,7 +82,7 @@ function dockerRouter(deps) {
       await dockerService.restartContainer(containerId);
       res.json({ success: true, message: `Container ${containerId} restarted successfully` });
     } catch (error) {
-      logger.error(`Error restarting Docker container ${containerId}:`, error);
+      logger.error(`Error restarting Docker container ${containerId}:`, error, FILENAME);
       res.status(500).json({ error: `Failed to restart container: ${error.message}` });
     }
   });

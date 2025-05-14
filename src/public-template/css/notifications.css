@@ -1,24 +1,28 @@
-#notifications-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1070;
-    width: 300px;
-    max-width: calc(100vw - 40px);
-}
 
-.notification {
-    margin-bottom: 10px;
-    padding: 15px;
-    border-radius: 5px;
-    background-color: var(--card-bg);
-    box-shadow: var(--box-shadow);
+/* Notification Styles */
+#notification-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9999;
+  }
+  
+  .notification {
+    min-width: 250px;
+    max-width: 350px;
+    padding: 12px 15px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    animation: slideIn 0.3s ease;
-    transition: background-color var(--transition-speed);
-}
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slidein 0.3s ease;
+    background-color: var(--background-color);
+    border-left: 5px solid var(--primary-color);
+  }
 
 .notification.success {
     border-left: 4px solid var(--success-color);
@@ -63,6 +67,11 @@
     transition: color var(--transition-speed);
 }
 
+.notification.removing {
+  animation: slideout 0.3s ease forwards;
+}
+
+
 .notification-close:hover {
     color: var(--danger-color);
 }
@@ -83,28 +92,24 @@
     color: var(--info-color);
 }
 
-@keyframes slideIn {
+@keyframes slidein {
     from {
-        opacity: 0;
-        transform: translateX(30px);
+      transform: translateX(100%);
+      opacity: 0;
     }
     to {
-        opacity: 1;
-        transform: translateX(0);
+      transform: translateX(0);
+      opacity: 1;
     }
-}
-
-@keyframes slideOut {
+  }
+  
+  @keyframes slideout {
     from {
-        opacity: 1;
-        transform: translateX(0);
+      transform: translateX(0);
+      opacity: 1;
     }
     to {
-        opacity: 0;
-        transform: translateX(30px);
+      transform: translateX(100%);
+      opacity: 0;
     }
-}
-
-.notification.removing {
-    animation: slideOut 0.3s ease forwards;
-}
+  }

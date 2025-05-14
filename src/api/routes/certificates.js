@@ -10,7 +10,7 @@
  * @requires ../../services/OpenSSLWrapper
  * @requires ../../services/CertificateManager
  * @requires ../../services/PassphraseManager
- * @version 0.0.2
+ * @version 0.0.3
  * @author Christian Meiners
  * @license MIT
  * @description This module provides an Express router for managing certificates.
@@ -39,6 +39,15 @@ function initCertificatesRouter(deps) {
   // Get all certificates
   router.get('/', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       // Check if this is a refresh request from the frontend
       const force = req.query.force === 'true';
       logger.debug(`Force refresh: ${force}`, null, FILENAME);
@@ -77,7 +86,7 @@ function initCertificatesRouter(deps) {
       const Certificate = require('../../models/Certificate');
       const cert = new Certificate({
         name,
-        san: {
+        sans: {
           domains,
           ips: ips || []
         },
@@ -103,10 +112,11 @@ function initCertificatesRouter(deps) {
       }
 
       // Create the certificate
-      const result = await cert.createOrRenew(openSSL, {
-        certsDir: certificateManager.certsDir,
+      const result = await certificateManager.createOrRenewCertificate(null, {
+        certificate: cert,
         signingCA,
-        passphrase
+        passphrase,
+        days: req.body.days || 365
       });
 
       // Store passphrase if requested
@@ -129,6 +139,15 @@ function initCertificatesRouter(deps) {
   // Get certificate by fingerprint
   router.get('/:fingerprint', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       // Use getCertificate which handles cache efficiently
       const cert = deps.certificateManager.getCertificate(req.params.fingerprint);
       if (!cert) {
@@ -146,6 +165,15 @@ function initCertificatesRouter(deps) {
   // Update certificate
   router.put('/:fingerprint', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const { autoRenew, renewDaysBeforeExpiry, signWithCA, caFingerprint, deployActions } = req.body;
 
@@ -178,6 +206,15 @@ function initCertificatesRouter(deps) {
   // Update certificate metadata (PATCH)
   router.patch('/:fingerprint', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const { name, description, group, tags, metadata } = req.body;
 
@@ -266,6 +303,15 @@ function initCertificatesRouter(deps) {
   // Delete certificate
   router.delete('/:fingerprint', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       const result = await certificateManager.deleteCertificate(fingerprint);
@@ -284,6 +330,15 @@ function initCertificatesRouter(deps) {
   // Get all backups for a certificate
   router.get('/:fingerprint/backups', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -319,6 +374,15 @@ function initCertificatesRouter(deps) {
   // Create a backup of a certificate
   router.post('/:fingerprint/backups', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -354,6 +418,15 @@ function initCertificatesRouter(deps) {
   // Delete a backup
   router.delete('/:fingerprint/backups/:backupId', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, backupId } = req.params;
 
       // Get certificate
@@ -383,6 +456,15 @@ function initCertificatesRouter(deps) {
   // Download a backup
   router.get('/:fingerprint/backups/:backupId/download', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, backupId } = req.params;
 
       // Get certificate
@@ -429,6 +511,15 @@ function initCertificatesRouter(deps) {
   // Restore a backup
   router.post('/:fingerprint/backups/:backupId/restore', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, backupId } = req.params;
 
       // Get certificate
@@ -458,6 +549,15 @@ function initCertificatesRouter(deps) {
   // Convert certificate to different format
   router.post('/:fingerprint/convert', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const { format, password } = req.body;
 
@@ -498,58 +598,46 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Create a certificate object structure compatible with the OpenSSLWrapper
-      // FIXED: Use consistent path keys from certificate paths property
-      const paths = certificate.paths || {};
-      const certObj = {
-        paths: {
-          crtPath: paths.crtPath,
-          cerPath: paths.cerPath,
-          keyPath: paths.keyPath,
-          csrPath: paths.csrPath,
-          pemPath: paths.pemPath,
-          p12Path: paths.p12Path,
-          pfxPath: paths.pfxPath,
-          derPath: paths.derPath,
-          p7bPath: paths.p7bPath,
-          chainPath: paths.chainPath,
-          fullchainPath: paths.fullchainPath,
-          extPath: paths.extPath
-        }
-      };
-
-      // Use OpenSSLWrapper to convert certificate with enhanced method
+      // Use new Certificate structure - without Path suffixes
+      const paths = certificate._paths || {};
+      
+      // Use OpenSSLWrapper to convert certificate
       let result;
-      try {
-        result = await deps.openSSL.convertCertificate(certObj, format, { password });
-      } catch (error) {
-        logger.error(`Error converting certificate to ${format}:`, error, FILENAME);
-        return res.status(500).json({
-          success: false,
-          message: `Failed to convert certificate: ${error.message}`,
-          statusCode: 500
-        });
+      
+      switch(format) {
+        case 'p12':
+        case 'pfx':
+          result = await deps.openSSL.convertToP12(certificate, {
+            passphrase: password,
+            outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.${format}`)
+          });
+          break;
+          
+        case 'pem':
+          result = await deps.openSSL.convertToPEM(certificate, {
+            outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.pem`)
+          });
+          break;
+          
+        default:
+          result = await deps.openSSL.convertCertificate(certificate, format, { 
+            password,
+            outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.${format}`)
+          });
       }
 
-      // Update certificate with new file paths using Certificate.addPath method
+      // Update certificate with new file paths
       if (result.outputPath || result.p12Path || result.pemPath) {
         // Get the output path from any of the possible properties
         const outputPath = result.outputPath || result.p12Path || result.pemPath;
 
-        // Create property name based on format
-        const pathKey = format;
+        // Update paths in the certificate using the proper method
+        certificate.addPath(format, outputPath);
 
-        // Add the new path using the Certificate's addPath method
-        const pathAdded = certificate.addPath(pathKey, outputPath);
-
-        if (pathAdded) {
-          logger.info(`Added ${format} path to certificate ${certificate.name}: ${outputPath}`, null, FILENAME);
-
-          // Save certificate config to persist the new path
-          await deps.certificateManager.saveCertificateConfigs();
-        } else {
-          logger.warn(`Failed to add ${format} path to certificate ${certificate.name}: ${outputPath} (file may not exist)`, null, FILENAME);
-        }
+        // Save certificate config to persist the new path
+        await deps.certificateManager.saveCertificateConfigs();
+        
+        logger.info(`Added ${format} path to certificate ${certificate.name}: ${outputPath}`, null, FILENAME);
       }
 
       res.json({
@@ -579,6 +667,15 @@ function initCertificatesRouter(deps) {
   // Add direct deploy endpoint
   router.post('/:fingerprint/deploy', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -608,6 +705,15 @@ function initCertificatesRouter(deps) {
   // Download specific certificate file
   router.get('/:fingerprint/download/:fileType', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, fileType } = req.params;
 
       // Get certificate
@@ -619,32 +725,8 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Map fileType to path property based on Certificate class properties
-      const fileTypeMap = {
-        crt: 'crtPath',
-        key: 'keyPath',
-        chain: 'chainPath',
-        fullchain: 'fullchainPath',
-        p12: 'p12Path',
-        pfx: 'pfxPath',
-        pem: 'pemPath',
-        p7b: 'p7bPath',
-        csr: 'csrPath',
-        cer: 'cerPath',
-        der: 'derPath',
-        ext: 'extPath'
-      };
-
-      const pathKey = fileTypeMap[fileType];
-      if (!pathKey) {
-        return res.status(400).json({
-          message: `Invalid file type: ${fileType}`,
-          statusCode: 400
-        });
-      }
-
-      // Get the file path from the certificate
-      const filePath = certificate.getPath(pathKey.replace('Path', ''));
+      // Get the file path from certificate using new getPath method
+      const filePath = certificate._paths?.[fileType];
 
       if (!filePath) {
         return res.status(404).json({
@@ -719,6 +801,15 @@ function initCertificatesRouter(deps) {
   // Download all certificate files as a ZIP archive
   router.get('/:fingerprint/download', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const archiver = require('archiver');
 
@@ -731,23 +822,23 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Use certificate.paths consistently and with proper path keys
-      const paths = certificate.paths || {};
+      // Use certificate._paths directly to avoid Path suffix issues
+      const paths = certificate._paths || {};
 
       // Create file paths map (only existing files)
       const filesToAdd = [
-        { key: 'crtPath', name: 'certificate.crt' },
-        { key: 'keyPath', name: 'private.key' },
-        { key: 'pemPath', name: 'certificate.pem' },
-        { key: 'p12Path', name: 'certificate.p12' },
-        { key: 'pfxPath', name: 'certificate.pfx' },
-        { key: 'csrPath', name: 'certificate.csr' },
-        { key: 'chainPath', name: 'chain.pem' },
-        { key: 'fullchainPath', name: 'fullchain.pem' },
-        { key: 'derPath', name: 'certificate.der' },
-        { key: 'p7bPath', name: 'certificate.p7b' },
-        { key: 'cerPath', name: 'certificate.cer' },
-        { key: 'extPath', name: 'certificate.ext' }
+        { key: 'crt', name: 'certificate.crt' },
+        { key: 'key', name: 'private.key' },
+        { key: 'pem', name: 'certificate.pem' },
+        { key: 'p12', name: 'certificate.p12' },
+        { key: 'pfx', name: 'certificate.pfx' },
+        { key: 'csr', name: 'certificate.csr' },
+        { key: 'chain', name: 'chain.pem' },
+        { key: 'fullchain', name: 'fullchain.pem' },
+        { key: 'der', name: 'certificate.der' },
+        { key: 'p7b', name: 'certificate.p7b' },
+        { key: 'cer', name: 'certificate.cer' },
+        { key: 'ext', name: 'certificate.ext' }
       ].filter(item => paths[item.key] && fs.existsSync(paths[item.key]));
 
       if (filesToAdd.length === 0) {
@@ -782,11 +873,11 @@ function initCertificatesRouter(deps) {
       const metadata = {
         name: certificate.name,
         fingerprint: certificate.fingerprint,
-        domains: certificate.domains,
+        domains: certificate._sans?.domains || [],
+        ips: certificate._sans?.ips || [],
         issuer: certificate.issuer,
         validFrom: certificate.validFrom,
         validTo: certificate.validTo,
-        createdAt: certificate.createdAt,
         exportedAt: new Date()
       };
 
@@ -809,6 +900,15 @@ function initCertificatesRouter(deps) {
   // Get all available files for a certificate
   router.get('/:fingerprint/files', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -820,9 +920,11 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Get paths from certificate and verify they exist
+      // Verify paths exist before checking them
       certificate.verifyPaths();
-      const paths = certificate.paths || {};
+      
+      // Use direct _paths property without Path suffixes
+      const paths = certificate._paths || {};
 
       // Check which files actually exist
       const availableFiles = [];
@@ -830,12 +932,9 @@ function initCertificatesRouter(deps) {
       // Check each path and add to available files if it exists
       Object.entries(paths).forEach(([key, filePath]) => {
         try {
-          // Skip path suffix
-          const fileType = key.replace(/Path$/, '');
-
           if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
             availableFiles.push({
-              type: fileType,
+              type: key,
               path: filePath,
               size: fs.statSync(filePath).size
             });
@@ -858,6 +957,15 @@ function initCertificatesRouter(deps) {
   // Get certificate previous versions
   router.get('/:fingerprint/history', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -892,6 +1000,15 @@ function initCertificatesRouter(deps) {
   // Download a previous version file
   router.get('/:fingerprint/history/:previousFingerprint/files/:fileType', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, previousFingerprint, fileType } = req.params;
 
       // Get certificate
@@ -970,6 +1087,15 @@ function initCertificatesRouter(deps) {
   // Download all files from a previous version as zip
   router.get('/:fingerprint/history/:previousFingerprint/download', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, previousFingerprint } = req.params;
       const archiver = require('archiver');
 
@@ -1065,6 +1191,15 @@ function initCertificatesRouter(deps) {
   // Renew certificate
   router.post('/:fingerprint/renew', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const {
         days,
@@ -1085,13 +1220,6 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Get passphrase if needed
-      let certPassphrase = passphrase;
-      if (!certPassphrase && deps.passphraseManager &&
-        certificate.hasStoredPassphrase(deps.passphraseManager)) {
-        certPassphrase = certificate.getPassphrase(deps.passphraseManager);
-      }
-
       // Determine if we need to sign with CA and get the signing CA
       let signingCA = null;
       if (certificate.signWithCA && certificate.caFingerprint) {
@@ -1099,12 +1227,45 @@ function initCertificatesRouter(deps) {
 
         if (!signingCA) {
           logger.warn(`Signing CA not found: ${certificate.caFingerprint}`, null, FILENAME);
-        } else if (!signingCA.isCA()) {
+          return res.status(400).json({
+            success: false,
+            message: `Signing CA not found: ${certificate.caFingerprint}`
+          });
+        } else if (!signingCA.isCA) {
           logger.warn(`Certificate is not a CA, cannot use for signing: ${signingCA.name}`, null, FILENAME);
-          signingCA = null;
+          return res.status(400).json({
+            success: false,
+            message: `Certificate ${signingCA.name} is not a CA and cannot be used for signing`
+          });
         } else {
           logger.debug(`Using CA for renewal: ${signingCA.name}`, null, FILENAME);
+          
+          // Check CA passphrase if needed
+          if (signingCA.needsPassphrase && !signingCAPassphrase && 
+              !deps.passphraseManager?.hasPassphrase(signingCA.fingerprint)) {
+            logger.warn(`CA certificate requires passphrase but none provided: ${signingCA.name}`, null, FILENAME);
+            return res.status(400).json({
+              success: false,
+              message: `CA certificate ${signingCA.name} requires a passphrase`
+            });
+          }
         }
+      }
+
+      // Get passphrase for certificate if needed
+      let certPassphrase = passphrase;
+      if (!certPassphrase && deps.passphraseManager &&
+        certificate.hasStoredPassphrase(deps.passphraseManager)) {
+        certPassphrase = certificate.getPassphrase(deps.passphraseManager);
+      }
+
+      // Check if certificate needs passphrase
+      if (certificate.needsPassphrase && !certPassphrase) {
+        logger.warn(`Certificate requires passphrase but none provided: ${certificate.name}`, null, FILENAME);
+        return res.status(400).json({
+          success: false,
+          message: `Certificate ${certificate.name} requires a passphrase`
+        });
       }
 
       // Store passphrases if requested
@@ -1123,17 +1284,16 @@ function initCertificatesRouter(deps) {
       }
 
       // Renew the certificate with appropriate passphrases
-      const result = await certificate.createOrRenew(deps.openSSL, {
+      const result = await deps.certificateManager.createOrRenewCertificate(fingerprint, {
         days: days || 365,
         passphrase: certPassphrase,
         signingCA,
-        signingCAPassphrase, // Pass the signing CA passphrase
-        certificateManager: deps.certificateManager
+        signingCAPassphrase
       });
 
       if (result.success) {
         // Save the updated certificate
-        await deps.certificateManager.saveCertificates();
+        await deps.certificateManager.saveCertificateConfigs();
 
         // Return success with the API response that includes CA name
         res.json({
@@ -1142,13 +1302,13 @@ function initCertificatesRouter(deps) {
           certificate: await deps.certificateManager.getCertificateApiResponse(certificate.fingerprint)
         });
       } else {
-        throw new Error('Certificate renewal failed');
+        throw new Error(result.error || 'Certificate renewal failed');
       }
     } catch (error) {
       logger.error(`Error renewing certificate ${req.params.fingerprint}:`, error, FILENAME);
       res.status(500).json({
         success: false,
-        message: 'Failed to renew certificate',
+        message: `Failed to renew certificate: ${error.message}`,
         error: error.message
       });
     }
@@ -1157,6 +1317,15 @@ function initCertificatesRouter(deps) {
   // Verify key match
   router.get('/:fingerprint/verify-key-match', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get the certificate
@@ -1165,7 +1334,18 @@ function initCertificatesRouter(deps) {
         return res.status(404).json({ message: 'Certificate not found', statusCode: 404 });
       }
 
-      const matches = await cert.verifyKeyMatch(openSSL);
+      // Get the key and certificate paths
+      const certPath = cert._paths?.crt;
+      const keyPath = cert._paths?.key;
+
+      if (!certPath || !keyPath) {
+        return res.status(400).json({ 
+          message: 'Certificate is missing required files', 
+          statusCode: 400 
+        });
+      }
+
+      const matches = await openSSL.verifyCertificateKeyPair(certPath, keyPath);
 
       res.json({ matches });
     } catch (error) {
@@ -1177,6 +1357,15 @@ function initCertificatesRouter(deps) {
   // Check if certificate has passphrase
   router.get('/:fingerprint/passphrase', (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       const hasPassphrase = certificateManager.hasPassphrase(fingerprint);
@@ -1191,6 +1380,15 @@ function initCertificatesRouter(deps) {
   // Store certificate passphrase
   router.post('/:fingerprint/passphrase', (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const { passphrase } = req.body;
 
@@ -1214,6 +1412,15 @@ function initCertificatesRouter(deps) {
   // Delete certificate passphrase
   router.delete('/:fingerprint/passphrase', (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       const success = certificateManager.deletePassphrase(fingerprint);
@@ -1232,6 +1439,15 @@ function initCertificatesRouter(deps) {
   // Get all certificate groups
   router.get('/groups', (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const groups = new Set();
 
       // Extract all groups from certificates
@@ -1260,6 +1476,15 @@ function initCertificatesRouter(deps) {
   // Get certificate SAN entries
   router.get('/:fingerprint/san', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get the certificate
@@ -1271,13 +1496,19 @@ function initCertificatesRouter(deps) {
         });
       }
 
+      // Get SAN entries from the new sans structure
+      const domains = cert._sans?.domains || [];
+      const idleDomains = cert._sans?.idleDomains || [];
+      const ips = cert._sans?.ips || [];
+      const idleIps = cert._sans?.idleIps || [];
+
       // Return all SAN entries
       res.json({
-        domains: cert.domains,
-        idleDomains: cert.idleDomains,
-        ips: cert.ips,
-        idleIps: cert.idleIps,
-        needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        domains,
+        idleDomains,
+        ips,
+        idleIps,
+        needsRenewal: idleDomains.length > 0 || idleIps.length > 0
       });
     } catch (error) {
       logger.error(`Error getting SAN entries for certificate ${req.params.fingerprint}:`, error, FILENAME);
@@ -1291,6 +1522,15 @@ function initCertificatesRouter(deps) {
   // Add a new domain or IP to certificate
   router.post('/:fingerprint/san', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
       const { value, type = 'auto', idle = true } = req.body;
 
@@ -1339,20 +1579,26 @@ function initCertificatesRouter(deps) {
       }
 
       let added = false;
+      let result = null;
 
-      // Add domain or IP based on type
+      // Add domain or IP directly to certificate using the certificate's methods
       if (subjectType === 'ip') {
-        added = await deps.certificateManager.addIp(fingerprint, value, idle);
+        result = cert.addIp(value, idle);
       } else {
-        added = await deps.certificateManager.addDomain(fingerprint, value, idle);
+        result = cert.addDomain(value, idle);
       }
+      
+      added = result.success;
 
       if (!added) {
         return res.status(400).json({
-          message: `Failed to add ${subjectType}: ${value}. It may already exist.`,
+          message: `Failed to add ${subjectType}: ${value}. ${result.message}`,
           statusCode: 400
         });
       }
+
+      // Save certificate changes
+      await deps.certificateManager.saveCertificateConfigs();
 
       // Log activity
       try {
@@ -1386,11 +1632,11 @@ function initCertificatesRouter(deps) {
       // Return updated SAN entries
       res.status(201).json({
         message: `${subjectType === 'ip' ? 'IP address' : 'Domain'} added successfully${idle ? ' (idle until renewal)' : ''}`,
-        domains: cert.domains,
-        idleDomains: cert.idleDomains,
-        ips: cert.ips,
-        idleIps: cert.idleIps,
-        needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        domains: cert._sans?.domains || [],
+        idleDomains: cert._sans?.idleDomains || [],
+        ips: cert._sans?.ips || [],
+        idleIps: cert._sans?.idleIps || [],
+        needsRenewal: (cert._sans?.idleDomains?.length > 0) || (cert._sans?.idleIps?.length > 0)
       });
     } catch (error) {
       logger.error(`Error adding SAN entry to certificate ${req.params.fingerprint}:`, error, FILENAME);
@@ -1404,6 +1650,15 @@ function initCertificatesRouter(deps) {
   // Remove a domain or IP from certificate
   router.delete('/:fingerprint/san/:type/:value', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint, type, value } = req.params;
       const fromIdle = req.query.idle === 'true';
 
@@ -1418,11 +1673,11 @@ function initCertificatesRouter(deps) {
 
       let removed = false;
 
-      // Remove domain or IP based on type
+      // Remove domain or IP directly using certificate methods
       if (type === 'ip') {
-        removed = await deps.certificateManager.removeIp(fingerprint, value, fromIdle);
+        removed = cert.removeIp(value, fromIdle);
       } else if (type === 'domain') {
-        removed = await deps.certificateManager.removeDomain(fingerprint, value, fromIdle);
+        removed = cert.removeDomain(value, fromIdle);
       } else {
         return res.status(400).json({
           message: `Invalid SAN type: ${type}. Must be 'domain' or 'ip'.`,
@@ -1436,6 +1691,9 @@ function initCertificatesRouter(deps) {
           statusCode: 404
         });
       }
+
+      // Save certificate changes
+      await deps.certificateManager.saveCertificateConfigs();
 
       // Log activity
       try {
@@ -1469,11 +1727,11 @@ function initCertificatesRouter(deps) {
       // Return updated SAN entries
       res.json({
         message: `${type === 'ip' ? 'IP address' : 'Domain'} removed successfully`,
-        domains: cert.domains,
-        idleDomains: cert.idleDomains,
-        ips: cert.ips,
-        idleIps: cert.idleIps,
-        needsRenewal: cert.idleDomains.length > 0 || cert.idleIps.length > 0
+        domains: cert._sans?.domains || [],
+        idleDomains: cert._sans?.idleDomains || [],
+        ips: cert._sans?.ips || [],
+        idleIps: cert._sans?.idleIps || [],
+        needsRenewal: (cert._sans?.idleDomains?.length > 0) || (cert._sans?.idleIps?.length > 0)
       });
     } catch (error) {
       logger.error(`Error removing SAN entry from certificate ${req.params.fingerprint}:`, error, FILENAME);
@@ -1487,6 +1745,15 @@ function initCertificatesRouter(deps) {
   // Apply idle domains/IPs and renew certificate
   router.post('/:fingerprint/san/apply', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get the certificate
@@ -1499,7 +1766,7 @@ function initCertificatesRouter(deps) {
       }
 
       // Check if there are any idle domains or IPs
-      if (cert.idleDomains.length === 0 && cert.idleIps.length === 0) {
+      if (!cert._sans?.idleDomains?.length && !cert._sans?.idleIps?.length) {
         return res.status(400).json({
           message: 'No idle domains or IPs to apply',
           statusCode: 400
@@ -1507,7 +1774,21 @@ function initCertificatesRouter(deps) {
       }
 
       // Apply idle subjects and renew
-      const result = await deps.certificateManager.applyIdleSubjectsAndRenew(fingerprint);
+      const hadChanges = cert.applyIdleSubjects();
+      if (!hadChanges) {
+        return res.status(400).json({
+          message: 'No idle subjects were found to apply',
+          statusCode: 400
+        });
+      }
+
+      // Renew the certificate with the now-active subjects
+      const renewResult = await deps.certificateManager.createOrRenewCertificate(fingerprint, {});
+
+      // Save certificate changes
+      if (renewResult.success) {
+        await deps.certificateManager.saveCertificateConfigs();
+      }
 
       // Log activity
       try {
@@ -1538,7 +1819,7 @@ function initCertificatesRouter(deps) {
       res.json({
         message: 'Idle domains and IPs applied and certificate renewed successfully',
         success: true,
-        result
+        certificate: await deps.certificateManager.getCertificateApiResponse(cert.fingerprint)
       });
     } catch (error) {
       logger.error(`Error applying idle subjects for certificate ${req.params.fingerprint}:`, error, FILENAME);
@@ -1552,6 +1833,15 @@ function initCertificatesRouter(deps) {
   // Pre-renewal passphrase check endpoint
   router.get('/:fingerprint/check-renewal-passphrases', async (req, res) => {
     try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
       const { fingerprint } = req.params;
 
       // Get certificate
@@ -1569,7 +1859,7 @@ function initCertificatesRouter(deps) {
         certificate: {
           fingerprint,
           name: certificate.name,
-          // Use cached values, not OpenSSL operations
+          // Use new certificate property structure
           needsPassphrase: certificate._needsPassphrase || false,
           hasPassphrase: deps.passphraseManager ? deps.passphraseManager.hasPassphrase(fingerprint) : false
         },
@@ -1582,7 +1872,6 @@ function initCertificatesRouter(deps) {
         const signingCA = deps.certificateManager.getCertificate(certificate.caFingerprint);
 
         if (signingCA) {
-          // Use cached values again, not OpenSSL operations
           const signingCANeedsPassphrase = signingCA._needsPassphrase || false;
           const signingCAHasPassphrase = deps.passphraseManager ?
             deps.passphraseManager.hasPassphrase(certificate.caFingerprint) : false;

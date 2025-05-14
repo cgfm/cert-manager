@@ -20,6 +20,8 @@ const logger = require("./logger");
 const fsPromises = fs.promises;
 const statAsync = promisify(fs.stat);
 
+const FILENAME = 'services/filesystem-service.js';
+
 /**
  * FileSystemService class for interacting with the filesystem
  */
@@ -53,7 +55,7 @@ class FileSystemService {
         this.isDocker = this.checkIfRunningInDocker();
       }
     } catch (error) {
-      logger.warn("Error checking Docker status:", error);
+      logger.warn("Error checking Docker status:", error, FILENAME);
       // Fallback to our own detection
       this.isDocker = this.checkIfRunningInDocker();
     }
@@ -63,7 +65,7 @@ class FileSystemService {
       (process.env.OS && process.env.OS.toLowerCase() === "windows_nt");
 
     if (this.isWindowsDocker) {
-      logger.info("Running in Windows Docker Desktop environment");
+      logger.info("Running in Windows Docker Desktop environment", null, FILENAME);
     }
 
     // Load Docker volumes if in Docker
@@ -108,7 +110,7 @@ class FileSystemService {
     try {
       // Method 1: Check for .dockerenv file
       if (fs.existsSync("/.dockerenv")) {
-        logger.debug("Docker detected: /.dockerenv exists");
+        logger.debug("Docker detected: /.dockerenv exists", null, FILENAME);
         return true;
       }
 
@@ -119,7 +121,7 @@ class FileSystemService {
           cgroupContent.includes("docker") ||
           cgroupContent.includes("containerd")
         ) {
-          logger.debug("Docker detected: Docker found in cgroup");
+          logger.debug("Docker detected: Docker found in cgroup", null, FILENAME);
           return true;
         }
       }
@@ -127,20 +129,20 @@ class FileSystemService {
       // Method 3: Check hostname (often Docker sets hostname to container ID)
       const hostname = os.hostname();
       if (hostname && hostname.length === 12 && /^[0-9a-f]+$/.test(hostname)) {
-        logger.debug("Docker detected: Hostname appears to be a container ID");
+        logger.debug("Docker detected: Hostname appears to be a container ID", null, FILENAME);
         return true;
       }
 
       // Method 4: Check environment variables
       if (process.env.DOCKER_HOST_OS || process.env.IS_DOCKER) {
-        logger.debug("Docker detected: Environment variables indicate Docker");
+        logger.debug("Docker detected: Environment variables indicate Docker", null, FILENAME);
         return true;
       }
 
       return false;
     } catch (error) {
       // If any error occurs, log it and assume not in Docker
-      logger.debug("Error detecting Docker environment:", error.message);
+      logger.debug("Error detecting Docker environment:", error.message, FILENAME);
       return false;
     }
   }
@@ -155,11 +157,11 @@ class FileSystemService {
         return;
       }
 
-      logger.debug("Loading Docker volumes from DockerService");
+      logger.debug("Loading Docker volumes from DockerService", null, FILENAME);
 
       // Windows Docker Desktop-specific handling
       if (this.isWindowsDockerDesktop()) {
-        logger.debug("Detected Windows Docker Desktop environment");
+        logger.debug("Detected Windows Docker Desktop environment", null, FILENAME);
 
         // For Windows Docker Desktop, manually add common mounted volumes
         const windowsVolumes = [
@@ -180,7 +182,7 @@ class FileSystemService {
               });
             }
           } catch (err) {
-            logger.debug("Error reading mounts:", err);
+            logger.debug("Error reading mounts:", err, FILENAME);
           }
         }
 
@@ -202,7 +204,7 @@ class FileSystemService {
         }
       }
     } catch (error) {
-      logger.debug("Error loading Docker volumes from service:", error);
+      logger.debug("Error loading Docker volumes from service:", error, FILENAME);
     }
   }
 
@@ -308,7 +310,7 @@ class FileSystemService {
               }
             }
           } catch (error) {
-            logger.debug(`Error checking volume path ${volumePath}:`, error);
+            logger.debug(`Error checking volume path ${volumePath}:`, error, FILENAME);
           }
         }
       }
@@ -348,7 +350,7 @@ class FileSystemService {
       );
       return volumes;
     } catch (error) {
-      logger.error("Error getting Docker volumes by filesystem:", error);
+      logger.error("Error getting Docker volumes by filesystem:", error, FILENAME);
       return [];
     }
   }
@@ -436,7 +438,7 @@ class FileSystemService {
       }
       return drives;
     } catch (error) {
-      logger.error("Error getting Windows drives:", error);
+      logger.error("Error getting Windows drives:", error, FILENAME);
       return [];
     }
   }
@@ -511,7 +513,7 @@ class FileSystemService {
             itemStats = await statAsync(itemPath);
           } catch (statError) {
             // Skip files we can't access
-            logger.debug(`Unable to stat ${itemPath}: ${statError.message}`);
+            logger.debug(`Unable to stat ${itemPath}: ${statError.message}`, null, FILENAME);
             continue;
           }
 
@@ -533,7 +535,7 @@ class FileSystemService {
             created: itemStats.birthtime,
           });
         } catch (itemError) {
-          logger.debug(`Error processing item ${itemPath}:`, itemError);
+          logger.debug(`Error processing item ${itemPath}:`, itemError, null, FILENAME);
         }
       }
 
@@ -566,7 +568,7 @@ class FileSystemService {
 
       return result;
     } catch (error) {
-      logger.error(`Failed to list directory ${dirPath}:`, error);
+      logger.error(`Failed to list directory ${dirPath}:`, error, null, FILENAME);
       throw error;
     }
   }
@@ -599,7 +601,7 @@ class FileSystemService {
         };
       }
 
-      logger.error(`Error checking path ${filePath}:`, error);
+      logger.error(`Error checking path ${filePath}:`, error, null, FILENAME);
       throw error;
     }
   }
@@ -619,7 +621,7 @@ class FileSystemService {
         path: normalizedPath,
       };
     } catch (error) {
-      logger.error(`Failed to create directory ${dirPath}:`, error);
+      logger.error(`Failed to create directory ${dirPath}:`, error, null, FILENAME);
       throw error;
     }
   }

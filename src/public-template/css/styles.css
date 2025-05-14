@@ -3,29 +3,29 @@
     --primary-color: #3498db;
     --primary-hover: #2980b9;
     --primary-light: rgba(52, 152, 219, 0.15);
-    
+
     --secondary-color: #748194;
     --secondary-light: #rgba(116, 129, 148, 0.15);
 
     --success-color: #2ecc71;
     --success-light: rgba(46, 204, 113, 0.15);
-    
+
     --warning-color: #f6c343;
     --warning-light: rgba(243, 156, 18, 0.15);
-    
+
     --danger-color: #e74c3c;
     --danger-hover: #d93348;
     --danger-light: rgba(231, 76, 60, 0.15);
-    
+
     --info-color: #3498db;
     --info-light: rgba(52, 152, 219, 0.15);
-    
+
     --gray: #7f8c8d;
     --gray-light: rgba(127, 140, 141, 0.15);
-    
+
     --light-color: #f9fafd;
     --dark-color: #232e3c;
-    
+
     /* Light theme */
     --bg-color: #f8f9fa;
     --card-bg: #ffffff;
@@ -35,12 +35,13 @@
     --border-color: #dee2e6;
     --hover-bg: #f1f3f5;
     --header-bg: #ffffff;
-    --btn-bg: #e9ecef; /* Added button background for light theme */
-    
+    --btn-bg: #e9ecef;
+    /* Added button background for light theme */
+
     /* Shadows */
     --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    
+
     /* Other */
     --border-radius: 6px;
     --transition-speed: 0.2s;
@@ -50,10 +51,10 @@
     --logo-primary: #000035;
     --logo-blueAccent: #82a4bf;
     --favicon-primary: #000035;
-  }
-  
-  /* Dark theme colors */
-  [data-theme="dark"] {
+}
+
+/* Dark theme colors */
+[data-theme="dark"] {
     --primary-color: #2c7be5;
     --primary-hover: #4d8df3;
     --secondary-color: #748194;
@@ -70,8 +71,9 @@
     --card-bg: #2c3542;
     --header-bg: #232e3c;
     --hover-bg: #344050;
-    --btn-bg: #344050;  /* Already defined for dark theme */
-    --box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+    --btn-bg: #344050;
+    /* Already defined for dark theme */
+    --box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
     --bg-color: #1a1d21;
     --card-bg: #2d3035;
     --text-color: #e9ecef;
@@ -79,14 +81,14 @@
     --heading-color: #f8f9fa;
     --border-color: #444;
     --hover-bg: #34383e;
-    
+
     --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 
     --logo-primary: #ffffca;
     --logo-blueAccent: #82a4bf;
     --favicon-primary: #ffffca;
-  }
+}
 
 * {
     box-sizing: border-box;
@@ -106,7 +108,12 @@ body {
     transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     color: var(--dark-color);
     margin-bottom: 0.5rem;
     font-weight: 600;
@@ -123,11 +130,11 @@ a:hover {
     color: var(--primary-hover);
 }
 
-/* Header styles */
+/* Enhanced Header Design */
 header {
     background-color: var(--header-bg);
-    box-shadow: var(--box-shadow);
-    padding: 0.75rem 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 0.5rem 2rem;
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -135,22 +142,47 @@ header {
     align-items: center;
     justify-content: space-between;
     transition: background-color var(--transition-speed);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* App logo styling */
+/* Refined app logo styling */
 .app-logo {
     display: flex;
     align-items: center;
 }
 
 .app-logo .logo-svg {
-    margin-right: 10px;
-    width: 50px;
+    width: 32px;
+    height: auto;
+    margin-right: 12px;
+    transition: transform 0.3s ease;
+}
+
+.app-logo:hover .logo-svg {
+    transform: scale(1.05);
+}
+
+.theme-light-only {
+    display: block;
+}
+
+.theme-dark-only {
+    display: none;
+}
+
+body[data-theme="dark"] .theme-light-only {
+    display: none;
+}
+
+body[data-theme="dark"] .theme-dark-only {
+    display: block;
 }
 
 .app-logo h1 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
+    font-weight: 600;
     margin: 0;
+    letter-spacing: 0.03em;
 }
 
 /* Apply colors to SVG elements */
@@ -182,60 +214,91 @@ header {
     }
 }
 
+/* Improved navigation */
 nav ul {
     display: flex;
     list-style: none;
     margin: 0;
+    padding: 0;
 }
 
 nav ul li {
-    margin: 0 0.5rem;
+    margin: 0;
 }
 
 nav ul li a {
-    color: var(--secondary-color);
-    padding: 0.5rem;
-    border-radius: 0.25rem;
+    color: var(--text-muted);
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    position: relative;
     transition: all var(--transition-speed);
+    display: block;
+}
+
+/* Add underline indicator for active/hover nav items */
+nav ul li a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--primary-color);
+    transform: translateX(-50%);
+    transition: width var(--transition-speed);
+}
+
+nav ul li a:hover::after,
+nav ul li a.active::after {
+    width: 80%;
 }
 
 nav ul li a:hover,
 nav ul li a.active {
     color: var(--primary-color);
-    background-color: var(--hover-bg);
 }
 
 .user-menu {
     display: flex;
 }
 
+/* Enhanced theme toggle button */
 #theme-toggle {
     background: none;
     border: none;
-    color: var(--secondary-color);
+    color: var(--text-muted);
     cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 0.25rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 #theme-toggle:hover {
     background-color: var(--hover-bg);
+    color: var(--primary-color);
 }
 
-#theme-toggle svg {
-    fill: currentColor;
-    width: 1.25rem;
-    height: 1.25rem;
+#theme-toggle i {
+    font-size: 18px;
+    transition: transform 0.3s;
 }
 
-body:not([data-theme="dark"]) .moon-icon {
+#theme-toggle:hover i {
+    transform: rotate(15deg);
+}
+
+/* Show/hide appropriate icon based on theme */
+body:not([data-theme="dark"]) #theme-icon-dark {
     display: none;
 }
 
-body[data-theme="dark"] .sun-icon {
+body[data-theme="dark"] #theme-icon-light {
     display: none;
 }
 
@@ -263,7 +326,7 @@ main::before {
     background-size: 70%;
     opacity: 0.03;
     pointer-events: none;
-    
+
     /* Use CSS mask for dynamic coloring */
     -webkit-mask-image: url('../img/logo.svg');
     mask-image: url('../img/logo.svg');
@@ -273,7 +336,7 @@ main::before {
     mask-position: center;
     -webkit-mask-size: 70%;
     mask-size: 70%;
-    
+
 }
 
 /* Dark mode version for the fallback */
@@ -292,8 +355,13 @@ main::before {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Card styles */
@@ -436,6 +504,7 @@ main::before {
     font-size: 0.75rem;
     color: var(--secondary-color);
     margin-top: 0.25rem;
+    margin-left: 0.25rem;
 }
 
 .input-with-button {
@@ -474,25 +543,6 @@ main::before {
     margin-bottom: 1rem;
 }
 
-.filter-bar {
-    display: flex;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding: 0.5rem;
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    box-shadow: var(--box-shadow);
-}
-
-.filter-bar input[type="text"] {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    background-color: var(--card-bg);
-    color: var(--text-color);
-}
-
 .filter-options {
     display: flex;
     margin-left: 1rem;
@@ -508,14 +558,6 @@ main::before {
     margin-right: 0.25rem;
 }
 
-.certificates-list, 
-.ca-certificates {
-    background-color: var(--card-bg);
-    border-radius: 0.5rem;
-    box-shadow: var(--box-shadow);
-    overflow: hidden;
-}
-
 /* Settings */
 .settings-container {
     display: flex;
@@ -529,6 +571,10 @@ main::before {
     width: 200px;
     border-right: 1px solid var(--border-color);
     padding: 1rem 0;
+}
+
+.settings-sidebar h2 {
+    padding-left: 1rem;
 }
 
 .settings-sidebar ul {
@@ -614,93 +660,95 @@ main::before {
 }
 
 /* Certificate and CA item cards */
-.certificate-item, .ca-item {
-  background-color: var(--card-bg);
-  border-radius: var(--border-radius);
-  box-shadow: var(--card-shadow);
-  margin-bottom: 1rem;
-  padding: 1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+.certificate-item,
+.ca-item {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 1rem;
+    padding: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.certificate-item:hover, .ca-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-hover-shadow);
+.certificate-item:hover,
+.ca-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-hover-shadow);
 }
 
 /* Dashboard certificate sections */
 .dashboard-section {
-  margin-bottom: 2rem;
+    margin-bottom: 2rem;
 }
 
 .expiring-cert-item {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .expiring-cert-item:last-child {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 .expiring-cert-name {
-  font-weight: 500;
-  flex: 1;
+    font-weight: 500;
+    flex: 1;
 }
 
 .expiring-cert-domain {
-  color: var(--text-muted);
-  flex: 1;
+    color: var(--text-muted);
+    flex: 1;
 }
 
 .expiring-days {
-  margin-right: 1rem;
+    margin-right: 1rem;
 }
 
 /* Activity feed */
 .activity-item {
-  display: flex;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-  align-items: center;
-  font-size: 0.9rem;
+    display: flex;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    font-size: 0.9rem;
 }
 
 .activity-time {
-  color: var(--text-muted);
-  width: 120px;
-  flex-shrink: 0;
+    color: var(--text-muted);
+    width: 120px;
+    flex-shrink: 0;
 }
 
 .activity-action {
-  margin: 0 0.5rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
+    margin: 0 0.5rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
 }
 
 .activity-create {
-  background-color: var(--success-light);
-  color: var(--success);
+    background-color: var(--success-light);
+    color: var(--success);
 }
 
 .activity-renew {
-  background-color: var(--info-light);
-  color: var(--info);
+    background-color: var(--info-light);
+    color: var(--info);
 }
 
 .activity-delete {
-  background-color: var(--danger-light);
-  color: var(--danger);
+    background-color: var(--danger-light);
+    color: var(--danger);
 }
 
 .activity-target {
-  margin-left: 0.5rem;
-  flex-grow: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    margin-left: 0.5rem;
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Responsive */
@@ -708,60 +756,171 @@ main::before {
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .settings-container {
         flex-direction: column;
     }
-    
+
     .settings-sidebar {
         width: 100%;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
     }
-    
+
     header {
         flex-direction: column;
         padding-bottom: 0;
     }
-    
+
     nav ul {
         justify-content: center;
         width: 100%;
         overflow-x: auto;
         padding-bottom: 0.5rem;
     }
-    
+
     main::before {
         -webkit-mask-size: 120%;
         mask-size: 120%;
         background-size: 120%;
     }
-    
-    .cert-details, .ca-details {
+
+    .cert-details,
+    .ca-details {
         flex-direction: column;
         align-items: flex-start;
     }
-    
-    .cert-actions, .ca-actions {
+
+    .cert-actions,
+    .ca-actions {
         margin-top: 0.5rem;
     }
-    
+
     .cert-details-table th {
         width: 120px;
     }
-    
+
     .activity-time {
         width: 80px;
     }
-    
+
     .expiring-cert-item {
         flex-direction: column;
         align-items: flex-start;
     }
-    
-    .expiring-cert-name, 
-    .expiring-cert-domain, 
+
+    .expiring-cert-name,
+    .expiring-cert-domain,
     .expiring-days {
         margin-bottom: 0.5rem;
     }
+}
+
+.tabs {
+    width: 100%;
+}
+
+.tab-header {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-color);
+    transition: all var(--transition-speed);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+
+.tab-button.active {
+    border-bottom: 2px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.tab-button:hover:not(.active) {
+    color: var(--primary-hover);
+    background-color: var(--hover-bg);
+}
+
+.tab-content {
+    padding: 1rem 0;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Deployment Settings Styles */
+.settings-tabs {
+    display: flex;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.settings-tab-button {
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.2s, border-bottom 0.2s;
+}
+
+.settings-tab-button:hover {
+    color: var(--primary-color);
+}
+
+.settings-tab-button.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.settings-tab-content {
+    display: none;
+    padding: 1rem 0;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+.form-actions {
+    display: flex;
+    margin-top: 1.5rem;
+    gap: 0.5rem;
+}
+
+#test-email-form {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Dark mode adjustments */
+body[data-theme="dark"] .settings-tabs {
+    border-bottom-color: var(--border-color-dark);
+}
+
+body[data-theme="dark"] .settings-tab-button:hover {
+    color: var(--primary-color-dark, #6ab5ff);
+}
+
+body[data-theme="dark"] .settings-tab-button.active {
+    color: var(--primary-color-dark, #6ab5ff);
+    border-bottom-color: var(--primary-color-dark, #6ab5ff);
 }

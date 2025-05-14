@@ -15,6 +15,8 @@
 const express = require('express');
 const logger = require('../../services/logger');
 
+const FILENAME = 'api/routes/ca.js';
+
 /**
  * Initialize the CA certificates router with dependencies
  * @param {Object} deps - Dependencies
@@ -32,12 +34,12 @@ function initCARouter(deps) {
       const caCerts = certificateManager.getCAcertificates();
       
       const response = caCerts.map(cert => 
-        cert.toApiResponse(certificateManager.passphraseManager)
+        cert.toJSON(certificateManager.passphraseManager)
       );
       
       res.json(response);
     } catch (error) {
-      logger.error('Error getting CA certificates:', error);
+      logger.error('Error getting CA certificates:', error, FILENAME);
       res.status(500).json({ message: 'Failed to retrieve CA certificates', statusCode: 500 });
     }
   });

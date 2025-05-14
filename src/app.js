@@ -103,6 +103,8 @@ async function startApp() {
       checkOnStart: false
     });
 
+    openSSL.setRenewalService(renewalService);
+
     // Record system startup
     await activityService.recordSystemActivity('startup', {
       version: pkg.version,
