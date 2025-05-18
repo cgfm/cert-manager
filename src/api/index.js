@@ -35,7 +35,7 @@ const logsRoutes = require('./routes/logs');
 const FILENAME = 'api/index.js';
 
 // Import routes - with safety checks
-let certificatesRouter, caRouter, dockerRoutes, securityRouter, renewalRouter, settingsRouter, filesystemRouter, authRouter, publicRouter, setupRouter;
+let certificatesRouter, caRouter, dockerRoutes, securityRouter, renewalRouter, settingsRouter, filesystemRouter, authRouter, publicRouter, setupRouter, integrationsRouter, activityRoutes;
 
 try {
   certificatesRouter = require('./routes/certificates');
@@ -119,9 +119,22 @@ try {
   logger.error('Error loading setup router:', error, FILENAME);
   filesystemRouter = null;
 }
-
-// Add in your requires at the top
-const activityRoutes = require('./routes/activity');
+try {
+  // Setup routes (before auth middleware is applied)
+  integrationsRouter = require('./routes/integrations');
+  logger.debug('Loaded NPM integrations routes', null, FILENAME);
+} catch (error) {
+  logger.error('Error loading NPM integrations router:', error, FILENAME);
+  integrationsRouter = null;
+}
+try {
+  // Setup routes (before auth middleware is applied)
+  activityRoutes = require('./routes/activity');
+  logger.debug('Loaded activity routes', null, FILENAME);
+} catch (error) {
+  logger.error('Error loading activity router:', error, FILENAME);
+  activityRoutes = null;
+}
 
 /**
  * Register all API routes
@@ -274,6 +287,14 @@ function setupApi(deps) {
   } else {
     logger.warn('Settings routes not available', null, FILENAME);
     apiRouter.use('/settings', (req, res) => res.status(503).json({ error: 'Service unavailable' }));
+  }
+
+  if(integrationsRouter) {
+    apiRouter.use('/integrations', integrationsRouter(deps));
+    logger.debug('Registered NPM integrations routes', null, FILENAME);
+  } else {
+    logger.warn('NPM integrations routes not available', null, FILENAME);
+    apiRouter.use('/integrations', (req, res) => res.status(503).json({ error: 'Service unavailable' }));
   }
 
   if (filesystemRouter) {

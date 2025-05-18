@@ -503,7 +503,7 @@ async function createNewFolder() {
 
     // Refresh the current directory
     refreshFileBrowser();
-    UIUtils.showNotification(`Created folder: ${folderName}`, "success");
+    UIUtils.showToast(`Created folder: ${folderName}`, "success");
   } catch (error) {
     UIUtils.showError(error.message);
   }

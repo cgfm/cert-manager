@@ -13,6 +13,7 @@
   },
   "autoRenewByDefault": true,
   "renewDaysBeforeExpiry": 30,
+  "includeIdleDomainsOnRenewal": false,
   "logLevel": "debug",
   "jsonOutput": false,
   "enableCertificateBackups": true,
@@ -29,7 +30,7 @@
         "port": 465,
         "secure": true,
         "user": "chrischan@ikmail.com",
-        "password": "flhbJy3fT!&9BIroj^Jsvtg!D05Fjagayit6Cm^*",
+        "password": "••••••••",
         "from": "Certificate Manager <chrischan@aikq.de>"
       }
     },
@@ -37,9 +38,11 @@
       "host": "nginxpm.seneca.local",
       "port": 443,
       "useHttps": true,
-      "rejectUnauthorized": false,
       "username": "chrischan-service@aikq.de",
-      "password": "••••••••"
+      "password": "mge.fhq5cvu.DFB*hjg",
+      "rejectUnauthorized": false,
+      "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcGkiLCJhdHRycyI6eyJpZCI6MX0sInNjb3BlIjpbInVzZXIiXSwiZXhwaXJlc0luIjoiMWQiLCJqdGkiOiJsazl1THdiSkRySHJ0ak5SIiwiaWF0IjoxNzQ3Mzg2MjQ4LCJleHAiOjE3NDc0NzI2NDh9.Y7O-MpfNIcJyc6Ls-vte98q2-Yx6A8ICtK7o7pzlm7bpVpeoVkYYirqahz9JgxKrq_pdYKMffRRL7Qg9VLhI37p24DuK2V6_VeaZMbVCrqTsEAQ4P5LuoqRpB2_OBVqyOOfifWN6MUUBssQCP-5MWdcEygn0LGau3Lcq7CpVz6p9tx2qASiMKX8XYjbXWCT1T-c79WuLFxhXd3Y-xeJYNHI1VL4rXt7hyt_6VuXd1gR8nCDIo6UtBw5WYangMy9pNK68xF9TBYWz7mV0M0RY4JrFjPe3teP_GEgw_rJS8HODUjS_c2yFXmXnA-3dVTGNiurB7G7V84NBjm8TjejFbg",
+      "tokenExpiry": "2025-05-23T09:04:09.167Z"
     },
     "dockerDefaults": {
       "socketPath": "/var/run/docker.sock",
@@ -51,8 +54,10 @@
   "fileLogLevels": {
     "services/openssl-wrapper.js": "fine",
     "models/CertificateManager.js": "fine",
-    "models/Certificate.js": "fine",
-    "api/routes/certificates.js": "fine"
+    "models/Certificate.js": "finest",
+    "api/routes/certificates.js": "fine",
+    "services/PassphraseManager.js": "finest",
+    "api/routes/settings.js": "fine"
   },
   "port": 3000,
   "security": {

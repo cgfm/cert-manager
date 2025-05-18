@@ -437,3 +437,116 @@ select.form-control {
 .action-order-info i {
   margin-right: 6px;
 }
+
+/* Add this to your main CSS file */
+
+/* NPM status indicators */
+.npm-status-message {
+  padding: 10px;
+  margin-bottom: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #6c757d;
+}
+
+/* NPM Connection status */
+.connection-status {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: var(--bg-lighter, #f8f9fa);
+  border-radius: var(--border-radius, 4px);
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+  display: inline-block;
+}
+
+.status-indicator.checking {
+  background-color: var(--warning-color, #ffc107);
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.connected {
+  background-color: var(--success-color, #28a745);
+}
+
+.status-indicator.warning {
+  background-color: var(--warning-color, #ffc107);
+}
+
+.status-indicator.error {
+  background-color: var(--danger-color, #dc3545);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Certificate preview */
+.certificate-preview {
+  margin-top: 10px;
+  padding: 12px;
+  background-color: var(--bg-lighter, #f8f9fa);
+  border-radius: var(--border-radius, 4px);
+  border: 1px solid var(--border-color, #e9ecef);
+}
+
+.preview-row {
+  display: flex;
+  margin-bottom: 6px;
+}
+
+.preview-row:last-child {
+  margin-bottom: 0;
+}
+
+.preview-label {
+  font-weight: 500;
+  width: 80px;
+  color: var(--text-muted, #6c757d);
+}
+
+.preview-value {
+  color: var(--text-color, #212529);
+}
+
+/* Section divider */
+.section-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #6c757d;
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.section-divider span {
+  padding: 0 10px;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Info text */
+.info-text {
+  font-size: 0.85em;
+  color: #6c757d;
+  margin-top: 5px;
+}
+
+.info-text i {
+  margin-right: 5px;
+}

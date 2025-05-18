@@ -23,11 +23,11 @@ class ConfigService {
      */
     constructor(options = {}) {
         // Get config directory from options, environment variable or default path
-        this.configDir = options.configDir || 
-                        process.env.CONFIG_DIR || 
-                        process.env.CERT_MANAGER_CONFIG_DIR || 
-                        '/config';
-        
+        this.configDir = options.configDir ||
+            process.env.CONFIG_DIR ||
+            process.env.CERT_MANAGER_CONFIG_DIR ||
+            '/config';
+
         // Ensure config directory exists
         try {
             if (!fs.existsSync(this.configDir)) {
@@ -40,14 +40,14 @@ class ConfigService {
             this.configDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
             logger.info(`Using fallback config directory: ${this.configDir}`, null, FILENAME);
         }
-        
+
         this.settingsPath = path.join(this.configDir, 'settings.json');
-        
-        this.certPath = options.certPath || 
-                       process.env.CERT_PATH || 
-                       process.env.CERT_MANAGER_CERT_PATH || 
-                       '/certs';
-                       
+
+        this.certPath = options.certPath ||
+            process.env.CERT_PATH ||
+            process.env.CERT_MANAGER_CERT_PATH ||
+            '/certs';
+
         // Ensure certificate directory exists
         try {
             if (!fs.existsSync(this.certPath)) {
@@ -76,6 +76,7 @@ class ConfigService {
             },
             autoRenewByDefault: true,
             renewDaysBeforeExpiry: 30,
+            includeIdleDomainsOnRenewal: true,
             logLevel: "info",
             jsonOutput: false,
             enableCertificateBackups: true,
@@ -123,16 +124,16 @@ class ConfigService {
             jwtSecret: process.env.JWT_SECRET || '',     // Will be auto-generated if empty
             tokenExpiration: process.env.TOKEN_EXPIRATION || '8h'
         };
-        
+
         // Load settings from file
         this.fileSettings = this.loadSettings();
-        
+
         // Process environment variables and create effective settings
         this.processEnvironmentVariables();
-        
+
         this.config = {};
         this.loaded = false;
-        
+
         logger.debug('ConfigService initialized with settings from file and environment variables', null, FILENAME);
     }
 
@@ -143,7 +144,7 @@ class ConfigService {
     processEnvironmentVariables() {
         // Start with file-based settings
         this.effectiveSettings = { ...this.fileSettings };
-        
+
         // Environment variable mapping - define mappings for special/complex cases
         const envMappings = {
             'PORT': 'port',
@@ -152,7 +153,7 @@ class ConfigService {
             'ENABLE_FILE_WATCHER': 'enableFileWatch',
             'RENEWAL_SCHEDULE': 'renewalSchedule'
         };
-        
+
         // Process direct mappings first
         Object.entries(envMappings).forEach(([envName, settingKey]) => {
             if (process.env[envName] !== undefined) {
@@ -161,7 +162,7 @@ class ConfigService {
                 logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`, null, FILENAME);
             }
         });
-        
+
         // Process standard CERT_MANAGER_ environment variables
         Object.keys(process.env)
             .filter(key => key.startsWith('CERT_MANAGER_'))
@@ -174,7 +175,7 @@ class ConfigService {
                 }
             });
     }
-    
+
     /**
      * Convert environment variable name to settings key
      * @param {string} envName - Environment variable name (without prefix)
@@ -185,7 +186,7 @@ class ConfigService {
         return envName.toLowerCase()
             .replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
     }
-    
+
     /**
      * Parse environment variable value to appropriate type
      * @param {string} value - Environment variable value
@@ -218,14 +219,14 @@ class ConfigService {
             try {
                 // Read settings from file
                 const fileContents = fs.readFileSync(this.settingsPath, 'utf8');
-                
+
                 // Try to parse JSON, but handle JSON with comments
                 let settings;
                 try {
                     settings = JSON.parse(fileContents);
                 } catch (jsonError) {
                     logger.warn(`Invalid JSON in settings file: ${jsonError.message}. Removing comments and trying again...`, null, FILENAME);
-                    
+
                     // Try to fix common JSON issues (comments and trailing commas)
                     const cleanedJson = fileContents
                         // Remove comments (both // and /* */)
@@ -233,7 +234,7 @@ class ConfigService {
                         .replace(/\/\*[\s\S]*?\*\//g, '')
                         // Remove trailing commas
                         .replace(/,(\s*[\]}])/g, '$1');
-                    
+
                     try {
                         settings = JSON.parse(cleanedJson);
                         // Since we successfully parsed after cleaning, save the clean version
@@ -279,10 +280,10 @@ class ConfigService {
 
             // Update file settings
             this.fileSettings = settings;
-            
+
             // Re-process environment variables to update effective settings
             this.processEnvironmentVariables();
-            
+
             return true;
         } catch (error) {
             logger.error('Error saving settings:', error, FILENAME);
@@ -300,12 +301,12 @@ class ConfigService {
             // Merge new settings with existing file settings
             const updatedSettings = { ...this.fileSettings, ...newSettings };
             const result = this.saveSettings(updatedSettings);
-            
+
             // Update effective settings
             if (result) {
                 this.effectiveSettings = { ...this.effectiveSettings, ...newSettings };
             }
-            
+
             return result;
         } catch (error) {
             logger.error('Error updating settings:', error, FILENAME);
@@ -335,10 +336,48 @@ class ConfigService {
         if (key === null) {
             return { ...this.effectiveSettings };
         }
-        
+
         // Return specific setting or default value
-        return this.effectiveSettings[key] !== undefined ? 
+        return this.effectiveSettings[key] !== undefined ?
             this.effectiveSettings[key] : defaultValue;
+    }
+
+    /**
+     * Update deployment settings
+     * @param {Object} settings - New deployment settings
+     * @returns {Promise<Boolean>} Success status
+     */
+    async updateDeploymentSettings(settings) {
+        try {
+            // Ensure config is loaded
+            if (!this.config) {
+                await this.loadConfig();
+            }
+
+            // Initialize deployment section if it doesn't exist
+            if (!this.config.deployment) {
+                this.config.deployment = {};
+            }
+
+            // Update deployment settings
+            this.config.deployment = {
+                ...this.config.deployment,
+                ...settings
+            };
+
+            // Save config
+            await this.saveConfig();
+
+            // Notify the NPM integration service if it exists and settings include NPM
+            if (settings.nginxProxyManager && this.services && this.services.npmIntegrationService) {
+                this.services.npmIntegrationService.updateSettings(settings.nginxProxyManager);
+            }
+
+            return true;
+        } catch (error) {
+            logger.error(`Error updating deployment settings: ${error.message}`, error, FILENAME);
+            return false;
+        }
     }
 }
 

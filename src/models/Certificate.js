@@ -68,7 +68,7 @@ class Certificate {
 
         // Configuration
         this._config = {
-            autoRenew: false,
+            autoRenew: true,
             renewDaysBeforeExpiry: 30,
             signWithCA: false,
             caFingerprint: null,
@@ -99,7 +99,7 @@ class Certificate {
      * @param {Object} data - Certificate data
      */
     _fromData(data) {
-        logger.fine(`Initializing certificate from data: ${data.name || 'unnamed'}`, null, FILENAME, data.name);
+        logger.fine(`Initializing certificate from data: ${data.name || 'unnamed'}`, data, FILENAME, data.name);
 
         try {
             // Basic properties
@@ -180,7 +180,7 @@ class Certificate {
 
             // Configuration with consistent structure
             this._config = {
-                autoRenew: false,
+                autoRenew: true,
                 renewDaysBeforeExpiry: 30,
                 signWithCA: false,
                 caFingerprint: null,
@@ -256,7 +256,7 @@ class Certificate {
      */
     updateFromData(data, options = {}) {
         const preserveConfig = options.preserveConfig !== false;
-        logger.finest(`Updating certificate data for ${this._name || data.name}`, null, FILENAME);
+        logger.fine(`Updating certificate data for ${this._name || data.name}`, data, FILENAME);
 
         // Update basic properties
         if (data.fingerprint) this._fingerprint = data.fingerprint;
@@ -345,7 +345,7 @@ class Certificate {
                 // If we're not preserving config and no new config was provided,
                 // initialize with defaults but keep existing deploy actions
                 this._config = {
-                    autoRenew: false,
+                    autoRenew: true,
                     renewDaysBeforeExpiry: 30,
                     signWithCA: false,
                     caFingerprint: null,
@@ -401,15 +401,81 @@ class Certificate {
      */
     _addDomainFromName() {
         try {
-            if (this._name &&
-                this._name.includes('.') &&
-                !this._sans.domains.includes(this._name.toLowerCase())) {
-                this._sans.domains.push(this._name.toLowerCase());
-                logger.fine(`Added certificate name as domain: ${this._name}`, null, FILENAME, this._name);
+            if (!this._name) {
+                return;
+            }
+            
+            const name = this._name.toLowerCase();
+            
+            // Don't add if it's already in the domains list
+            if (this._sans.domains.includes(name)) {
+                logger.finest(`Certificate name ${this._name} already exists in domains list`, null, FILENAME, this._name);
+                return;
+            }
+            
+            // Check if name is a valid domain
+            if (this._isValidDomain(name)) {
+                this._sans.domains.push(name);
+                logger.fine(`Added certificate name as domain: ${name}`, null, FILENAME, this._name);
+            } else {
+                logger.fine(`Certificate name '${name}' does not appear to be a valid domain, not adding to domains list`, null, FILENAME, this._name);
             }
         } catch (error) {
-            logger.error(`Error adding domain from name: ${error.message}`, null, FILENAME, this._name);
+            logger.error(`Error adding domain from name: ${error.message}`, error, FILENAME, this._name);
         }
+    }
+
+    /**
+     * Validate a domain name
+     * @param {string} domain - Domain to validate
+     * @returns {boolean} True if domain is valid
+     * @private
+     */
+    _isValidDomain(domain) {
+        if (!domain || typeof domain !== 'string') {
+            return false;
+        }
+        
+        // Trim the domain
+        const trimmedDomain = domain.trim();
+        
+        // Check for empty string
+        if (trimmedDomain === '') {
+            return false;
+        }
+        
+        // Domain regex pattern - supports standard domains and wildcards
+        const domainRegex = /^(\*\.)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))$/;
+        
+        // Basic validation check
+        if (!domainRegex.test(trimmedDomain)) {
+            return false;
+        }
+        
+        // Check domain label length and format
+        const labels = trimmedDomain.split('.');
+        
+        // Domain must have at least 2 labels (example.com)
+        if (labels.length < 2) {
+            return false;
+        }
+        
+        // Each label must be 1-63 characters
+        for (let i = 0; i < labels.length; i++) {
+            const label = labels[i];
+            
+            // First label can be a wildcard (exactly "*")
+            if (i === 0 && label === '*') {
+                continue;
+            }
+            
+            // Check length of each label
+            if (label.length < 1 || label.length > 63) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /**
@@ -641,45 +707,6 @@ class Certificate {
                 version: data.version || 0
             }))
             .sort((a, b) => (b.version || 0) - (a.version || 0)); // Sort by version, newest first
-    }
-
-    /**
-     * Check if this certificate's private key requires a passphrase
-     * @param {OpenSSLWrapper} openssl - OpenSSL wrapper instance
-     * @param {boolean} forceCheck - Force rechecking even if already cached
-     * @returns {Promise<boolean>} True if private key is encrypted
-     */
-    async checkNeedsPassphrase(openssl, forceCheck = false) {
-        // Return cached value if available and not forcing a check
-        if (this._passphraseChecked && !forceCheck) {
-            logger.finest(`Using cached passphrase requirement value: ${this._needsPassphrase}`, null, FILENAME, this._name);
-            return this._needsPassphrase;
-        }
-
-        if (!this._paths?.key || !fs.existsSync(this._paths.key)) {
-            logger.debug(`No key file found to check for passphrase requirement: ${this._name}`, null, FILENAME, this._name);
-            this._needsPassphrase = false;
-            this._passphraseChecked = true;
-            return false;
-        }
-
-        try {
-            logger.debug(`Checking if certificate key requires passphrase: ${this._name}`, null, FILENAME, this._name);
-            const isEncrypted = await openssl.isKeyEncrypted(this._paths.key);
-            logger.debug(`Certificate key is${isEncrypted ? '' : ' not'} encrypted: ${this._name}`, null, FILENAME, this._name);
-
-            // Cache the result
-            this._needsPassphrase = isEncrypted;
-            this._passphraseChecked = true;
-
-            return isEncrypted;
-        } catch (error) {
-            logger.warn(`Error checking if key needs passphrase: ${error.message}`, null, FILENAME, this._name);
-            // If we can't check, assume it might need a passphrase to be safe
-            this._needsPassphrase = true;
-            this._passphraseChecked = true;
-            return true;
-        }
     }
 
     /**

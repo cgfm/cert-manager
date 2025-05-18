@@ -29,6 +29,8 @@ tags:
     description: Authentication operations
   - name: setup
     description: First-time setup operations
+  - name: integrations
+    description: Integrations with external systems and services
 paths:
   /auth/login:
     post:
@@ -1010,6 +1012,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /certificates/{fingerprint}/check-renewal-passphrases:
+    get:
+      summary: Check if passphrases are needed for renewal
+      operationId: checkRenewalPassphrases
+      tags:
+        - certificates
+        - passphrases
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Passphrase requirements for renewal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  certificate:
+                    type: object
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  signingCA:
+                    type: object
+                    nullable: true
+                    properties:
+                      fingerprint:
+                        type: string
+                      name:
+                        type: string
+                      needsPassphrase:
+                        type: boolean
+                      hasPassphrase:
+                        type: boolean
+                  passphraseNeeded:
+                    type: boolean
+
   /certificates/{fingerprint}/convert:
     post:
       summary: Convert certificate to different format
@@ -1103,141 +1154,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/history:
-    get:
-      summary: Get certificate previous versions
-      operationId: getCertificateHistory
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Certificate history retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  fingerprint:
-                    type: string
-                  certificate:
-                    type: string
-                  previousVersions:
-                    type: object
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
-    get:
-      summary: Download a file from a previous certificate version
-      operationId: downloadPreviousVersionFile
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: fileType
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: File from previous version
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/download:
-    get:
-      summary: Download all files from a previous certificate version as ZIP
-      operationId: downloadPreviousVersionZip
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ZIP archive containing all files from previous version
-          content:
-            application/zip:
-              schema:
-                type: string
-                format: binary
-
-  /certificates/{fingerprint}/check-renewal-passphrases:
-    get:
-      summary: Check if passphrases are needed for renewal
-      operationId: checkRenewalPassphrases
-      tags:
-        - certificates
-        - passphrases
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Passphrase requirements for renewal
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  certificate:
-                    type: object
-                    properties:
-                      fingerprint:
-                        type: string
-                      name:
-                        type: string
-                      needsPassphrase:
-                        type: boolean
-                      hasPassphrase:
-                        type: boolean
-                  signingCA:
-                    type: object
-                    nullable: true
-                    properties:
-                      fingerprint:
-                        type: string
-                      name:
-                        type: string
-                      needsPassphrase:
-                        type: boolean
-                      hasPassphrase:
-                        type: boolean
-                  passphraseNeeded:
-                    type: boolean
 
   /certificates/{fingerprint}/deploy-actions/{actionIndex}/toggle:
     post:
@@ -1704,6 +1620,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history:
+    get:
+      summary: Get certificate previous versions
+      operationId: getCertificateHistory
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Certificate history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  fingerprint:
+                    type: string
+                  certificate:
+                    type: string
+                  previousVersions:
+                    type: object
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
+    get:
+      summary: Download a file from a previous certificate version
+      operationId: downloadPreviousVersionFile
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fileType
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File from previous version
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /certificates/{fingerprint}/history/{previousFingerprint}/download:
+    get:
+      summary: Download all files from a previous certificate version as ZIP
+      operationId: downloadPreviousVersionZip
+      tags:
+        - certificates
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: previousFingerprint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ZIP archive containing all files from previous version
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
 
   /certificates/{fingerprint}/passphrase:
     get:
@@ -2434,6 +2436,306 @@ paths:
                         type: string
                       documents:
                         type: string
+
+  /integrations/npm/check-connection:
+    post:
+      summary: Check connection to Nginx Proxy Manager API
+      operationId: checkNpmConnection
+      tags:
+        - integrations
+        - deployment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiUrl:
+                  type: string
+                  description: Nginx Proxy Manager API URL (optional, uses global settings if not provided)
+      responses:
+        "200":
+          description: Connection check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Invalid request or missing settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /integrations/npm/request-token:
+    post:
+      summary: Request authentication token from Nginx Proxy Manager
+      operationId: requestNpmToken
+      tags:
+        - integrations
+        - deployment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiUrl:
+                  type: string
+                  description: Nginx Proxy Manager API URL (optional, uses global settings if not provided)
+                email:
+                  type: string
+                  format: email
+                  description: Email for NPM authentication (optional, uses global settings if not provided)
+                password:
+                  type: string
+                  format: password
+                  description: Password for NPM authentication (optional, uses global settings if not provided)
+      responses:
+        "200":
+          description: Token request result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  token:
+                    type: string
+                    description: Authentication token (if successful)
+        "400":
+          description: Invalid request or missing settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /integrations/npm/validate-token:
+    get:
+      summary: Validate Nginx Proxy Manager authentication token
+      operationId: validateNpmToken
+      tags:
+        - integrations
+        - deployment
+      responses:
+        "200":
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  valid:
+                    type: boolean
+                    description: Whether the token is valid
+                  message:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        type: string
+        "400":
+          description: Invalid request or missing settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /integrations/npm/certificates:
+    get:
+      summary: Get certificates from Nginx Proxy Manager
+      operationId: getNpmCertificates
+      tags:
+        - integrations
+        - deployment
+      responses:
+        "200":
+          description: Certificates from NPM
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  certificates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        domain:
+                          type: string
+                        nice_name:
+                          type: string
+                        expires_on:
+                          type: string
+                          format: date-time
+        "400":
+          description: Invalid request or missing settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  
+  /integrations/npm/status:
+    get:
+      summary: Get NPM connection status
+      operationId: getNpmStatus
+      tags:
+        - integrations
+        - deployment
+      responses:
+        "200":
+          description: NPM connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  configured:
+                    type: boolean
+                    description: Whether NPM is configured
+                  hasToken:
+                    type: boolean
+                    description: Whether we have a token stored
+                  connected:
+                    type: boolean
+                    description: Whether we can connect to NPM
+                  tokenValid:
+                    type: boolean
+                    description: Whether the token is valid
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        type: string
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+                
+  /integrations/npm/certificates/{id}:
+    post:
+      summary: Update a certificate in Nginx Proxy Manager
+      operationId: updateNpmCertificate
+      tags:
+        - integrations
+        - deployment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: NPM certificate ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - certData
+              properties:
+                certData:
+                  type: object
+                  required:
+                    - certificate
+                    - key
+                  properties:
+                    certificate:
+                      type: string
+                      description: Certificate content (PEM format)
+                    key:
+                      type: string
+                      description: Private key content (PEM format)
+                    chain:
+                      type: string
+                      description: Certificate chain content (PEM format)
+                apiUrl:
+                  type: string
+                  description: Nginx Proxy Manager API URL (optional, uses global settings if not provided)
+                token:
+                  type: string
+                  description: Authentication token (optional, uses global settings if not provided)
+      responses:
+        "200":
+          description: Certificate update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  certificate:
+                    type: object
+                    description: Updated certificate details
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /logs:
     get:
@@ -3369,6 +3671,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/renewal:
+    get:
+      summary: Get auto-renewal settings
+      operationId: getRenewalSettings
+      tags:
+        - settings
+      responses:
+        "200":
+          description: Current renewal settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enableAutoRenewalJob:
+                    type: boolean
+                  renewalSchedule:
+                    type: string
+                  renewDaysBeforeExpiry:
+                    type: integer
+                  enableFileWatch:
+                    type: boolean
+                  includeIdleDomainsOnRenewal:
+                    type: boolean
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    
+    put:
+      summary: Update auto-renewal settings
+      operationId: updateRenewalSettings
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enableAutoRenewalJob:
+                  type: boolean
+                renewalSchedule:
+                  type: string
+                renewDaysBeforeExpiry:
+                  type: integer
+                enableFileWatch:
+                  type: boolean
+                includeIdleDomainsOnRenewal:
+                  type: boolean
+      responses:
+        "200":
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  settings:
+                    type: object
+                    properties:
+                      enableAutoRenewalJob:
+                        type: boolean
+                      renewalSchedule:
+                        type: string
+                      renewDaysBeforeExpiry:
+                        type: integer
+                      enableFileWatch:
+                        type: boolean
+                      includeIdleDomainsOnRenewal:
+                        type: boolean
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /public/logLevel:
     get:
       tags:
@@ -4143,6 +4536,8 @@ components:
           type: boolean
         renewDaysBeforeExpiry:
           type: integer
+        includeIdleDomainsOnRenewal:
+          type: boolean
         logLevel:
           type: string
           enum: [error, warn, info, debug]

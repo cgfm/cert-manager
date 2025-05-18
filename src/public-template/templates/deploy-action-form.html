@@ -95,11 +95,20 @@
     
     <!-- Nginx Proxy Manager Options -->
     <div id="nginx-proxy-manager-action-options" class="action-type-options hidden">
+      <div id="npm-connection-status" class="npm-status-message">
+        <i class="fas fa-spinner fa-spin"></i> Checking connection to Nginx Proxy Manager...
+      </div>
+      
       <div class="form-group">
         <label>Update Method</label>
         <div class="toggle-options">
           <label class="radio-option">
-            <input type="radio" id="npm-method-path" name="npm-method" value="path" checked>
+            <input type="radio" id="npm-method-api" name="npm-method" value="api" checked>
+            <span></span>
+            NPM API
+          </label>
+          <label class="radio-option">
+            <input type="radio" id="npm-method-path" name="npm-method" value="path">
             <span></span>
             NPM Installation Path
           </label>
@@ -111,6 +120,7 @@
         </div>
       </div>
       
+      <!-- Path installation method -->
       <div id="npm-path-group">
         <div class="form-group">
           <label for="npm-path">Nginx Proxy Manager Path</label>
@@ -122,11 +132,76 @@
         </div>
       </div>
       
+      <!-- Docker container method -->
       <div id="npm-docker-group" class="hidden">
         <div class="form-group">
           <label for="npm-docker-container">Docker Container Name</label>
           <input type="text" id="npm-docker-container" class="form-control" placeholder="nginx-proxy-manager">
           <div class="help-text">Name of the Nginx Proxy Manager container</div>
+        </div>
+      </div>
+      
+      <!-- API method -->
+      <div id="npm-api-group" class="hidden">
+        <div class="form-group">
+          <label for="npm-api-url">NPM API URL</label>
+          <input type="text" id="npm-api-url" class="form-control" placeholder="https://npm.example.com">
+          <div class="help-text">URL of your Nginx Proxy Manager instance</div>
+        </div>
+        
+        <div class="form-group">
+          <div class="connection-status" id="npm-api-status">
+            <span class="status-indicator"></span>
+            <span class="status-text">Checking connection...</span>
+          </div>
+          <button type="button" id="npm-test-connection" class="button secondary">Test Connection</button>
+          <button type="button" id="npm-request-token" class="button secondary hidden">Request Token</button>
+        </div>
+      </div>
+            
+      <!-- Certificate target selection -->
+      <div id="npm-certificate-selection" class="hidden">
+        <div class="section-divider"><span>Target Certificate</span></div>
+        
+        <div class="form-group">
+          <label for="npm-certificate-id">Target Certificate</label>
+          <select id="npm-certificate-id" class="form-control">
+            <option value="">Loading certificates...</option>
+          </select>
+          <div class="help-text">Select which NPM certificate to update</div>
+        </div>
+        
+        <!-- Certificate details preview -->
+        <div id="npm-certificate-preview" class="certificate-preview hidden">
+          <div class="preview-row">
+            <span class="preview-label">Domain:</span>
+            <span class="preview-value" id="npm-cert-domain">example.com</span>
+          </div>
+          <div class="preview-row">
+            <span class="preview-label">Expires:</span>
+            <span class="preview-value" id="npm-cert-expiry">2023-12-31</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Deployment options -->
+      <div id="npm-options" class="hidden">
+        <div class="section-divider"><span>Options</span></div>
+        
+        <div class="form-group">
+          <div class="toggle-switch">
+            <input type="checkbox" id="npm-restart-services" checked>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Restart NPM services after update</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <div class="toggle-switch">
+            <input type="checkbox" id="npm-verify-update">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Verify certificate after update</span>
+          </div>
         </div>
       </div>
     </div>

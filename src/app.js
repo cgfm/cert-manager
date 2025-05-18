@@ -11,10 +11,11 @@ const ActivityService = require('./services/activity-service');
 const LogsService = require('./services/logs-service');
 const FileSystemService = require('./services/filesystem-service');
 const DockerService = require('./services/docker-service');
-const deployService = require('./services/deploy-service');
+const NpmIntegrationService = require('./services/npm-integration-service');
 const AuthMiddleware = require('./middleware/auth');
 const UserManager = require('./services/user-manager');
 const cookieParser = require('cookie-parser');
+const DeployService = require('./services/deploy-service');
 
 const FILENAME = 'app.js';
 global.systemReady = false;
@@ -86,6 +87,10 @@ async function startApp() {
 
     const openSSL = new OpenSSLWrapper();
 
+    const npmIntegrationService = new NpmIntegrationService({
+        configService: configService
+    });
+
     // Initialize services
     const certificateManager = new CertificateManager(
       config.certPath,
@@ -94,6 +99,13 @@ async function startApp() {
       openSSL,
       activityService
     );
+
+    // Initialize the Deploy Service with the NPM integration service
+    const deployService = new DeployService({
+      certificateManager,
+      dockerService,
+      npmIntegrationService
+    });
 
     // Initialize renewal service
     const renewalService = new RenewalService(certificateManager, {
@@ -238,7 +250,9 @@ async function startApp() {
       fileSystemService,
       dockerService,
       userManager,
-      authMiddleware
+      authMiddleware,
+      npmIntegrationService,
+      deployService
     }));
 
     // Serve frontend for any other route (already protected by auth middleware)

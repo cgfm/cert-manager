@@ -26,7 +26,7 @@ class RenewalService {
      * @param {CertificateManager} certificateManager - Certificate manager instance
      * @param {Object} options - Configuration options
      */
-    constructor(certificateManager, options = {}) {
+    constructor(certificateManager, deployService, options = {}) {
         this.certificateManager = certificateManager;
         this.options = {
             renewalSchedule: options.renewalSchedule || '0 0 * * *', // Default: daily at midnight
@@ -560,45 +560,64 @@ class RenewalService {
 
             // Determine if a signing CA is needed
             let signingCA = null;
-            if (certificate.signWithCA && certificate.caFingerprint) {
-                signingCA = this.certificateManager.getCertificate(certificate.caFingerprint);
-
+            if (certificate.config?.signWithCA && certificate.config?.caFingerprint) {
+                const caFingerprint = certificate.config.caFingerprint;
+                logger.debug(`Certificate requires signing CA: ${caFingerprint}`, null, FILENAME);
+                
+                signingCA = this.certificateManager.getCertificate(caFingerprint);
                 if (!signingCA) {
-                    throw new Error(`Signing CA with fingerprint ${certificate.caFingerprint} not found`);
+                    throw new Error(`Signing CA with fingerprint ${caFingerprint} not found`);
                 }
+                
+                logger.debug(`Found signing CA: ${signingCA.name}`, null, FILENAME);
             }
 
             // Get stored passphrase if available
             let certPassphrase = null;
             if (certificate.hasStoredPassphrase(this.certificateManager.passphraseManager)) {
                 certPassphrase = certificate.getPassphrase(this.certificateManager.passphraseManager);
+                logger.debug(`Using stored passphrase for certificate ${certificate.name}`, null, FILENAME);
             }
 
-            // Renew the certificate with deploy actions
-            const result = await this.certificateManager.renewAndDeployCertificate(
+            // Set up CA passphrase if needed
+            let caPassphrase = null;
+            if (signingCA && signingCA.needsPassphrase && this.certificateManager.passphraseManager) {
+                caPassphrase = this.certificateManager.passphraseManager.getPassphrase(signingCA.fingerprint);
+                logger.debug(`Using stored passphrase for CA ${signingCA.name}`, null, FILENAME);
+            }
+            
+            const includeIdle = this.certificateManager.configService.get('includeIdleDomainsOnRenewal') !== false;
+
+            const result = await this.certificateManager.createOrRenewCertificate(
                 certificate.fingerprint,
                 {
-                    signingCA,
-                    passphrase: certPassphrase
+                    days: certificate.config?.days || 365,
+                    passphrase: certPassphrase,
+                    caPassphrase: caPassphrase,
+                    deploy: true,
+                    createBackup: true,
+                    preserveFormats: true, 
+                    recordActivity: true,
+                    user: { username: 'renewal-service', isSystem: true }, // Use system user for auto-renewals
+                    includeIdle: includeIdle
                 }
             );
 
-            // Save certificate configurations
-            await this.certificateManager.saveCertificateConfigs();
-
-            // Determine if deploy actions were successful
-            const deploySuccess = result.deployResult ? result.deployResult.success : true;
-
-            logger.info(`Certificate ${certificate.name} renewed successfully`, null, FILENAME);
-
-            // Notify CertificateManager about the change
-            certificateManager.notifyCertificateChanged(fingerprint, 'update');
-
-            return {
-                success: true,
-                certificate,
-                deploySuccess
-            };
+            // Determine if the renewal was successful
+            if (result.success) {
+                logger.info(`Certificate ${certificate.name} renewed successfully`, null, FILENAME);
+                
+                // Determine if deploy actions were successful
+                const deploySuccess = result.deployResult ? result.deployResult.success : true;
+                
+                return {
+                    success: true,
+                    certificate,
+                    deploySuccess
+                };
+            } else {
+                throw new Error(result.error || 'Unknown error during renewal');
+            }
         } catch (error) {
             logger.error(`Failed to renew certificate ${certificate.name}:`, error, FILENAME);
 

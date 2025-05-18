@@ -81,6 +81,21 @@ const execAsync = promisify(exec);
  */
 class DeployService {
     /**
+     * Creates an instance of DeployService.
+     * @param {Object} services - Optional services to inject
+     * @param {Object} services.certificateManager - Certificate manager service
+     * @param {Object} services.dockerService - Docker service
+     * @param {Object} services.npmIntegrationService - Nginx Proxy Manager integration service
+     * @constructor
+     */      
+    constructor(services = null) {
+        const { certificateManager, dockerService, npmIntegrationService } = services || {};
+        this.dockerService = dockerService;
+        this.certificateManager = certificateManager;
+        this.npmIntegrationService = npmIntegrationService;
+    }
+
+    /**
      * Execute deployment actions for a certificate
      * @param {Certificate} certificate - Certificate object
      * @param {Array} actions - Deployment actions to execute
@@ -596,249 +611,188 @@ class DeployService {
      * @returns {Promise<Object>} Result of the NPM update
      */
     async executeNginxProxyManagerAction(certificate, action) {
-        logger.finest(`executeNginxProxyManagerAction called for certificate: ${certificate.name}`, {
-            fingerprint: certificate.fingerprint,
-            action
-        }, FILENAME);
+    logger.finest(`executeNginxProxyManagerAction called for certificate: ${certificate.name}`, {
+        fingerprint: certificate.fingerprint,
+        action
+    }, FILENAME);
 
-        if (!action.npmPath && !action.dockerContainer && !action.useAPI) {
-            // Try to load global settings if not provided in action
-            logger.debug('No Nginx Proxy Manager path specified, checking global settings', null, FILENAME);
+    // First check if this is a file-based deployment (legacy methods)
+    if (action.npmPath || action.dockerContainer) {
+        return this._executeNginxProxyManagerFileAction(certificate, action);
+    }
 
-            try {
-                // Load global settings
-                const fs = require('fs');
-                const path = require('path');
-                const configDir = process.env.CONFIG_DIR || path.join(process.cwd(), 'config');
-                const settingsPath = path.join(configDir, 'deployment-settings.json');
-
-                if (fs.existsSync(settingsPath)) {
-                    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-
-                    if (settings?.deployment?.nginxProxyManager?.host) {
-                        logger.debug('Using global Nginx Proxy Manager API settings', null, FILENAME);
-
-                        // Make a copy of the action to not modify the original
-                        action = { ...action };
-
-                        // Use API mode with global settings
-                        action.useAPI = true;
-                        action.npmHost = settings.deployment.nginxProxyManager.host;
-                        action.npmPort = settings.deployment.nginxProxyManager.port || 81;
-                        action.npmUseHttps = settings.deployment.nginxProxyManager.useHttps;
-                        action.npmUsername = settings.deployment.nginxProxyManager.username;
-                        action.npmPassword = settings.deployment.nginxProxyManager.password;
-                        action.npmAccessToken = settings.deployment.nginxProxyManager.accessToken;
-                        action.npmRefreshToken = settings.deployment.nginxProxyManager.refreshToken;
-                        action.npmTokenExpiry = settings.deployment.nginxProxyManager.tokenExpiry;
-
-                        logger.fine(`Using global NPM settings: ${action.npmHost}:${action.npmPort}`, null, FILENAME);
-                    }
-                }
-            } catch (settingsError) {
-                logger.warn(`Failed to load global NPM settings: ${settingsError.message}`, null, FILENAME);
-            }
+    // This is an API-based deployment - use the NPM integration service
+    try {
+        logger.debug('Using NPM Integration Service for certificate update', null, FILENAME);
+        
+        // Get the NPM integration service
+        const npmIntegrationService = this.services.npmIntegrationService;
+        if (!npmIntegrationService) {
+        logger.error('NPM Integration Service not available', null, FILENAME);
+        throw new Error('NPM Integration Service not available');
         }
+        
+        logger.debug('NPM Integration Service is available', null, FILENAME);
 
-        if (!action.npmPath && !action.dockerContainer && !action.useAPI) {
-            logger.error('Nginx Proxy Manager action missing required npmPath, dockerContainer, or API settings', null, FILENAME);
-            throw new Error('Nginx Proxy Manager action requires npmPath, dockerContainer property, or API settings');
-        }
-
-        // Handle API mode for Nginx Proxy Manager
-        if (action.useAPI) {
-            return await this._executeNginxProxyManagerAPIAction(certificate, action);
-        }
-
-        // Check if we have all required certificate files
-        logger.debug('Checking if certificate files exist', null, FILENAME);
+        // Read certificate files
         if (!certificate.paths.crtPath || !certificate.paths.keyPath) {
-            logger.error('Certificate and key files are required for Nginx Proxy Manager update', null, FILENAME);
-            throw new Error('Certificate and key files are required for Nginx Proxy Manager update');
+        logger.error('Certificate and key files are required for Nginx Proxy Manager update', null, FILENAME);
+        throw new Error('Certificate and key files are required for Nginx Proxy Manager update');
         }
 
-        logger.debug(`Certificate file: ${certificate.paths.crtPath}, exists: ${fs.existsSync(certificate.paths.crtPath)}`, null, FILENAME);
-        logger.debug(`Key file: ${certificate.paths.keyPath}, exists: ${fs.existsSync(certificate.paths.keyPath)}`, null, FILENAME);
+        const certContent = fs.readFileSync(certificate.paths.crtPath, 'utf8');
+        const keyContent = fs.readFileSync(certificate.paths.keyPath, 'utf8');
+        
+        // Get chain content if available
+        let chainContent = '';
+        if (certificate.paths.chainPath && fs.existsSync(certificate.paths.chainPath)) {
+        chainContent = fs.readFileSync(certificate.paths.chainPath, 'utf8');
+        logger.debug(`Chain file loaded: ${certificate.paths.chainPath}`, null, FILENAME);
+        } else if (certificate.paths.fullchainPath && fs.existsSync(certificate.paths.fullchainPath)) {
+        // Extract chain from fullchain by removing the certificate part
+        const fullchain = fs.readFileSync(certificate.paths.fullchainPath, 'utf8');
+        chainContent = fullchain.replace(certContent, '').trim();
+        logger.debug(`Chain extracted from fullchain: ${certificate.paths.fullchainPath}`, null, FILENAME);
+        }
 
-        let npmLetsEncryptDir;
+        const certData = {
+        certificate: certContent,
+        key: keyContent,
+        ...(chainContent && { chain: chainContent })
+        };
 
+        // Set up custom settings if specified in the action
+        let customSettings = null;
+        if (action.npmUrl) {
         try {
-            // Determine Nginx Proxy Manager path
-            if (action.npmPath) {
-                // Direct path to Nginx Proxy Manager installation
-                npmLetsEncryptDir = path.join(action.npmPath, 'letsencrypt');
-                logger.debug(`Using local NPM path: ${npmLetsEncryptDir}`, null, FILENAME);
-
-                if (!fs.existsSync(action.npmPath)) {
-                    logger.error(`NPM path doesn't exist: ${action.npmPath}`, null, FILENAME);
-                    throw new Error(`NPM path doesn't exist: ${action.npmPath}`);
-                }
-
-                if (!fs.existsSync(npmLetsEncryptDir)) {
-                    logger.warn(`NPM letsencrypt directory doesn't exist, creating: ${npmLetsEncryptDir}`, null, FILENAME);
-                    fs.mkdirSync(npmLetsEncryptDir, { recursive: true });
-                }
-            } else {
-                // Docker container-based Nginx Proxy Manager
-                logger.debug('Using Docker container for NPM deployment', null, FILENAME);
-
-                logger.debug('Checking if Docker is available', null, FILENAME);
-                if (!dockerService.isAvailable) {
-                    logger.error('Docker is not available for Nginx Proxy Manager container access', null, FILENAME);
-                    throw new Error('Docker is not available for Nginx Proxy Manager container access');
-                }
-                logger.debug('Docker is available', null, FILENAME);
-
-                // Find the container
-                logger.debug(`Looking for NPM container: ${action.dockerContainer}`, null, FILENAME);
-                const containers = await dockerService.getContainers();
-                logger.finest(`Found ${containers.length} Docker containers`, null, FILENAME);
-
-                // For debugging, log found containers
-                containers.forEach(c => {
-                    logger.finest(`Docker container: ID=${c.Id.substring(0, 12)}, Names=${c.Names.join(', ')}, State=${c.State}`, null, FILENAME);
-                });
-
-                const container = containers.find(c => {
-                    return c.Names.some(name => name.replace(/^\//, '') === action.dockerContainer);
-                });
-
-                if (!container) {
-                    logger.error(`Docker container not found with name: ${action.dockerContainer}`, null, FILENAME);
-                    throw new Error(`Docker container not found with name: ${action.dockerContainer}`);
-                }
-                logger.debug(`Found NPM container: ${container.Id.substring(0, 12)}`, null, FILENAME);
-
-                // Create a temp directory for NPM certificate files
-                const tempNpmDir = path.join(os.tmpdir(), 'npm-cert-update', certificate.fingerprint);
-                logger.debug(`Creating temp directory for NPM certificate files: ${tempNpmDir}`, null, FILENAME);
-                await fs.promises.mkdir(tempNpmDir, { recursive: true });
-                logger.fine(`Temp directory created: ${tempNpmDir}`, null, FILENAME);
-
-                // Copy certificate files to temp directory
-                const certTempPath = path.join(tempNpmDir, 'fullchain.pem');
-                const keyTempPath = path.join(tempNpmDir, 'privkey.pem');
-
-                logger.debug(`Copying certificate to temp file: ${certTempPath}`, null, FILENAME);
-                await fs.promises.copyFile(certificate.paths.crtPath, certTempPath);
-
-                logger.debug(`Copying key to temp file: ${keyTempPath}`, null, FILENAME);
-                await fs.promises.copyFile(certificate.paths.keyPath, keyTempPath);
-
-                logger.fine(`Certificate files copied to temp directory`, null, FILENAME);
-
-                // Copy files to container
-                const dockerContainer = dockerService.docker.getContainer(container.Id);
-
-                // Determine the NPM letsencrypt directory inside the container
-                const npmContainerDir = '/etc/letsencrypt/live/custom-' + certificate.name.replace(/\./g, '-');
-                logger.debug(`Target directory in NPM container: ${npmContainerDir}`, null, FILENAME);
-
-                // Ensure directory exists in container
-                logger.debug(`Creating directory in container: ${npmContainerDir}`, null, FILENAME);
-                const mkdirCommand = `docker exec ${container.Id} mkdir -p ${npmContainerDir}`;
-                logger.finest(`Executing command: ${mkdirCommand}`, null, FILENAME);
-
-                const mkdirResult = await execAsync(mkdirCommand);
-                logger.finest(`mkdir result: ${JSON.stringify(mkdirResult)}`, null, FILENAME);
-
-                // Copy files to container
-                logger.debug(`Copying certificate to container: ${npmContainerDir}/fullchain.pem`, null, FILENAME);
-                const certCopyCommand = `docker cp ${certTempPath} ${container.Id}:${npmContainerDir}/fullchain.pem`;
-                logger.finest(`Executing command: ${certCopyCommand}`, null, FILENAME);
-
-                const certCopyResult = await execAsync(certCopyCommand);
-                logger.finest(`Certificate copy result: ${JSON.stringify(certCopyResult)}`, null, FILENAME);
-
-                logger.debug(`Copying key to container: ${npmContainerDir}/privkey.pem`, null, FILENAME);
-                const keyCopyCommand = `docker cp ${keyTempPath} ${container.Id}:${npmContainerDir}/privkey.pem`;
-                logger.finest(`Executing command: ${keyCopyCommand}`, null, FILENAME);
-
-                const keyCopyResult = await execAsync(keyCopyCommand);
-                logger.finest(`Key copy result: ${JSON.stringify(keyCopyResult)}`, null, FILENAME);
-
-                // Verify files were copied correctly
-                logger.debug(`Verifying files were copied to container`, null, FILENAME);
-                const verifyCommand = `docker exec ${container.Id} ls -la ${npmContainerDir}/`;
-                logger.finest(`Executing command: ${verifyCommand}`, null, FILENAME);
-
-                try {
-                    const verifyResult = await execAsync(verifyCommand);
-                    logger.debug(`Files in container directory: ${verifyResult.stdout}`, null, FILENAME);
-                } catch (verifyError) {
-                    logger.warn(`Could not verify files in container: ${verifyError.message}`, null, FILENAME);
-                }
-
-                // Clean up temp directory
-                logger.debug(`Cleaning up temp directory: ${tempNpmDir}`, null, FILENAME);
-                await fs.promises.rm(tempNpmDir, { recursive: true, force: true });
-                logger.fine(`Temp directory removed`, null, FILENAME);
-
-                // Restart the container to apply changes
-                logger.info(`Restarting NPM container to apply changes: ${action.dockerContainer}`, null, FILENAME);
-                await dockerService.restartContainer(container.Id);
-                logger.fine(`NPM container restart initiated`, null, FILENAME);
-
-                // Wait a moment to allow the container to restart
-                logger.debug(`Waiting 3 seconds for container restart...`, null, FILENAME);
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                // Check container status after restart
-                try {
-                    const containerInfo = await dockerService.docker.getContainer(container.Id).inspect();
-                    logger.debug(`Container status after restart: ${containerInfo.State.Status}`, null, FILENAME);
-
-                    if (containerInfo.State.Status !== 'running') {
-                        logger.warn(`Container may not have restarted properly: ${containerInfo.State.Status}`, null, FILENAME);
-                    } else {
-                        logger.fine(`Container is running after restart`, null, FILENAME);
-                    }
-                } catch (inspectError) {
-                    logger.warn(`Could not inspect container after restart: ${inspectError.message}`, null, FILENAME);
-                }
-
-                logger.info(`Nginx Proxy Manager certificate update completed in container ${action.dockerContainer}`, null, FILENAME);
-                return {
-                    success: true,
-                    message: `Nginx Proxy Manager certificate updated in container ${action.dockerContainer}`,
-                    containerName: action.dockerContainer
-                };
-            }
-
-            // Local NPM installation
-            const certName = `custom-${certificate.name.replace(/\./g, '-')}`;
-            const npmCertDir = path.join(npmLetsEncryptDir, 'live', certName);
-            logger.debug(`Using NPM certificate directory: ${npmCertDir}`, null, FILENAME);
-
-            // Create NPM certificate directory if it doesn't exist
-            logger.debug(`Creating NPM certificate directory: ${npmCertDir}`, null, FILENAME);
-            await fs.promises.mkdir(npmCertDir, { recursive: true });
-            logger.fine(`NPM certificate directory created or already exists`, null, FILENAME);
-
-            // Copy certificate files
-            logger.debug(`Copying certificate to NPM: ${npmCertDir}/fullchain.pem`, null, FILENAME);
-            await fs.promises.copyFile(certificate.paths.crtPath, path.join(npmCertDir, 'fullchain.pem'));
-
-            logger.debug(`Copying key to NPM: ${npmCertDir}/privkey.pem`, null, FILENAME);
-            await fs.promises.copyFile(certificate.paths.keyPath, path.join(npmCertDir, 'privkey.pem'));
-
-            logger.fine(`Certificate files copied to NPM directory`, null, FILENAME);
-
-            // Create a restart flag file to trigger NPM reload
-            const restartFlagFile = path.join(npmLetsEncryptDir, 'reload.nginx');
-            logger.debug(`Creating NPM reload flag file: ${restartFlagFile}`, null, FILENAME);
-            await fs.promises.writeFile(restartFlagFile, new Date().toISOString(), 'utf8');
-            logger.fine(`NPM reload flag file created`, null, FILENAME);
-
-            logger.info(`Nginx Proxy Manager certificate updated at ${npmCertDir}`, null, FILENAME);
-            return {
-                success: true,
-                message: `Nginx Proxy Manager certificate updated at ${npmCertDir}`,
-                npmCertDir
+            const url = new URL(action.npmUrl);
+            const host = url.hostname;
+            const port = url.port ? parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : 80);
+            const useHttps = url.protocol === 'https:';
+            
+            customSettings = {
+            host: host,
+            port: port,
+            useHttps: useHttps,
+            rejectUnauthorized: action.rejectUnauthorized !== false, // Default to true unless explicitly set to false
             };
+            
+            logger.debug(`Using custom NPM settings from URL: ${action.npmUrl}`, customSettings, FILENAME);
+        } catch (urlError) {
+            logger.error(`Invalid NPM URL: ${action.npmUrl}`, urlError, FILENAME);
+            throw new Error(`Invalid NPM URL: ${action.npmUrl}`);
+        }
+        }
+        
+        // If we have a certificate ID, update the existing certificate
+        if (action.certificateId) {
+        const certId = action.certificateId;
+        logger.info(`Updating existing NPM certificate ID: ${certId}`, null, FILENAME);
+        
+        // Use the integration service to update the certificate
+        const updateResult = await npmIntegrationService.updateCertificate(certId, certData, customSettings);
+        
+        if (!updateResult.success) {
+            logger.error(`Failed to update certificate in NPM: ${updateResult.message}`, null, FILENAME);
+            throw new Error(`Failed to update certificate in NPM: ${updateResult.message}`);
+        }
+        
+        logger.info(`Certificate updated successfully in NPM. ID: ${certId}`, null, FILENAME);
+        
+        // Handle restart if requested
+        if (action.restartServices) {
+            logger.info('Restarting NPM services as requested', null, FILENAME);
+            // TODO: Add service restart capability to the NPM integration service
+        }
+        
+        return {
+            success: true,
+            message: `Certificate updated in Nginx Proxy Manager via API`,
+            certId: certId,
+            mode: 'update'
+        };
+        } else {
+        // If no certificate ID is provided, we can't update anything
+        logger.error('No target certificate ID specified for NPM update', null, FILENAME);
+        throw new Error('No target certificate ID specified for NPM update');
+        }
+    } catch (error) {
+        logger.error(`Nginx Proxy Manager API action failed: ${error.message}`, error, FILENAME);
+        throw error;
+    }
+    }
+
+    /**
+     * Apply certificate to NPM hosts
+     * @private
+     * @param {Object} npmIntegrationService - NPM integration service
+     * @param {string} certId - Certificate ID
+     * @param {Array} hosts - Host identifiers (names or IDs)
+     * @param {Object} customSettings - Custom NPM settings
+     * @returns {Promise<void>}
+     */
+    async _applyNpmCertificateToHosts(npmIntegrationService, certId, hosts, customSettings) {
+        logger.info(`Applying certificate to ${hosts.length} hosts in NPM`, null, FILENAME);
+        
+        try {
+            // We need to call the API directly since the integration service doesn't
+            // yet support host operations
+            
+            // Ensure we have valid token
+            const tokenResult = await npmIntegrationService.ensureValidToken(customSettings);
+            if (!tokenResult.success) {
+                logger.error(`Failed to get valid token for host updates: ${tokenResult.message}`, null, FILENAME);
+                throw new Error(`Failed to get valid token for host updates: ${tokenResult.message}`);
+            }
+            
+            // Get NPM settings
+            const npmSettings = customSettings || npmIntegrationService.getSettings();
+            const apiUrl = npmIntegrationService.buildApiUrl(npmSettings);
+            
+            if (!apiUrl) {
+                logger.error('Invalid NPM settings - could not build API URL', null, FILENAME);
+                throw new Error('Invalid NPM settings - could not build API URL');
+            }
+            
+            // Set up request options
+            const options = {
+                headers: {
+                    'Authorization': `Bearer ${npmSettings.accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            // Get host list
+            logger.debug('Getting host list from NPM', null, FILENAME);
+            const hostsResponse = await axios.get(`${apiUrl}nginx/proxy-hosts`, options);
+            
+            for (const hostIdentifier of hosts) {
+                // Find host by domain name or ID
+                const host = hostsResponse.data.find(h =>
+                    h.domain_names.includes(hostIdentifier) || h.id == hostIdentifier);
+                
+                if (host) {
+                    logger.debug(`Found host: ${host.domain_names.join(', ')} (ID: ${host.id})`, null, FILENAME);
+                    
+                    // Update host to use this certificate
+                    const updatedHost = {
+                        ...host,
+                        certificate_id: certId,
+                        ssl_forced: true,
+                        ssl_enabled: true
+                    };
+                    
+                    await axios.put(`${apiUrl}nginx/proxy-hosts/${host.id}`, updatedHost, options);
+                    logger.debug(`Updated host ${host.id} to use certificate ${certId}`, null, FILENAME);
+                } else {
+                    logger.warn(`Could not find host in NPM: ${hostIdentifier}`, null, FILENAME);
+                }
+            }
+            
+            logger.info('Host updates completed successfully', null, FILENAME);
         } catch (error) {
-            logger.error(`Nginx Proxy Manager action failed: ${error.message}`, error, FILENAME);
-            throw error;
+            logger.error(`Failed to apply certificate to hosts: ${error.message}`, error, FILENAME);
+            throw new Error(`Failed to apply certificate to hosts: ${error.message}`);
         }
     }
 
@@ -1048,6 +1002,216 @@ class DeployService {
             };
         } catch (error) {
             logger.error(`Nginx Proxy Manager API action failed: ${error.message}`, error, FILENAME);
+            throw error;
+        }
+    }
+
+    /**
+     * Execute a Nginx Proxy Manager update via files or Docker
+     * @private
+     * @param {Certificate} certificate - Certificate object
+     * @param {Object} action - Nginx Proxy Manager file action configuration
+     * @returns {Promise<Object>} Result of the NPM update
+     */
+    async _executeNginxProxyManagerFileAction(certificate, action) {
+        logger.finest(`_executeNginxProxyManagerFileAction called for certificate: ${certificate.name}`, {
+            fingerprint: certificate.fingerprint,
+            action
+        }, FILENAME);
+
+        if (!action.npmPath && !action.dockerContainer) {
+            logger.error('Nginx Proxy Manager file action missing required npmPath or dockerContainer property', null, FILENAME);
+            throw new Error('Nginx Proxy Manager file action requires npmPath or dockerContainer property');
+        }
+
+        // Check if we have all required certificate files
+        logger.debug('Checking if certificate files exist', null, FILENAME);
+        if (!certificate.paths.crtPath || !certificate.paths.keyPath) {
+            logger.error('Certificate and key files are required for Nginx Proxy Manager update', null, FILENAME);
+            throw new Error('Certificate and key files are required for Nginx Proxy Manager update');
+        }
+
+        logger.debug(`Certificate file: ${certificate.paths.crtPath}, exists: ${fs.existsSync(certificate.paths.crtPath)}`, null, FILENAME);
+        logger.debug(`Key file: ${certificate.paths.keyPath}, exists: ${fs.existsSync(certificate.paths.keyPath)}`, null, FILENAME);
+
+        let npmLetsEncryptDir;
+
+        try {
+            // Determine Nginx Proxy Manager path
+            if (action.npmPath) {
+                // Direct path to Nginx Proxy Manager installation
+                npmLetsEncryptDir = path.join(action.npmPath, 'letsencrypt');
+                logger.debug(`Using local NPM path: ${npmLetsEncryptDir}`, null, FILENAME);
+
+                if (!fs.existsSync(action.npmPath)) {
+                    logger.error(`NPM path doesn't exist: ${action.npmPath}`, null, FILENAME);
+                    throw new Error(`NPM path doesn't exist: ${action.npmPath}`);
+                }
+
+                if (!fs.existsSync(npmLetsEncryptDir)) {
+                    logger.warn(`NPM letsencrypt directory doesn't exist, creating: ${npmLetsEncryptDir}`, null, FILENAME);
+                    fs.mkdirSync(npmLetsEncryptDir, { recursive: true });
+                }
+            } else {
+                // Docker container-based Nginx Proxy Manager
+                logger.debug('Using Docker container for NPM deployment', null, FILENAME);
+
+                logger.debug('Checking if Docker is available', null, FILENAME);
+                if (!dockerService.isAvailable) {
+                    logger.error('Docker is not available for Nginx Proxy Manager container access', null, FILENAME);
+                    throw new Error('Docker is not available for Nginx Proxy Manager container access');
+                }
+                logger.debug('Docker is available', null, FILENAME);
+
+                // Find the container
+                logger.debug(`Looking for NPM container: ${action.dockerContainer}`, null, FILENAME);
+                const containers = await dockerService.getContainers();
+                logger.finest(`Found ${containers.length} Docker containers`, null, FILENAME);
+
+                // For debugging, log found containers
+                containers.forEach(c => {
+                    logger.finest(`Docker container: ID=${c.Id.substring(0, 12)}, Names=${c.Names.join(', ')}, State=${c.State}`, null, FILENAME);
+                });
+
+                const container = containers.find(c => {
+                    return c.Names.some(name => name.replace(/^\//, '') === action.dockerContainer);
+                });
+
+                if (!container) {
+                    logger.error(`Docker container not found with name: ${action.dockerContainer}`, null, FILENAME);
+                    throw new Error(`Docker container not found with name: ${action.dockerContainer}`);
+                }
+                logger.debug(`Found NPM container: ${container.Id.substring(0, 12)}`, null, FILENAME);
+
+                // Create a temp directory for NPM certificate files
+                const tempNpmDir = path.join(os.tmpdir(), 'npm-cert-update', certificate.fingerprint);
+                logger.debug(`Creating temp directory for NPM certificate files: ${tempNpmDir}`, null, FILENAME);
+                await fs.promises.mkdir(tempNpmDir, { recursive: true });
+                logger.fine(`Temp directory created: ${tempNpmDir}`, null, FILENAME);
+
+                // Copy certificate files to temp directory
+                const certTempPath = path.join(tempNpmDir, 'fullchain.pem');
+                const keyTempPath = path.join(tempNpmDir, 'privkey.pem');
+
+                logger.debug(`Copying certificate to temp file: ${certTempPath}`, null, FILENAME);
+                await fs.promises.copyFile(certificate.paths.crtPath, certTempPath);
+
+                logger.debug(`Copying key to temp file: ${keyTempPath}`, null, FILENAME);
+                await fs.promises.copyFile(certificate.paths.keyPath, keyTempPath);
+
+                logger.fine(`Certificate files copied to temp directory`, null, FILENAME);
+
+                // Copy files to container
+                const dockerContainer = dockerService.docker.getContainer(container.Id);
+
+                // Determine the NPM letsencrypt directory inside the container
+                const npmContainerDir = '/etc/letsencrypt/live/custom-' + certificate.name.replace(/\./g, '-');
+                logger.debug(`Target directory in NPM container: ${npmContainerDir}`, null, FILENAME);
+
+                // Ensure directory exists in container
+                logger.debug(`Creating directory in container: ${npmContainerDir}`, null, FILENAME);
+                const mkdirCommand = `docker exec ${container.Id} mkdir -p ${npmContainerDir}`;
+                logger.finest(`Executing command: ${mkdirCommand}`, null, FILENAME);
+
+                const mkdirResult = await execAsync(mkdirCommand);
+                logger.finest(`mkdir result: ${JSON.stringify(mkdirResult)}`, null, FILENAME);
+
+                // Copy files to container
+                logger.debug(`Copying certificate to container: ${npmContainerDir}/fullchain.pem`, null, FILENAME);
+                const certCopyCommand = `docker cp ${certTempPath} ${container.Id}:${npmContainerDir}/fullchain.pem`;
+                logger.finest(`Executing command: ${certCopyCommand}`, null, FILENAME);
+
+                const certCopyResult = await execAsync(certCopyCommand);
+                logger.finest(`Certificate copy result: ${JSON.stringify(certCopyResult)}`, null, FILENAME);
+
+                logger.debug(`Copying key to container: ${npmContainerDir}/privkey.pem`, null, FILENAME);
+                const keyCopyCommand = `docker cp ${keyTempPath} ${container.Id}:${npmContainerDir}/privkey.pem`;
+                logger.finest(`Executing command: ${keyCopyCommand}`, null, FILENAME);
+
+                const keyCopyResult = await execAsync(keyCopyCommand);
+                logger.finest(`Key copy result: ${JSON.stringify(keyCopyResult)}`, null, FILENAME);
+
+                // Verify files were copied correctly
+                logger.debug(`Verifying files were copied to container`, null, FILENAME);
+                const verifyCommand = `docker exec ${container.Id} ls -la ${npmContainerDir}/`;
+                logger.finest(`Executing command: ${verifyCommand}`, null, FILENAME);
+
+                try {
+                    const verifyResult = await execAsync(verifyCommand);
+                    logger.debug(`Files in container directory: ${verifyResult.stdout}`, null, FILENAME);
+                } catch (verifyError) {
+                    logger.warn(`Could not verify files in container: ${verifyError.message}`, null, FILENAME);
+                }
+
+                // Clean up temp directory
+                logger.debug(`Cleaning up temp directory: ${tempNpmDir}`, null, FILENAME);
+                await fs.promises.rm(tempNpmDir, { recursive: true, force: true });
+                logger.fine(`Temp directory removed`, null, FILENAME);
+
+                // Restart the container to apply changes
+                logger.info(`Restarting NPM container to apply changes: ${action.dockerContainer}`, null, FILENAME);
+                await dockerService.restartContainer(container.Id);
+                logger.fine(`NPM container restart initiated`, null, FILENAME);
+
+                // Wait a moment to allow the container to restart
+                logger.debug(`Waiting 3 seconds for container restart...`, null, FILENAME);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Check container status after restart
+                try {
+                    const containerInfo = await dockerService.docker.getContainer(container.Id).inspect();
+                    logger.debug(`Container status after restart: ${containerInfo.State.Status}`, null, FILENAME);
+
+                    if (containerInfo.State.Status !== 'running') {
+                        logger.warn(`Container may not have restarted properly: ${containerInfo.State.Status}`, null, FILENAME);
+                    } else {
+                        logger.fine(`Container is running after restart`, null, FILENAME);
+                    }
+                } catch (inspectError) {
+                    logger.warn(`Could not inspect container after restart: ${inspectError.message}`, null, FILENAME);
+                }
+
+                logger.info(`Nginx Proxy Manager certificate update completed in container ${action.dockerContainer}`, null, FILENAME);
+                return {
+                    success: true,
+                    message: `Nginx Proxy Manager certificate updated in container ${action.dockerContainer}`,
+                    containerName: action.dockerContainer
+                };
+            }
+
+            // Local NPM installation
+            const certName = `custom-${certificate.name.replace(/\./g, '-')}`;
+            const npmCertDir = path.join(npmLetsEncryptDir, 'live', certName);
+            logger.debug(`Using NPM certificate directory: ${npmCertDir}`, null, FILENAME);
+
+            // Create NPM certificate directory if it doesn't exist
+            logger.debug(`Creating NPM certificate directory: ${npmCertDir}`, null, FILENAME);
+            await fs.promises.mkdir(npmCertDir, { recursive: true });
+            logger.fine(`NPM certificate directory created or already exists`, null, FILENAME);
+
+            // Copy certificate files
+            logger.debug(`Copying certificate to NPM: ${npmCertDir}/fullchain.pem`, null, FILENAME);
+            await fs.promises.copyFile(certificate.paths.crtPath, path.join(npmCertDir, 'fullchain.pem'));
+
+            logger.debug(`Copying key to NPM: ${npmCertDir}/privkey.pem`, null, FILENAME);
+            await fs.promises.copyFile(certificate.paths.keyPath, path.join(npmCertDir, 'privkey.pem'));
+
+            logger.fine(`Certificate files copied to NPM directory`, null, FILENAME);
+
+            // Create a restart flag file to trigger NPM reload
+            const restartFlagFile = path.join(npmLetsEncryptDir, 'reload.nginx');
+            logger.debug(`Creating NPM reload flag file: ${restartFlagFile}`, null, FILENAME);
+            await fs.promises.writeFile(restartFlagFile, new Date().toISOString(), 'utf8');
+            logger.fine(`NPM reload flag file created`, null, FILENAME);
+
+            logger.info(`Nginx Proxy Manager certificate updated at ${npmCertDir}`, null, FILENAME);
+            return {
+                success: true,
+                message: `Nginx Proxy Manager certificate updated at ${npmCertDir}`,
+                npmCertDir
+            };
+        } catch (error) {
+            logger.error(`Nginx Proxy Manager file action failed: ${error.message}`, error, FILENAME);
             throw error;
         }
     }
@@ -2478,9 +2642,11 @@ This is an automated notification from the Certificate Manager.
         logger.finest(`Returning path: ${result}`, null, FILENAME);
         return result;
     }
-
-
-
+    
+    /**
+     * Get deployment settings from the config service
+     * @returns {Object} Deployment settings
+     */
     getDeploymentSettings() {
         try {
             const configService = require('./config-service');
@@ -2503,6 +2669,4 @@ This is an automated notification from the Certificate Manager.
     }
 }
 
-// Create and export a singleton instance
-const deployService = new DeployService();
-module.exports = deployService;
+module.exports = DeployService;

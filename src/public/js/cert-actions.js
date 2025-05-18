@@ -300,7 +300,7 @@ async function saveCertificate() {
   }
 
   // Show loading
-  UIUtils.showNotification("Creating certificate...", "info");
+  UIUtils.showToast("Creating certificate...", "info");
   Logger.info(`${isEdit ? "Updating" : "Creating"} certificate: ${name}`);
 
   try {
@@ -333,7 +333,7 @@ async function saveCertificate() {
     await loadCertificates();
 
     // Show success message
-    UIUtils.showNotification(
+    UIUtils.showToast(
       `Certificate ${isEdit ? "updated" : "created"} successfully`,
       "success"
     );
@@ -442,6 +442,8 @@ async function showCertificateDetails(fingerprint, activeTab = null, ca = false)
         // Load additional data for tabs
         loadCertificateTabData(certificate);
 
+        initializePassphraseManagement(state.currentCertificate);
+        
         // Also explicitly add event listeners for the problematic buttons
         const addActionBtn = document.getElementById('add-deployment-action-btn');
         if (addActionBtn) {
@@ -465,7 +467,7 @@ async function showCertificateDetails(fingerprint, activeTab = null, ca = false)
         }
 
         if (activeTab) {
-          const tabButton = document.querySelector(`button[data-tab="${activeTab}"]`);
+          const tabButton = document.querySelector(`.cert-tab-btn[data-tab="${activeTab}"]`);
           if (tabButton) {
             tabButton.click();
           }
@@ -648,6 +650,467 @@ function addCertificateButtonHandlers(fingerprint) {
       confirmDeleteCertificate();
     }
   });
+}
+
+/**
+ * Initialize passphrase management in certificate details
+ * @param {Object} certificate - The certificate object
+ */
+function initializePassphraseManagement(certificate) {
+  const container = document.getElementById('passphrase-content-container');
+  if (!container) return;
+  
+  // Generate HTML based on certificate properties
+  let contentHtml = '';
+  
+  if (certificate.needsPassphrase) {
+    contentHtml = `
+      <div class="passphrase-status">
+        <i class="fas fa-key"></i>
+        <span>This certificate ${certificate.hasPassphrase ? 'has a stored passphrase' : 'requires a passphrase'}</span>
+      </div>
+      
+      <div class="passphrase-actions">
+        ${certificate.hasPassphrase ? `
+          <button id="remove-passphrase-btn" class="button small">
+            <i class="fas fa-trash"></i> Remove Stored Passphrase
+          </button>
+          <button id="change-passphrase-btn" class="button small">
+            <i class="fas fa-edit"></i> Change Passphrase
+          </button>
+        ` : `
+          <button id="store-passphrase-btn" class="button small primary">
+            <i class="fas fa-save"></i> Store Passphrase
+          </button>
+        `}
+      </div>
+    `;
+  } else {
+    contentHtml = `
+      <div class="passphrase-not-needed">
+        <i class="fas fa-info-circle"></i>
+        <span>This certificate does not require a passphrase</span>
+      </div>
+    `;
+  }
+  
+  // Set the generated HTML
+  container.innerHTML = contentHtml;
+  
+  // Get buttons based on presence of stored passphrase
+  const storePassphraseBtn = document.getElementById('store-passphrase-btn');
+  const removePassphraseBtn = document.getElementById('remove-passphrase-btn');
+  const changePassphraseBtn = document.getElementById('change-passphrase-btn');
+  
+  // Add event listeners
+  if (storePassphraseBtn) {
+    storePassphraseBtn.addEventListener('click', () => {
+      showStorePassphraseModal(certificate.fingerprint);
+    });
+  }
+  
+  if (removePassphraseBtn) {
+    removePassphraseBtn.addEventListener('click', () => {
+      confirmRemovePassphrase(certificate.fingerprint);
+    });
+  }
+  
+  if (changePassphraseBtn) {
+    changePassphraseBtn.addEventListener('click', () => {
+      showChangePassphraseModal(certificate.fingerprint);
+    });
+  }
+}
+/**
+ * Show modal to store a certificate passphrase
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+function showStorePassphraseModal(fingerprint) {
+  Logger.debug(`Opening store passphrase modal for certificate: ${fingerprint}`);
+  
+  // First, ensure any existing modal is removed
+  const existingModal = document.getElementById('store-passphrase-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  UIUtils.showModal('store-passphrase-modal', {
+    title: "Store Certificate Passphrase",
+    content: `
+      <div class="passphrase-modal-content">
+        <p>Enter the passphrase for this certificate to store it securely:</p>
+        
+        <div class="passphrase-form-group">
+          <label for="cert-detail-passphrase-input">Passphrase:</label>
+          <div class="input-group">
+            <input type="password" id="cert-detail-passphrase-input" class="form-control" placeholder="Certificate Passphrase">
+            <div class="input-append">
+              <button type="button" class="toggle-password-btn" tabindex="-1" data-target="cert-detail-passphrase-input">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="passphrase-form-group">
+          <label for="cert-detail-passphrase-confirm">Confirm Passphrase:</label>
+          <div class="input-group">
+            <input type="password" id="cert-detail-passphrase-confirm" class="form-control" placeholder="Confirm Passphrase">
+            <div class="input-append">
+              <button type="button" class="toggle-password-btn" tabindex="-1" data-target="cert-detail-passphrase-confirm">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="passphrase-info">
+          <i class="fas fa-info-circle"></i>
+          <span>The passphrase will be stored encrypted and used automatically for renewal operations.</span>
+        </div>
+      </div>
+    `,
+    buttons: [
+      { text: "Cancel", id: "cancel-passphrase-btn", action: "close" },
+      { text: "Store Passphrase", id: "submit-passphrase-btn", class: "primary", action: "custom" }
+    ],
+    onShow: () => {
+      setupTogglePasswordVisibility();
+      
+      // Directly add click handler for the submit button
+      const submitBtn = document.getElementById('submit-passphrase-btn');
+      if (submitBtn) {
+        submitBtn.addEventListener("click", async (event) => {
+          event.preventDefault();
+          await submitPassphraseForm(fingerprint, 'store');
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Show modal to change a certificate passphrase
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+function showChangePassphraseModal(fingerprint) {
+  Logger.debug(`Opening change passphrase modal for certificate: ${fingerprint}`);
+  
+  // First, ensure any existing modal is removed
+  const existingModal = document.getElementById('change-passphrase-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  UIUtils.showModal('change-passphrase-modal', {
+    title: "Change Certificate Passphrase",
+    content: `
+      <div class="passphrase-modal-content">
+        <p>Enter the new passphrase for this certificate:</p>
+        
+        <div class="passphrase-form-group">
+          <label for="new-passphrase-input">New Passphrase:</label>
+          <div class="input-group">
+            <input type="password" id="new-passphrase-input" class="form-control" placeholder="New Passphrase">
+            <div class="input-append">
+              <button type="button" class="toggle-password-btn" tabindex="-1" data-target="new-passphrase-input">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="passphrase-form-group">
+          <label for="new-passphrase-confirm">Confirm New Passphrase:</label>
+          <div class="input-group">
+            <input type="password" id="new-passphrase-confirm" class="form-control" placeholder="Confirm New Passphrase">
+            <div class="input-append">
+              <button type="button" class="toggle-password-btn" tabindex="-1" data-target="new-passphrase-confirm">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `,
+    buttons: [
+      { text: "Cancel", id: "cancel-change-btn", action: "close" },
+      { text: "Update Passphrase", id: "submit-change-btn", class: "primary", action: "custom" }
+    ],
+    onShow: () => {
+      setupTogglePasswordVisibility();
+      
+      // Directly add click handler for the submit button
+      const submitBtn = document.getElementById('submit-change-btn');
+      if (submitBtn) {
+        submitBtn.addEventListener("click", async (event) => {
+          event.preventDefault();
+          await submitPassphraseForm(fingerprint, 'change');
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Set up toggle password visibility feature
+ */
+function setupTogglePasswordVisibility() {
+  Logger.debug("Setting up setupTogglePasswordVisibility");
+  // Use setTimeout to ensure DOM is updated before adding event listeners
+  setTimeout(() => {
+    document.querySelectorAll(".toggle-password-btn").forEach(btn => {
+      // Remove existing listeners to prevent duplicates
+      btn.removeEventListener("click", null); // Remove any existing listeners
+      
+      // Add the event listener to the new button
+      btn.addEventListener("click", (event) => {
+        const targetId = btn.getAttribute("data-target");
+        const input = document.getElementById(targetId);
+        const icon = btn.querySelector("i");
+        
+        if (input && icon) {
+          if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove("fa-eye");
+            icon.classList.add("fa-eye-slash");
+          } else {
+            input.type = "password";
+            icon.classList.remove("fa-eye-slash");
+            icon.classList.add("fa-eye");
+          }
+        }
+        
+        // Prevent event from bubbling up and triggering modal buttons
+        event.stopPropagation();
+      });
+    });
+  }, 100);
+}
+
+/**
+ * Submit the passphrase form (for both store and change operations)
+ * @param {string} fingerprint - Certificate fingerprint
+ * @param {string} action - Action type ('store' or 'change')
+ */
+async function submitPassphraseForm(fingerprint, action) {
+  try {
+    Logger.debug(`Submitting passphrase form for action: ${action}`);
+    const isStore = action === 'store';
+    const modalId = isStore ? 'store-passphrase-modal' : 'change-passphrase-modal';
+    const passphraseInput = document.getElementById(isStore ? 'cert-detail-passphrase-input' : 'new-passphrase-input');
+    const confirmInput = document.getElementById(isStore ? 'cert-detail-passphrase-confirm' : 'new-passphrase-confirm');
+
+    if (!passphraseInput || !confirmInput) {
+      Logger.error("Passphrase input fields not found");
+      UIUtils.showToast("Error: Passphrase fields not found", "error");
+      return;
+    }
+
+    // Clear any existing errors
+    removeInputErrors(modalId);
+
+    const passphrase = passphraseInput.value;
+    const confirm = confirmInput.value;
+
+    // Validate inputs
+    let hasError = false;
+
+    if (!passphrase) {
+      Logger.error("Passphrase is required");
+      addInputError(passphraseInput, "Passphrase is required");
+      hasError = true;
+    }
+
+    if (passphrase !== confirm) {
+      Logger.error(`Passphrases do not match. ${passphrase} !== ${confirm}`);
+      addInputError(confirmInput, "Passphrases do not match");
+      hasError = true;
+    }
+
+    if (hasError) {
+      return; // Stop if validation failed
+    }
+
+    Logger.debug(`Closing Modal ${modalId}`)
+    // Close modal and show loading toast
+    UIUtils.closeModal(modalId);
+    Logger.debug(`Showing Toast for ${isStore ? 'storing' : 'updating'} passphrase`);
+    UIUtils.showToast(isStore ? "Storing passphrase..." : "Updating passphrase...", "info");
+
+    // Encode fingerprint for API call
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+
+    // Add a debug log to see if we're getting past encoding
+    Logger.debug(`Encoded fingerprint: ${encodedFingerprint}`);
+
+    // Make API request based on action type
+    const method = "POST";
+    const url = `/api/certificates/${encodedFingerprint}/passphrase`;
+    
+    // Add a debug log for the request
+    Logger.debug(`Making ${method} request to: ${url}`);
+
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ passphrase })
+    });
+
+    // Log the response status
+    Logger.debug(`API response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Error: ${response.status}`);
+    }
+
+    // Log successful response
+    Logger.debug(`Successfully ${isStore ? 'stored' : 'updated'} passphrase`);
+
+    UIUtils.showToast(
+      isStore ? "Passphrase stored successfully" : "Passphrase updated successfully",
+      "success"
+    );
+
+    // Completely refresh the certificate details to show updated passphrase status
+    // by reloading the certificate from the server instead of just calling showCertificateDetails
+    refreshCertificateDetails(fingerprint);
+  } catch (error) {
+    Logger.error(`Failed to ${action} passphrase:`, error);
+    UIUtils.showToast(`Failed to ${action} passphrase: ${error.message}`, "error");
+  }
+}
+
+/**
+ * Add input error message for passphrase fields
+ * @param {HTMLElement} input - Input element 
+ * @param {string} message - Error message
+ */
+function addInputError(input, message) {
+  if (!input) {
+    Logger.error("Input element not found for error message");
+    return;
+  }
+
+  // Add error class to input
+  input.classList.add('error');
+  
+  // Find the appropriate container to add the error to
+  const formGroup = input.closest('.passphrase-form-group') || 
+                    input.closest('.form-group') || 
+                    input.parentNode;
+  
+  // Create error element
+  const errorEl = document.createElement('div');
+  errorEl.className = 'input-error';
+  errorEl.textContent = message;
+  errorEl.style.color = 'var(--error-color, #dc3545)';
+  errorEl.style.fontSize = '0.875rem';
+  errorEl.style.marginTop = '4px';
+  
+  // Append to form group
+  formGroup.appendChild(errorEl);
+}
+
+/**
+ * Remove all input errors from a modal
+ * @param {string} modalId - Modal ID
+ */
+function removeInputErrors(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  // Remove error classes from inputs
+  modal.querySelectorAll('input.error').forEach(input => {
+    input.classList.remove('error');
+  });
+  
+  // Remove error messages
+  modal.querySelectorAll('.input-error').forEach(errorEl => {
+    errorEl.remove();
+  });
+}
+
+/**
+ * Confirm removal of stored passphrase
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+function confirmRemovePassphrase(fingerprint) {
+  UIUtils.confirmDialog(
+    "Remove Passphrase",
+    "Are you sure you want to remove the stored passphrase for this certificate? You will need to provide it manually for future operations.",
+    async () => {
+      try {
+        UIUtils.showToast("Removing passphrase...", "info");
+
+        const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+        const response = await fetch(`/api/certificates/${encodedFingerprint}/passphrase`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error: ${response.status}`);
+        }
+
+        UIUtils.showToast("Passphrase removed successfully", "success");
+
+        // Completely refresh the certificate details
+        refreshCertificateDetails(fingerprint);
+      } catch (error) {
+        Logger.error("Failed to remove passphrase:", error);
+        UIUtils.showToast(`Failed to remove passphrase: ${error.message}`, "error");
+      }
+    }
+  );
+}
+
+/**
+ * Refresh certificate details from the server to show current passphrase status
+ * @param {string} fingerprint - Certificate fingerprint
+ */
+async function refreshCertificateDetails(fingerprint) {
+  try {
+    Logger.debug(`Refreshing certificate details for fingerprint: ${fingerprint}`);
+    
+    // Show loading indicator
+    UIUtils.showToast("Refreshing certificate information...", "info");
+    
+    // Fetch the latest certificate data from the server
+    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+    const response = await fetch(`/api/certificates/${encodedFingerprint}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to refresh certificate details: ${response.status}`);
+    }
+    
+    const certificateData = await response.json();
+    
+    // Update the certificate in state
+    if (window.state && window.state.certificates) {
+      const index = window.state.certificates.findIndex(c => c.fingerprint === fingerprint);
+      if (index >= 0) {
+        window.state.certificates[index] = certificateData;
+      }
+    }
+    
+    // Update the current certificate if it's the one we're viewing
+    if (window.state && window.state.currentCertificate && 
+        window.state.currentCertificate.fingerprint === fingerprint) {
+      window.state.currentCertificate = certificateData;
+    }
+    
+    // Re-render the certificate details view
+    showCertificateDetails(fingerprint);
+    
+    Logger.debug(`Certificate details refreshed successfully`);
+  } catch (error) {
+    Logger.error(`Failed to refresh certificate details: ${error.message}`, error);
+    UIUtils.showToast(`Failed to refresh certificate details: ${error.message}`, "error");
+  }
 }
 
 /**
@@ -2814,7 +3277,7 @@ async function deleteCertificate(certId) {
       }
     }
 
-    UIUtils.showNotification("Certificate deleted successfully", "success");
+    UIUtils.showToast("Certificate deleted successfully", "success");
   } catch (error) {
     Logger.error(`Error deleting certificate: ${error.message}`, error);
     UIUtils.showError(error.message);
@@ -2939,16 +3402,16 @@ function showPassphrasePrompt(passphraseData, callback) {
     content: modalContent,
     closable: true,
     buttons: [
-      { 
-        text: "Cancel", 
-        id: "cancel-passphrase-btn", 
-        action: "close" 
+      {
+        text: "Cancel",
+        id: "cancel-passphrase-btn",
+        action: "close"
       },
-      { 
-        text: "Continue Renewal", 
-        id: "submit-passphrase-btn", 
-        class: "primary", 
-        action: "custom" 
+      {
+        text: "Continue Renewal",
+        id: "submit-passphrase-btn",
+        class: "primary",
+        action: "custom"
       }
     ],
     onShow: () => {
@@ -2958,7 +3421,7 @@ function showPassphrasePrompt(passphraseData, callback) {
           const targetId = btn.getAttribute("data-target");
           const input = document.getElementById(targetId);
           const icon = btn.querySelector("i");
-      
+
           if (input && icon) {
             if (input.type === "password") {
               input.type = "text";
@@ -2974,7 +3437,7 @@ function showPassphrasePrompt(passphraseData, callback) {
       });
     }
   });
-  
+
   // Add event listener for the submit button
   const modal = document.getElementById('passphrase-modal');
   if (modal) {
@@ -2984,19 +3447,22 @@ function showPassphrasePrompt(passphraseData, callback) {
         const passphrases = {
           storePassphrases: document.getElementById("store-passphrases")?.checked || false
         };
-    
+
         // Get certificate passphrase if field exists
         const certPassphraseInput = document.getElementById("cert-passphrase");
         if (certPassphraseInput) {
           passphrases.passphrase = certPassphraseInput.value;
         }
-    
+
         // Get CA passphrase if field exists
         const caPassphraseInput = document.getElementById("ca-passphrase");
         if (caPassphraseInput) {
           passphrases.signingCAPassphrase = caPassphraseInput.value;
         }
-    
+
+        // Close the passphrase modal before proceeding
+        UIUtils.closeModal('passphrase-modal');
+
         // Call callback with collected passphrases
         callback(passphrases);
       }
@@ -3013,15 +3479,12 @@ async function performCertificateRenewal(fingerprint, options = {}) {
   Logger.debug(`Performing certificate renewal with options:`, options);
 
   try {
-    // Create a loader container if it doesn't exist
-    let loaderContainer = document.getElementById("renewal-loader");
-    if (!loaderContainer) {
-      loaderContainer = document.createElement("div");
-      loaderContainer.id = "renewal-loader";
-      document.body.appendChild(loaderContainer);
-    }
-    
-    const loader = UIUtils.showLoader(loaderContainer, "Renewing certificate...");
+    // Show loading modal for renewal process
+    UIUtils.showLoadingModal("Renewing certificate...", {
+      additionalText: "This may take a moment, please wait.",
+      showSpinner: true,
+      modalId: "renewal-loading-modal"
+    });
 
     // Prepare request body
     const requestBody = {
@@ -3054,8 +3517,10 @@ async function performCertificateRenewal(fingerprint, options = {}) {
       throw new Error(data.message || `Error: ${response.status}`);
     }
 
+    // Close loading modal
+    UIUtils.closeModal("renewal-loading-modal");
+
     // Handle successful renewal
-    loader.hide();
     UIUtils.showToast("Certificate renewed successfully", "success");
 
     // Refresh certificate list and details
@@ -3069,13 +3534,9 @@ async function performCertificateRenewal(fingerprint, options = {}) {
       showCertificateDetails(fingerprint);
     }
   } catch (error) {
-    // Find and hide the loader
-    const loaderContainer = document.getElementById("renewal-loader");
-    if (loaderContainer) {
-      loaderContainer.innerHTML = '';
-      loaderContainer.style.display = 'none';
-    }
-    
+    // Close loading modal if it's still open
+    UIUtils.closeModal("renewal-loading-modal");
+
     Logger.error("Certificate renewal failed:", error);
     UIUtils.showError(`Certificate renewal failed: ${error.message}`);
   }
@@ -3846,11 +4307,11 @@ async function loadCertificates(forceRefresh = false) {
 
     const response = await fetch('/api/certificates');
     const data = await response.json();
-    
+
     if (data.initializing) {
       // Show a loading message in the UI
       showLoadingState("Certificate manager is still initializing...");
-      
+
       // Try again in a few seconds
       setTimeout(loadCertificates, 3000);
       return;
@@ -4148,7 +4609,7 @@ async function deleteCAcertificate(fingerprint) {
       renderCertificatesListDetailed(window.state.certificates);
     }
 
-    UIUtils.showNotification("CA certificate deleted successfully", "success");
+    UIUtils.showToast("CA certificate deleted successfully", "success");
   } catch (error) {
     Logger.error(`Error deleting CA certificate: ${error.message}`, error);
     UIUtils.showError(error.message);

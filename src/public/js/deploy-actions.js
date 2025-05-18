@@ -656,28 +656,42 @@ async function saveDeploymentAction() {
       break;
 
     case "nginx-proxy-manager":
-      const isPathMethod = document.getElementById("npm-method-path").checked;
+      const isPathMethod = document.getElementById("npm-method-path")?.checked;
+      const isDockerMethod = document.getElementById("npm-method-docker")?.checked;
+      const isApiMethod = document.getElementById("npm-method-api")?.checked;
 
       if (isPathMethod) {
         action.npmPath = document.getElementById("npm-path").value;
         if (!action.npmPath) {
-          UIUtils.showToast(
-            "Please specify the Nginx Proxy Manager path",
-            "warning"
-          );
+          UIUtils.showToast("Please enter the NPM path", "warning");
           return;
         }
-      } else {
-        action.dockerContainer = document.getElementById(
-          "npm-docker-container"
-        ).value;
+      } else if (isDockerMethod) {
+        action.dockerContainer = document.getElementById("npm-docker-container").value;
         if (!action.dockerContainer) {
-          UIUtils.showToast(
-            "Please specify the Docker container name",
-            "warning"
-          );
+          UIUtils.showToast("Please enter the Docker container name", "warning");
           return;
         }
+      } else if (isApiMethod) {
+        // For API method, get configuration from dedicated function
+        const apiConfig = getNpmApiActionConfig();
+        if (!apiConfig) {
+          return; // Error message already shown
+        }
+
+        // Merge API configuration into action object
+        Object.assign(action, apiConfig);
+      }
+
+      // Add common options regardless of method
+      const restartServices = document.getElementById("npm-restart-services");
+      if (restartServices) {
+        action.restartServices = restartServices.checked;
+      }
+
+      const verifyUpdate = document.getElementById("npm-verify-update");
+      if (verifyUpdate) {
+        action.verifyUpdate = verifyUpdate.checked;
       }
       break;
 
@@ -1730,41 +1744,573 @@ function getFieldsToWatchForType(actionType) {
 function setupNpmMethodToggle() {
   const pathMethodRadio = document.getElementById("npm-method-path");
   const dockerMethodRadio = document.getElementById("npm-method-docker");
+  const apiMethodRadio = document.getElementById("npm-method-api");
   const pathGroup = document.getElementById("npm-path-group");
   const dockerGroup = document.getElementById("npm-docker-group");
+  const apiGroup = document.getElementById("npm-api-group");
+  const certificateSelection = document.getElementById("npm-certificate-selection");
+  const npmOptions = document.getElementById("npm-options");
+  const connectionStatus = document.getElementById("npm-connection-status");
 
-  if (!pathMethodRadio || !dockerMethodRadio || !pathGroup || !dockerGroup) {
+  if (!pathMethodRadio || !dockerMethodRadio || !apiMethodRadio ||
+    !pathGroup || !dockerGroup || !apiGroup) {
     Logger.warn("NPM toggle elements not found");
     return;
   }
 
-  // Set initial state
-  if (pathMethodRadio.checked) {
-    pathGroup.classList.remove("hidden");
-    dockerGroup.classList.add("hidden");
-  } else if (dockerMethodRadio.checked) {
+  // Function to update UI based on selected method
+  function updateNpmMethodUI() {
+    // Hide all groups first
     pathGroup.classList.add("hidden");
-    dockerGroup.classList.remove("hidden");
+    dockerGroup.classList.add("hidden");
+    apiGroup.classList.add("hidden");
+    if (certificateSelection) certificateSelection.classList.add("hidden");
+    if (npmOptions) npmOptions.classList.add("hidden");
+
+    // Show the appropriate group
+    if (pathMethodRadio.checked) {
+      pathGroup.classList.remove("hidden");
+      if (npmOptions) npmOptions.classList.remove("hidden");
+      // Hide the initial loading message when not using API method
+      if (connectionStatus) {
+        connectionStatus.style.display = "none";
+      }
+    } else if (dockerMethodRadio.checked) {
+      dockerGroup.classList.remove("hidden");
+      if (npmOptions) npmOptions.classList.remove("hidden");
+      // Hide the initial loading message when not using API method
+      if (connectionStatus) {
+        connectionStatus.style.display = "none";
+      }
+    } else if (apiMethodRadio.checked) {
+      apiGroup.classList.remove("hidden");
+
+      // Load settings and check connection status
+      loadDeploymentSettings().then(settings => {
+        const npmSettings = settings?.nginxProxyManager;
+
+        // Check if we have what we need to load NPM certificates
+        if (npmSettings && npmSettings.accessToken) {
+          if (certificateSelection) certificateSelection.classList.remove("hidden");
+          if (npmOptions) npmOptions.classList.remove("hidden");
+
+          // Load available certificates from NPM
+          loadNpmCertificates();
+        } else {
+          // Check connection to see if we can authenticate
+          setTimeout(testNpmApiConnection, 100);
+        }
+      });
+    }
+
+    updateActionName();
   }
 
-  // Add change listeners
+  // Set initial state
+  updateNpmMethodUI();
+
+  // Add change listeners for radio buttons
   pathMethodRadio.addEventListener("change", function () {
     if (this.checked) {
-      pathGroup.classList.remove("hidden");
-      dockerGroup.classList.add("hidden");
+      updateNpmMethodUI();
       markFormChanged();
-      updateActionName();
     }
   });
 
   dockerMethodRadio.addEventListener("change", function () {
     if (this.checked) {
-      pathGroup.classList.add("hidden");
-      dockerGroup.classList.remove("hidden");
+      updateNpmMethodUI();
       markFormChanged();
-      updateActionName();
     }
   });
+
+  apiMethodRadio.addEventListener("change", function () {
+    if (this.checked) {
+      updateNpmMethodUI();
+      markFormChanged();
+    }
+  });
+
+  // Set up test connection button
+  const testConnectionButton = document.getElementById("npm-test-connection");
+  if (testConnectionButton) {
+    testConnectionButton.addEventListener("click", function () {
+      testNpmApiConnection();
+    });
+  }
+
+  // Set up request token button
+  const requestTokenButton = document.getElementById("npm-request-token");
+  if (requestTokenButton) {
+    requestTokenButton.addEventListener("click", function () {
+      showNpmTokenRequestDialog();
+    });
+  }
+
+  // Initialize fields from settings
+  initNpmFieldsFromSettings();
+}
+
+/**
+ * Load deployment settings from server
+ * @returns {Promise<Object>} Deployment settings
+ */
+async function loadDeploymentSettings() {
+  if (window.deploymentSettings) {
+    // Return cached settings if available
+    return window.deploymentSettings;
+  }
+
+  try {
+    Logger.debug("Loading deployment settings from server");
+    const response = await fetch('/api/settings/deployment');
+
+    if (!response.ok) {
+      throw new Error(`Failed to load deployment settings: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data && data.success) {
+      // Store settings in window object for reuse
+      window.deploymentSettings = data.deployment || {};
+      Logger.debug("Deployment settings loaded successfully:", window.deploymentSettings);
+      return window.deploymentSettings;
+    } else {
+      throw new Error(data.message || 'Failed to load deployment settings');
+    }
+  } catch (error) {
+    Logger.error("Error loading deployment settings:", error);
+    // Return an empty object to avoid null references
+    return {};
+  }
+}
+
+/**
+ * Initialize NPM fields from global settings
+ */
+async function initNpmFieldsFromSettings() {
+  try {
+    // Fetch deployment settings if not already loaded
+    const deploymentSettings = await loadDeploymentSettings();
+
+    // Use the nginxProxyManager settings if available
+    const npmSettings = deploymentSettings?.nginxProxyManager;
+
+    if (npmSettings) {
+      Logger.debug("Initializing NPM fields from settings:", npmSettings);
+
+      // URL field
+      const apiUrlField = document.getElementById("npm-api-url");
+      if (apiUrlField) {
+        // Build URL from host, port and protocol
+        const protocol = npmSettings.useHttps ? 'https' : 'http';
+        const port = npmSettings.port ? `:${npmSettings.port}` : '';
+
+        if (npmSettings.host) {
+          apiUrlField.value = `${protocol}://${npmSettings.host}${port}`;
+        }
+      }
+
+      // Select API method if settings exist and have host
+      if (npmSettings.host) {
+        const apiMethodRadio = document.getElementById("npm-method-api");
+        if (apiMethodRadio) {
+          apiMethodRadio.checked = true;
+          // Trigger change event to update UI
+          apiMethodRadio.dispatchEvent(new Event('change'));
+        }
+      }
+    } else {
+      Logger.debug("No NPM settings found in deployment settings");
+    }
+  } catch (error) {
+    Logger.error("Error initializing NPM fields from settings:", error);
+  }
+}
+
+/**
+ * Test connection to Nginx Proxy Manager API
+ */
+async function testNpmApiConnection() {
+  const apiUrlField = document.getElementById("npm-api-url");
+  const statusElement = document.getElementById("npm-api-status");
+  const requestTokenButton = document.getElementById("npm-request-token");
+  const certificateSelection = document.getElementById("npm-certificate-selection");
+  const npmOptions = document.getElementById("npm-options");
+  const connectionStatus = document.getElementById("npm-connection-status");
+  
+  if (!apiUrlField || !statusElement) {
+    Logger.error("Required NPM UI elements not found");
+    return;
+  }
+  
+  // Hide the initial loading message if it exists
+  if (connectionStatus) {
+    connectionStatus.style.display = "none";
+  }
+  
+  const apiUrl = apiUrlField.value.trim();
+  if (!apiUrl) {
+    UIUtils.showToast("Please enter the NPM API URL", "warning");
+    return;
+  }
+  
+  // Update status
+  statusElement.innerHTML = '<span class="status-indicator checking"></span><span class="status-text">Testing connection...</span>';
+  
+  try {
+    // Check if the URL is reachable
+    const response = await fetch('/api/integrations/npm/check-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ apiUrl })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      statusElement.innerHTML = '<span class="status-indicator connected"></span><span class="status-text">API reachable</span>';
+      
+      // Next, check if we have a valid token using validate-token endpoint
+      const validateTokenResponse = await fetch('/api/integrations/npm/validate-token');
+      
+      if (!validateTokenResponse.ok) {
+        Logger.warn("Token validation request failed:", validateTokenResponse.status);
+        statusElement.innerHTML = '<span class="status-indicator warning"></span><span class="status-text">Authentication required</span>';
+        if (requestTokenButton) requestTokenButton.classList.remove("hidden");
+        if (certificateSelection) certificateSelection.classList.add("hidden");
+        return;
+      }
+      
+      const validationResult = await validateTokenResponse.json();
+      
+      if (validationResult.success && validationResult.valid) {
+        // We have a valid token
+        statusElement.innerHTML = '<span class="status-indicator connected"></span><span class="status-text">Connected as ' + (validationResult.user?.email || 'user') + '</span>';
+        if (requestTokenButton) requestTokenButton.classList.add("hidden");
+        if (certificateSelection) certificateSelection.classList.remove("hidden");
+        if (npmOptions) npmOptions.classList.remove("hidden");
+        
+        // Load certificates
+        loadNpmCertificates();
+      } else {
+        // Token not valid or missing
+        statusElement.innerHTML = '<span class="status-indicator warning"></span><span class="status-text">Authentication required</span>';
+        if (requestTokenButton) requestTokenButton.classList.remove("hidden");
+        if (certificateSelection) certificateSelection.classList.add("hidden");
+      }
+    } else {
+      statusElement.innerHTML = '<span class="status-indicator error"></span><span class="status-text">API not reachable</span>';
+      if (requestTokenButton) requestTokenButton.classList.add("hidden");
+      if (certificateSelection) certificateSelection.classList.add("hidden");
+    }
+  } catch (error) {
+    Logger.error("NPM connection test error:", error);
+    statusElement.innerHTML = '<span class="status-indicator error"></span><span class="status-text">Connection failed</span>';
+    if (requestTokenButton) requestTokenButton.classList.add("hidden");
+    if (certificateSelection) certificateSelection.classList.add("hidden");
+  }
+}
+
+/**
+ * Show dialog to request a new NPM token
+ */
+function showNpmTokenRequestDialog() {
+  const apiUrlField = document.getElementById("npm-api-url");
+  const apiUrl = apiUrlField ? apiUrlField.value.trim() : '';
+  
+  if (!apiUrl) {
+    UIUtils.showToast("Please enter the NPM API URL", "warning");
+    return;
+  }
+  
+  // Create the modal content
+  UIUtils.showModal({
+    title: "Nginx Proxy Manager Authentication",
+    content: `
+      <div class="npm-token-request-form">
+        <p>Please enter your NPM login credentials to obtain an API token.</p>
+        <div class="form-group">
+          <label for="npm-email">Email</label>
+          <input type="email" id="npm-email" class="form-control" placeholder="admin@example.com">
+        </div>
+        <div class="form-group">
+          <label for="npm-password">Password</label>
+          <input type="password" id="npm-password" class="form-control" placeholder="Password">
+        </div>
+        <p class="info-text"><i class="fas fa-info-circle"></i> Your password is only used to obtain an API token and is not stored.</p>
+      </div>
+    `,
+    buttons: [
+      {
+        text: "Cancel",
+        type: "secondary",
+        action: "close"
+      },
+      {
+        text: "Get Token",
+        type: "primary",
+        action: async () => {
+          const emailField = document.getElementById("npm-email");
+          const passwordField = document.getElementById("npm-password");
+          
+          if (!emailField || !passwordField) return;
+          
+          const email = emailField.value.trim();
+          const password = passwordField.value;
+          
+          if (!email || !password) {
+            UIUtils.showToast("Please enter both email and password", "warning");
+            return;
+          }
+          
+          // Show loading state
+          const getTokenButton = document.querySelector(".modal-footer button.primary");
+          if (getTokenButton) {
+            getTokenButton.disabled = true;
+            getTokenButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Requesting...';
+          }
+          
+          try {
+            const response = await fetch('/api/integrations/npm/request-token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ apiUrl, email, password })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+              // Token obtained and stored on the server
+              UIUtils.showToast("NPM authentication successful", "success");
+              UIUtils.closeModal();
+              
+              // Update UI to reflect authentication
+              const statusElement = document.getElementById("npm-api-status");
+              const requestTokenButton = document.getElementById("npm-request-token");
+              const certificateSelection = document.getElementById("npm-certificate-selection");
+              const npmOptions = document.getElementById("npm-options");
+              
+              if (statusElement) {
+                statusElement.innerHTML = '<span class="status-indicator connected"></span><span class="status-text">Authentication successful</span>';
+              }
+              
+              if (requestTokenButton) {
+                requestTokenButton.classList.add("hidden");
+              }
+              
+              if (certificateSelection) {
+                certificateSelection.classList.remove("hidden");
+              }
+              
+              if (npmOptions) {
+                npmOptions.classList.remove("hidden");
+              }
+              
+              // Load certificates
+              loadNpmCertificates();
+            } else {
+              UIUtils.showToast(result.message || "Authentication failed", "error");
+              
+              // Reset button state
+              if (getTokenButton) {
+                getTokenButton.disabled = false;
+                getTokenButton.textContent = "Get Token";
+              }
+            }
+          } catch (error) {
+            Logger.error("Error requesting NPM token:", error);
+            UIUtils.showToast(`Error requesting token: ${error.message}`, "error");
+            
+            // Reset button state
+            if (getTokenButton) {
+              getTokenButton.disabled = false;
+              getTokenButton.textContent = "Get Token";
+            }
+          }
+        }
+      }
+    ],
+    size: "medium"
+  });
+}
+
+/**
+ * Load certificates from Nginx Proxy Manager API
+ */
+async function loadNpmCertificates() {
+  let certificateSelect = document.getElementById("npm-certificate-id");
+  const certificatePreview = document.getElementById("npm-certificate-preview");
+  
+  if (!certificateSelect) {
+    Logger.error("Certificate select element not found");
+    return;
+  }
+  
+  if (certificatePreview) {
+    certificatePreview.classList.add("hidden");
+  }
+  
+  // Show loading state
+  certificateSelect.innerHTML = '<option value="">Loading certificates...</option>';
+  certificateSelect.disabled = true;
+  
+  try {
+    // Fetch certificates from NPM via our backend
+    const response = await fetch('/api/integrations/npm/certificates');
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && Array.isArray(result.certificates)) {
+      // Sort certificates by domain
+      const certificates = result.certificates.sort((a, b) => {
+        const domainA = a.nice_name || a.domain_names?.[0] || '';
+        const domainB = b.nice_name || b.domain_names?.[0] || '';
+        return domainA.localeCompare(domainB);
+      });
+      
+      if (certificates.length === 0) {
+        certificateSelect.innerHTML = '<option value="">No certificates found</option>';
+        Logger.warn("No certificates found in NPM instance");
+      } else {
+        certificateSelect.innerHTML = '<option value="">Select a certificate to update</option>';
+        Logger.info(`Loaded ${certificates.length} certificates from NPM`);
+        
+        certificates.forEach(cert => {
+          const option = document.createElement('option');
+          option.value = cert.id;
+          
+          // Format domain name for display
+          const domain = cert.nice_name || cert.domain_names?.[0] || 'Unknown Domain';
+          
+          // Format expiry date
+          let expiryDate = 'N/A';
+          if (cert.expires_on) {
+            try {
+              expiryDate = new Date(cert.expires_on).toLocaleDateString();
+            } catch (e) {
+              Logger.warn(`Invalid date format for certificate expiry: ${cert.expires_on}`);
+            }
+          }
+          
+          option.textContent = `${domain} (Exp: ${expiryDate})`;
+          
+          // Store additional data as attributes for preview
+          option.setAttribute('data-domain', domain);
+          option.setAttribute('data-expiry', expiryDate);
+          
+          certificateSelect.appendChild(option);
+        });
+        
+        // Remove existing listeners first if any
+        const newSelect = certificateSelect.cloneNode(true);
+        if (certificateSelect.parentNode) {
+          certificateSelect.parentNode.replaceChild(newSelect, certificateSelect);
+        }
+        
+        // Add listener for certificate selection
+        newSelect.addEventListener('change', updateCertificatePreview);
+        
+        // Update UI reference - use the new select element
+        certificateSelect = newSelect;
+      }
+    } else {
+      certificateSelect.innerHTML = '<option value="">Failed to load certificates</option>';
+      Logger.error("Error loading NPM certificates:", result.message);
+    }
+  } catch (error) {
+    Logger.error("Error loading NPM certificates:", error);
+    certificateSelect.innerHTML = '<option value="">Error loading certificates</option>';
+  } finally {
+    certificateSelect.disabled = false;
+  }
+}
+
+/**
+ * Update certificate preview when a certificate is selected
+ */
+function updateCertificatePreview() {
+  const certificateSelect = document.getElementById("npm-certificate-id");
+  const certPreview = document.getElementById("npm-certificate-preview");
+  const certDomain = document.getElementById("npm-cert-domain");
+  const certExpiry = document.getElementById("npm-cert-expiry");
+
+  if (!certificateSelect || !certPreview || !certDomain || !certExpiry) return;
+
+  const selectedOption = certificateSelect.options[certificateSelect.selectedIndex];
+
+  if (selectedOption && selectedOption.value) {
+    // Get certificate details from data attributes
+    certDomain.textContent = selectedOption.getAttribute('data-domain') || 'Unknown';
+    certExpiry.textContent = selectedOption.getAttribute('data-expiry') || 'Unknown';
+
+    // Show preview
+    certPreview.classList.remove("hidden");
+  } else {
+    // Hide preview if no certificate is selected
+    certPreview.classList.add("hidden");
+  }
+}
+
+/**
+ * Get the NPM action configuration from the form
+ * Called when saving the deployment action for API method
+ */
+function getNpmApiActionConfig() {
+  const actionConfig = {
+    type: 'nginx-proxy-manager',
+    method: 'api'
+  };
+
+  const apiUrlField = document.getElementById("npm-api-url");
+  const certificateSelect = document.getElementById("npm-certificate-id");
+
+  if (!apiUrlField || !apiUrlField.value.trim()) {
+    UIUtils.showToast("Please enter the NPM API URL", "warning");
+    return null;
+  }
+
+  // Add API URL
+  actionConfig.npmUrl = apiUrlField.value.trim();
+
+  // Check if a certificate is selected for update
+  if (certificateSelect && certificateSelect.value) {
+    actionConfig.certificateId = certificateSelect.value;
+  } else {
+    UIUtils.showToast("Please select a certificate to update", "warning");
+    return null;
+  }
+
+  // Add restart option if checked
+  const restartOption = document.getElementById("npm-restart-services");
+  if (restartOption && restartOption.checked) {
+    actionConfig.restartServices = true;
+  }
+
+  // Add verify option if checked
+  const verifyOption = document.getElementById("npm-verify-update");
+  if (verifyOption && verifyOption.checked) {
+    actionConfig.verifyUpdate = true;
+  }
+
+  return actionConfig;
 }
 
 /**
@@ -2205,13 +2751,6 @@ function getActionDescription(action) {
 
 // Setup event listeners for action buttons
 function setupActionEventListeners(fingerprint) {
-  // Add action button
-  const addActionBtn = document.getElementById('add-deployment-action-btn');
-  if (addActionBtn) {
-    addActionBtn.addEventListener('click', () => {
-      showAddActionDialog(fingerprint);
-    });
-  }
 
   // Execute all actions button
   const executeAllBtn = document.getElementById('execute-all-actions-btn');

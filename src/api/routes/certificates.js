@@ -1242,7 +1242,7 @@ function initCertificatesRouter(deps) {
           
           // Check CA passphrase if needed
           if (signingCA.needsPassphrase && !signingCAPassphrase && 
-              !deps.passphraseManager?.hasPassphrase(signingCA.fingerprint)) {
+              !signingCA._hasPassphrase) {
             logger.warn(`CA certificate requires passphrase but none provided: ${signingCA.name}`, null, FILENAME);
             return res.status(400).json({
               success: false,
@@ -1861,7 +1861,7 @@ function initCertificatesRouter(deps) {
           name: certificate.name,
           // Use new certificate property structure
           needsPassphrase: certificate._needsPassphrase || false,
-          hasPassphrase: deps.passphraseManager ? deps.passphraseManager.hasPassphrase(fingerprint) : false
+          hasPassphrase: certificate._hasPassphrase || false
         },
         signingCA: null,
         passphraseNeeded: false
@@ -1873,8 +1873,7 @@ function initCertificatesRouter(deps) {
 
         if (signingCA) {
           const signingCANeedsPassphrase = signingCA._needsPassphrase || false;
-          const signingCAHasPassphrase = deps.passphraseManager ?
-            deps.passphraseManager.hasPassphrase(certificate.caFingerprint) : false;
+          const signingCAHasPassphrase = signingCA._hasPassphrase || false
 
           response.signingCA = {
             fingerprint: signingCA.fingerprint,

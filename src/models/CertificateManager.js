@@ -87,6 +87,9 @@ class CertificateManager {
         this.loadCertificates().then(() => {
             this.isInitialized = true;
             logger.info('Certificate manager initialization complete', null, FILENAME);
+            if (logger.isLevelEnabled('fine', FILENAME)) {
+                logger.fine('Certificate manager initialized with certificates:', this.getAllCertificatesWithMetadata(), FILENAME);
+            }
         }).catch(error => {
             logger.error('Error during certificate manager initialization:', error, FILENAME);
             // Still mark as initialized to prevent permanent loading state
@@ -253,6 +256,9 @@ class CertificateManager {
             // Merge with existing config
             const mergeResult = await this.mergeCertificateConfigs();
 
+            // Update passphrase status for all certificates
+            await this.updateHasPassphrase();
+
             // Update CA relationships between certificates - using our new method
             await this.updateCertificateCARelationships();
 
@@ -405,6 +411,59 @@ class CertificateManager {
             logger.error(`Error merging certificate configs: ${error.message}`, error, FILENAME);
             return false;
         }
+    }
+
+    /**
+     * Update passphrase status for all certificates
+     * Uses the passphrase manager to check if certificates with passphrase requirements
+     * have a stored passphrase, and updates their status accordingly
+     * 
+     * @returns {Promise<void>}
+     */
+    async updateHasPassphrase() {
+        logger.debug("Starting passphrase status update for all certificates", null, FILENAME);
+
+        if (!this.passphraseManager) {
+            logger.info("Passphrase manager not available, skipping passphrase status update", null, FILENAME);
+            return;
+        }
+
+        // CertificateManager uses a Map for certificates, not an array
+        if (!this.certificates || this.certificates.size === 0) {
+            logger.debug("No certificates to update passphrase status for", null, FILENAME);
+            return;
+        }
+
+        logger.debug(`Updating passphrase status for ${this.certificates.size} certificates`, null, FILENAME);
+        let updatedCount = 0;
+
+        // Process all certificates that need passphrase
+        for (const [fingerprint, certificate] of this.certificates.entries()) {
+            const certName = certificate.name || certificate.commonName || "unnamed";
+
+            try {
+                // Check if certificate needs a passphrase by checking the key file
+                const needsPassphrase = certificate.needsPassphrase;
+
+                if (needsPassphrase) {
+                    logger.fine(`Updating passphrase status for certificate: ${certName}`, null, FILENAME, certName);
+                    certificate.updatePassphraseStatus(this.passphraseManager);
+                    updatedCount++;
+                } else {
+                    // Certificate doesn't need passphrase, ensure status is correct
+                    if (certificate.hasPassphrase !== false) {
+                        certificate.hasPassphrase = false;
+                        certificate.needsPassphrase = false;
+                        logger.fine(`Set no-passphrase status for certificate: ${certName}`, null, FILENAME, certName);
+                        updatedCount++;
+                    }
+                }
+            } catch (error) {
+                logger.warn(`Error updating passphrase status for certificate ${certName}: ${error.message}`, error, FILENAME, certName);
+            }
+        }
+
+        logger.info(`Updated passphrase status for ${updatedCount} certificates`, null, FILENAME);
     }
 
     /**
@@ -638,19 +697,17 @@ class CertificateManager {
 
             // Check if certificate already exists by fingerprint
             if (certInfo.fingerprint && this.certificates.has(certInfo.fingerprint)) {
-                logger.fine(`Updating existing certificate with fingerprint: ${certInfo.fingerprint}`, null, FILENAME);
                 certificate = this.certificates.get(certInfo.fingerprint);
+                logger.fine(`Updating existing certificate with fingerprint: ${certInfo.fingerprint}`, null, FILENAME, certificate.name);
 
                 // Update certificate with new information
                 certificate.updateFromData(certInfo);
             } else {
-                // Create new certificate with the consistent structure
-                const Certificate = require('./Certificate');
                 certificate = new Certificate(certInfo);
 
                 // Add to certificates map
                 this.certificates.set(certificate.fingerprint, certificate);
-                logger.fine(`Added certificate ${certificate.name} (${certificate.fingerprint})`, null, FILENAME);
+                logger.fine(`Added certificate ${certificate.name} (${certificate.fingerprint})`, null, FILENAME, certificate.name);
             }
 
             // Check passphrase requirement if openssl is available
@@ -662,17 +719,12 @@ class CertificateManager {
                     if (keyPath && fs.existsSync(keyPath)) {
                         // Use isKeyEncrypted directly to check if the key needs a passphrase
                         const needsPassphrase = await this.openssl.isKeyEncrypted(keyPath);
-                        logger.info(`Passphrase requirement checked for ${certificate.name}: ${needsPassphrase ? 'Needs passphrase' : 'No passphrase required'}`, null, FILENAME);
+                        logger.info(`Passphrase requirement checked for ${certificate.name}: ${needsPassphrase ? 'Needs passphrase' : 'No passphrase required'}`, null, FILENAME, certificate.name);
 
                         // Update the certificate using its own method
                         certificate.needsPassphrase = needsPassphrase;
-
-                        // Check if certificate has a stored passphrase if we have a passphrase manager
-                        if (this.passphraseManager && needsPassphrase) {
-                            certificate.updatePassphraseStatus(this.passphraseManager);
-                        }
                     } else {
-                        logger.debug(`No key file found to check passphrase requirement for ${certificate.name}`, null, FILENAME);
+                        logger.debug(`No key file found to check passphrase requirement for ${certificate.name}`, null, FILENAME, certificate.name);
                     }
                 } catch (passphraseError) {
                     logger.warn(`Error checking passphrase requirement for ${certificate.name}: ${passphraseError.message}`, null, FILENAME);
@@ -1140,12 +1192,20 @@ class CertificateManager {
      * @returns {boolean} Success status
      */
     storePassphrase(fingerprint, passphrase) {
+        logger.debug(`Storing passphrase for certificate ${fingerprint}`, null, FILENAME);
         try {
             if (!fingerprint) {
                 throw new Error('Fingerprint is required');
             }
 
             this.passphraseManager.storePassphrase(fingerprint, passphrase);
+            // Update the certificate to reflect that it now has a stored passphrase
+            const cert = this.getCertificate(fingerprint);
+            if (cert) {
+                cert.needsPassphrase = true;
+                cert.updatePassphraseStatus(this.passphraseManager);
+                logger.info(`Updated certificate ${cert.name} to reflect stored passphrase`, null, FILENAME);
+            }
             return true;
         } catch (error) {
             logger.error(`Error storing passphrase: ${error.message}`, null, FILENAME);
@@ -1202,7 +1262,15 @@ class CertificateManager {
             return false;
         }
 
-        return this.passphraseManager.deletePassphrase(fingerprint);
+        const result = this.passphraseManager.deletePassphrase(fingerprint);
+        if (result) {
+            const cert = this.getCertificate(fingerprint);
+            if (cert) {
+                cert.updatePassphraseStatus(this.passphraseManager);
+                logger.info(`Updated certificate ${cert.name} to reflect stored passphrase`, null, FILENAME);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1211,72 +1279,6 @@ class CertificateManager {
      */
     rotateEncryptionKey() {
         return this.passphraseManager.rotateEncryptionKey();
-    }
-
-    /**
-     * Renew a certificate and execute deployment actions, then notify about the change
-     * @param {string} fingerprint - Certificate fingerprint
-     * @param {Object} options - Renewal options
-     * @param {Object} user - User performing the action
-     * @returns {Promise<Object>} Result of renewal and deployment
-     */
-    async renewAndDeployCertificate(fingerprint, options = {}, user = null) {
-        try {
-            const cert = this.getCertificate(fingerprint);
-            if (!cert) {
-                throw new Error(`Certificate not found with fingerprint: ${fingerprint}`);
-            }
-
-            // Find signing CA if needed
-            let signingCA = null;
-            if (cert.signWithCA && cert.caFingerprint) {
-                signingCA = this.getCertificate(cert.caFingerprint);
-            }
-
-            // Get stored passphrase if available
-            let certPassphrase = options.passphrase;
-            if (!certPassphrase && cert.hasStoredPassphrase(this.passphraseManager)) {
-                certPassphrase = cert.getPassphrase(this.passphraseManager);
-            }
-
-            const renewalResult = await openssl.renewWithFormatPreservation(certificate, {
-                days: 365,
-                passphrase: certPassphrase,
-                signingCA: parentCA
-            });
-
-            // Save certificate configuration
-            await this.saveCertificateConfigs();
-
-            // Execute deployment actions if specified
-            if (options.deploy !== false && cert.deployActions?.length > 0) {
-                const deployService = require('../services/deploy-service');
-                const deployResult = await cert.executeDeployActions(deployService);
-
-                // Combine results
-                return {
-                    success: renewalResult.success && deployResult.success,
-                    renewalResult,
-                    deployResult
-                };
-            }
-
-            // Add notification about the change
-            this.notifyCertificateChanged(fingerprint, 'update');
-
-            // Record activity
-            if (this.activityService) {
-                await this.activityService.recordCertificateActivity('renew', cert, user);
-            }
-
-            return {
-                success: true,
-                renewalResult
-            };
-        } catch (error) {
-            logger.error(`Error renewing and deploying certificate ${fingerprint}`, error, FILENAME);
-            throw error;
-        }
     }
 
     /**
@@ -1376,43 +1378,6 @@ class CertificateManager {
     }
 
     /**
-     * Create or renew a certificate
-     * @param {string} fingerprint - Certificate fingerprint (for renewal)
-     * @param {Object} options - Creation/renewal options
-     * @returns {Promise<Object>} Result of the operation
-     */
-    async createOrRenewCertificate(fingerprint, options = {}) {
-        // If fingerprint is provided, it's a renewal
-        const isRenewal = !!fingerprint;
-
-        let certificate;
-
-        if (isRenewal) {
-            certificate = this.getCertificate(fingerprint);
-            if (!certificate) {
-                return { success: false, error: 'Certificate not found' };
-            }
-        } else {
-            // Creating new certificate
-            certificate = new Certificate(options.name || 'New Certificate');
-            // Initialize certificate properties
-            this._initializeNewCertificate(certificate, options);
-        }
-
-        // Perform the actual creation/renewal logic
-        const result = await this._performCertificateCreation(certificate, options);
-
-        // If successful, add to certificates and save config
-        if (result.success) {
-            this.certificates.set(certificate.fingerprint, certificate);
-            await this.saveCertificateConfigs();
-            this.notifyCertificateChanged(certificate.fingerprint, isRenewal ? 'update' : 'create');
-        }
-
-        return result;
-    }
-
-    /**
      * Initialize a new certificate with the provided options
      * @param {Certificate} certificate - Certificate object to initialize
      * @param {Object} options - Certificate options from request
@@ -1460,131 +1425,224 @@ class CertificateManager {
     }
 
     /**
-     * Perform the actual certificate creation or renewal using OpenSSL
-     * @param {Certificate} certificate - Certificate to create or renew
+     * Create or renew a certificate
+     * @param {string} fingerprint - Certificate fingerprint (for renewal)
      * @param {Object} options - Creation/renewal options
-     * @returns {Promise<Object>} Result object with creation/renewal results
-     * @private
+     * @returns {Promise<Object>} Result of the operation
      */
-    async _performCertificateCreation(certificate, options) {
+    async createOrRenewCertificate(fingerprint, options = {}) {
+        // If fingerprint is provided, it's a renewal
+        const isRenewal = !!fingerprint;
+
+        let certificate;
+        let result;
+
         try {
-            // Get options
-            const days = options.days || 365;
-            const passphrase = options.passphrase;
-
-            // Get signing CA if provided
-            let signingCA = null;
-            let signingCAPassphrase = null;
-
-            if (certificate.config.signWithCA && certificate.config.caFingerprint) {
-                // If specific CA is provided in options, use that
-                if (options.signingCA) {
-                    signingCA = options.signingCA;
-                    signingCAPassphrase = options.signingCAPassphrase;
-                } else {
-                    // Otherwise, look up the CA by fingerprint
+            if (isRenewal) {
+                logger.debug(`Renewing existing certificate with fingerprint: ${fingerprint}`, null, FILENAME);
+                
+                certificate = this.getCertificate(fingerprint);
+                if (!certificate) {
+                    return { success: false, error: 'Certificate not found' };
+                }
+                
+                // Create a backup before renewal if requested
+                if (options.createBackup !== false) {
+                    logger.info(`Creating backup of certificate ${certificate.name} before renewal`, null, FILENAME);
+                    const backupResult = await this.backupCertificate(certificate);
+                    if (!backupResult.success) {
+                        logger.warn(`Failed to create backup for certificate ${certificate.name}`, null, FILENAME);
+                    }
+                }
+                
+                // Prepare paths for version history
+                const previousVersionData = {
+                    fingerprint: certificate.fingerprint,
+                    paths: { ...certificate.paths },
+                    archivedAt: new Date().toISOString(),
+                    version: certificate.previousVersions?.length + 1 || 1
+                };
+                
+                // Get signing CA if needed
+                let signingCA = null;
+                if (certificate.config?.signWithCA && certificate.config?.caFingerprint) {
                     signingCA = this.getCertificate(certificate.config.caFingerprint);
-                    if (signingCA && signingCA.needsPassphrase && this.passphraseManager) {
-                        signingCAPassphrase = this.passphraseManager.getPassphrase(signingCA.fingerprint);
+                    
+                    if (!signingCA) {
+                        logger.warn(`Signing CA not found: ${certificate.config.caFingerprint}`, null, FILENAME);
+                        return { success: false, error: 'Signing CA certificate not found' };
+                    }
+                    
+                    // Prepare CA config
+                    signingCA = {
+                        certPath: signingCA.paths.crtPath || signingCA.paths.crt,
+                        keyPath: signingCA.paths.keyPath || signingCA.paths.key,
+                        passphrase: options.caPassphrase || 
+                            (this.passphraseManager && signingCA.needsPassphrase ? 
+                                this.passphraseManager.getPassphrase(signingCA.fingerprint) : null)
+                    };
+                }
+                
+                // Use the renewCertificate function
+                result = await this.openssl.renewCertificate(certificate, {
+                    days: options.days || 365,
+                    passphrase: options.passphrase || 
+                        (this.passphraseManager && certificate.needsPassphrase ? 
+                            this.passphraseManager.getPassphrase(fingerprint) : null),
+                    signingCA,
+                    includeIdle: options.includeIdle,
+                    preserveFormats: options.preserveFormats !== false
+                });
+                
+                // If renewal was successful, update version history
+                if (result.success) {
+                    // Add previous version to version history
+                    if (!certificate.previousVersions) {
+                        certificate.previousVersions = [];
+                    }
+                    certificate.previousVersions.push(previousVersionData);
+                    
+                    // Execute deployment actions if requested
+                    if (options.deploy !== false && certificate.config?.deployActions?.length > 0) {
+                        logger.info(`Executing ${certificate.config.deployActions.length} deployment actions for ${certificate.name}`, null, FILENAME);
+                        
+                        try {
+                            const deployService = require('../services/deploy-service');
+                            const deployResult = await deployService.executeDeployActions(
+                                certificate.config.deployActions, 
+                                {
+                                    certificate: certificate,
+                                    paths: certificate.paths,
+                                    user: options.user?.username || 'system'
+                                }
+                            );
+                            
+                            logger.info(`Deployment actions completed with status: ${deployResult.success ? 'success' : 'failure'}`, null, FILENAME);
+                            result.deployResult = deployResult;
+                        } catch (deployError) {
+                            logger.error(`Error executing deployment actions: ${deployError.message}`, deployError, FILENAME);
+                            result.deployResult = { 
+                                success: false, 
+                                error: deployError.message
+                            };
+                        }
+                    }
+                    
+                    // Record activity if requested and activity service is available
+                    if (options.recordActivity !== false && this.activityService && options.user) {
+                        try {
+                            await this.activityService.recordCertificateActivity('renew', certificate, options.user);
+                        } catch (activityError) {
+                            logger.warn(`Failed to record certificate activity: ${activityError.message}`, null, FILENAME);
+                        }
                     }
                 }
 
-                if (!signingCA) {
-                    logger.warn(`Signing CA not found: ${certificate.config.caFingerprint}`, null, FILENAME);
-                    return { success: false, error: 'Signing CA certificate not found' };
+            } else {
+                logger.debug(`Creating new certificate: ${options.name || 'unnamed'}`, null, FILENAME);
+
+                // Creating new certificate
+                certificate = new Certificate(options.name || 'New Certificate');
+                // Initialize certificate properties
+                this._initializeNewCertificate(certificate, options);
+
+                // Get signing CA if needed
+                let signingCA = null;
+                if (certificate.config?.signWithCA && certificate.config?.caFingerprint) {
+                    const caCert = this.getCertificate(certificate.config.caFingerprint);
+                    
+                    if (!caCert) {
+                        logger.warn(`Signing CA not found: ${certificate.config.caFingerprint}`, null, FILENAME);
+                        return { success: false, error: 'Signing CA certificate not found' };
+                    }
+                    
+                    // Prepare CA config
+                    signingCA = {
+                        certPath: caCert.paths.crtPath || caCert.paths.crt,
+                        keyPath: caCert.paths.keyPath || caCert.paths.key,
+                        passphrase: options.caPassphrase || 
+                            (this.passphraseManager && caCert.needsPassphrase ? 
+                                this.passphraseManager.getPassphrase(caCert.fingerprint) : null)
+                    };
+                }
+                
+                // Use the createCertificate function
+                result = await this.openssl.createCertificate({
+                    certPath: certificate.paths.crtPath || certificate.paths.crt,
+                    keyPath: certificate.paths.keyPath || certificate.paths.key,
+                    subject: certificate.subject || `CN=${certificate.name}`,
+                    sans: certificate._sans,
+                    days: options.days || 365,
+                    keySize: certificate.keySize || 2048,
+                    isCA: certificate.isCA || false,
+                    pathLengthConstraint: certificate.pathLengthConstraint,
+                    passphrase: options.passphrase,
+                    signingCA,
+                    name: certificate.name,
+                    includeIdle: options.includeIdle
+                });
+                
+                // Execute deployment actions for new certificate if requested
+                if (result.success && options.deploy !== false && certificate.config?.deployActions?.length > 0) {
+                    logger.info(`Executing ${certificate.config.deployActions.length} deployment actions for new certificate ${certificate.name}`, null, FILENAME);
+                    
+                    try {
+                        const deployService = require('../services/deploy-service');
+                        const deployResult = await deployService.executeDeployActions(
+                            certificate.config.deployActions, 
+                            {
+                                certificate: certificate,
+                                paths: certificate.paths,
+                                user: options.user?.username || 'system'
+                            }
+                        );
+                        
+                        logger.info(`Deployment actions completed with status: ${deployResult.success ? 'success' : 'failure'}`, null, FILENAME);
+                        result.deployResult = deployResult;
+                    } catch (deployError) {
+                        logger.error(`Error executing deployment actions: ${deployError.message}`, deployError, FILENAME);
+                        result.deployResult = { 
+                            success: false, 
+                            error: deployError.message
+                        };
+                    }
                 }
             }
 
-            // Make sure certificate has valid paths
-            if (!certificate.paths || !certificate.paths.crtPath || !certificate.paths.keyPath) {
-                certificate.generatePaths(path.join(this.certsDir, certificate.name.replace(/[^a-zA-Z0-9-_]/g, '_')));
-            }
-
-            // Create directory if it doesn't exist
-            const certDir = path.dirname(certificate.paths.crtPath);
-            if (!fs.existsSync(certDir)) {
-                fs.mkdirSync(certDir, { recursive: true });
-                logger.debug(`Created certificate directory: ${certDir}`, null, FILENAME);
-            }
-
-            // Prepare OpenSSL configuration
-            const config = {
-                certPath: certificate.paths.crtPath,
-                keyPath: certificate.paths.keyPath,
-                subject: certificate.subject || `CN=${certificate.sans.domains[0] || certificate.name}`,
-                days: days,
-                keyType: certificate.keyType || 'RSA',
-                keySize: certificate.keySize || 2048,
-                passphrase: passphrase,
-                sans: {
-                    domains: certificate.sans.domains,
-                    ips: certificate.sans.ips
-                },
-                isCA: certificate.certType === 'rootCA' || certificate.certType === 'intermediateCA',
-                pathLengthConstraint: certificate.certType === 'rootCA' ? -1 : 0,
-            };
-
-            // If we have a signing CA, add it to the config
-            if (signingCA && signingCA.paths && signingCA.paths.crtPath && signingCA.paths.keyPath) {
-                // Add validation for CA paths
-                const absoluteCertPath = path.isAbsolute(signingCA.paths.crtPath) ?
-                    signingCA.paths.crtPath : path.resolve(this.certsDir, signingCA.paths.crtPath);
-
-                const absoluteKeyPath = path.isAbsolute(signingCA.paths.keyPath) ?
-                    signingCA.paths.keyPath : path.resolve(this.certsDir, signingCA.paths.keyPath);
-
-                // Check if files exist at the calculated absolute paths
-                if (!fs.existsSync(absoluteCertPath)) {
-                    logger.error(`CA certificate file not found: ${absoluteCertPath}`, null, FILENAME);
-                    return { success: false, error: `CA certificate file not found: ${absoluteCertPath}` };
-                }
-
-                if (!fs.existsSync(absoluteKeyPath)) {
-                    logger.error(`CA key file not found: ${absoluteKeyPath}`, null, FILENAME);
-                    return { success: false, error: `CA key file not found: ${absoluteKeyPath}` };
-                }
-
-                config.signingCA = {
-                    certPath: absoluteCertPath,
-                    keyPath: absoluteKeyPath,
-                    passphrase: signingCAPassphrase
-                };
-                logger.debug(`Using signing CA: ${signingCA.name} with absolute paths`, config.signingCA, FILENAME);
-            }
-
-            // Create or renew certificate with OpenSSL
-            logger.info(`${certificate.fingerprint ? 'Renewing' : 'Creating'} certificate: ${certificate.name}`, null, FILENAME);
-
-            const result = await this.openssl.createOrRenewCertificate(config);
-
+            // Process the result
             if (result.success) {
-                // Update certificate with results from OpenSSL
+                // Update certificate properties from result
                 if (result.fingerprint) certificate.fingerprint = result.fingerprint;
                 if (result.subject) certificate.subject = result.subject;
                 if (result.issuer) certificate.issuer = result.issuer;
                 if (result.validFrom) certificate.validFrom = result.validFrom;
                 if (result.validTo) certificate.validTo = result.validTo;
-                if (result.serialNumber) certificate.serialNumber = result.serialNumber;
-                if (result.keyType) certificate.keyType = result.keyType;
-                if (result.keySize) certificate.keySize = result.keySize;
-                if (result.sigAlg) certificate.sigAlg = result.sigAlg;
-
+                
+                // Add to certificates collection and save
+                this.certificates.set(certificate.fingerprint, certificate);
+                await this.saveCertificateConfigs();
+                
+                // Notify about the change
+                this.notifyCertificateChanged(certificate.fingerprint, isRenewal ? 'update' : 'create');
+                
                 // Store passphrase if provided and not empty
-                if (passphrase && this.passphraseManager) {
-                    this.passphraseManager.storePassphrase(certificate.fingerprint, passphrase);
+                if (options.passphrase && this.passphraseManager) {
+                    this.passphraseManager.storePassphrase(certificate.fingerprint, options.passphrase);
                     certificate.needsPassphrase = true;
                     certificate.updatePassphraseStatus(this.passphraseManager);
-                    logger.debug(`Stored passphrase for certificate: ${certificate.name}`, null, FILENAME);
                 }
-
-                logger.info(`Certificate ${certificate.fingerprint ? 'renewed' : 'created'} successfully: ${certificate.name} (${certificate.fingerprint})`, null, FILENAME);
+                
+                logger.info(`Certificate ${isRenewal ? 'renewed' : 'created'} successfully: ${certificate.name}`, null, FILENAME);
+                
+                // Add certificate to result
+                result.certificate = certificate;
             } else {
-                logger.error(`Failed to ${certificate.fingerprint ? 'renew' : 'create'} certificate: ${result.error}`, null, FILENAME);
+                logger.error(`Failed to ${isRenewal ? 'renew' : 'create'} certificate: ${result.error}`, null, FILENAME);
             }
 
             return result;
         } catch (error) {
-            logger.error(`Error ${certificate.fingerprint ? 'renewing' : 'creating'} certificate ${certificate.name}:`, error, FILENAME);
+            logger.error(`Error ${isRenewal ? 'renewing' : 'creating'} certificate:`, error, FILENAME);
             return { success: false, error: error.message };
         }
     }
@@ -2264,11 +2322,13 @@ class CertificateManager {
     }
 
     /**
-     * Apply idle domains and IPs (moves them to active) and renews the certificate
-     * @param {string} fingerprint - Certificate fingerprint
-     * @returns {Promise<Object>} Result of renewal operation
-     */
-    async applyIdleSubjectsAndRenew(fingerprint) {
+    * Apply idle domains and IPs (moves them to active) and renews the certificate
+    * @param {string} fingerprint - Certificate fingerprint
+    * @param {Object} [options={}] - Renewal options
+    * @param {Object} [user=null] - User performing the action
+    * @returns {Promise<Object>} Result of renewal operation
+    */
+    async applyIdleSubjectsAndRenew(fingerprint, options = {}, user = null) {
         try {
             const cert = this.getCertificate(fingerprint);
             if (!cert) {
@@ -2287,13 +2347,28 @@ class CertificateManager {
 
             // Save configuration changes
             await this.saveCertificateConfigs();
+            
+            logger.info(`Applied idle subjects for certificate ${cert.name}, proceeding with renewal`, null, FILENAME);
 
-            // Now renew the certificate with the new subjects
-            const renewResult = await this.renewAndDeployCertificate(fingerprint);
+            // Now renew the certificate with the new subjects using createOrRenewCertificate
+            const renewResult = await this.createOrRenewCertificate(fingerprint, {
+                // Default options for renewal
+                days: options.days || 365,
+                passphrase: options.passphrase,
+                caPassphrase: options.caPassphrase,
+                deploy: options.deploy !== false,
+                preserveFormats: options.preserveFormats !== false,
+                createBackup: options.createBackup !== false,
+                recordActivity: options.recordActivity !== false,
+                user: user,
+                includeIdle: false // We've just applied the idle subjects, so no need to include them again
+            });
 
             return {
-                success: true,
-                message: 'Applied idle subjects and renewed certificate',
+                success: renewResult.success,
+                message: renewResult.success 
+                    ? 'Applied idle subjects and renewed certificate' 
+                    : `Applied idle subjects but renewal failed: ${renewResult.error || 'Unknown error'}`,
                 renewResult
             };
         } catch (error) {
@@ -2458,6 +2533,9 @@ class CertificateManager {
 
             // Merge with certificate configurations
             await this.mergeCertificateConfigs();
+
+            // Update passphrase status for all certificates
+            await this.updateHasPassphrase();
 
             // Update the metadata in the config file
             await this.updateCertificatesMetadata();
@@ -2671,7 +2749,12 @@ class CertificateManager {
             response.config.caName = this.getCAName(baseData.config.caFingerprint);
         }
 
-        logger.debug(`Generated API response for certificate ${baseData.name}`, null, FILENAME);
+        if (logger.isLevelEnabled('fine', FILENAME)) {
+            logger.fine(`API response for certificate ${baseData.name}`, response, FILENAME);
+        } else {
+            logger.debug(`Generated API response for certificate ${baseData.name}`, null, FILENAME);
+        }
+
         return response;
     }
 

@@ -105,6 +105,7 @@ function applySettingsToUI(settings) {
     document.getElementById('renewal-schedule').value = settings.renewalSchedule || '0 0 * * *';
     document.getElementById('renew-days').value = settings.renewDaysBeforeExpiry || 30;
     document.getElementById('enable-file-watch').checked = settings.enableFileWatch || false;
+    document.getElementById('include-idle-domains').checked = settings.includeIdleDomainsOnRenewal !== false;
 
     // Backup settings
     document.getElementById('enable-backups').checked = settings.enableCertificateBackups || false;
@@ -134,7 +135,7 @@ async function saveGeneralSettings(e) {
     }
 
     try {
-        UIUtils.showNotification('Saving general settings...', 'info');
+        UIUtils.showToast('Saving general settings...', 'info');
 
         const response = await fetch('/api/settings/general', {
             method: 'PUT',
@@ -149,7 +150,7 @@ async function saveGeneralSettings(e) {
             throw new Error(`Failed to save settings: ${errorText}`);
         }
 
-        UIUtils.showNotification('General settings saved successfully', 'success');
+        UIUtils.showToast('General settings saved successfully', 'success');
 
         // Update global settings
         await loadSettings();
@@ -188,7 +189,7 @@ async function saveSecuritySettings(e) {
     }
 
     try {
-        UIUtils.showNotification('Saving security settings...', 'info');
+        UIUtils.showToast('Saving security settings...', 'info');
 
         const response = await fetch('/api/settings/security', {
             method: 'PUT',
@@ -203,11 +204,11 @@ async function saveSecuritySettings(e) {
             throw new Error(`Failed to save settings: ${errorText}`);
         }
 
-        UIUtils.showNotification('Security settings saved successfully', 'success');
+        UIUtils.showToast('Security settings saved successfully', 'success');
 
         // Show restart warning if HTTPS was enabled or disabled
         if (data.enableHttps !== state.settings.enableHttps) {
-            UIUtils.showNotification('Server restart required for HTTPS changes to take effect', 'warning', 8000);
+            UIUtils.showToast('Server restart required for HTTPS changes to take effect', 'warning', 8000);
         }
 
         // Update global settings
@@ -230,7 +231,8 @@ async function saveRenewalSettings(e) {
         enableAutoRenewalJob: formData.get('enableAutoRenewalJob') === 'on',
         renewalSchedule: formData.get('renewalSchedule') || '0 0 * * *',
         renewDaysBeforeExpiry: parseInt(formData.get('renewDaysBeforeExpiry') || '30'),
-        enableFileWatch: formData.get('enableFileWatch') === 'on'
+        enableFileWatch: formData.get('enableFileWatch') === 'on',
+        includeIdleDomainsOnRenewal: formData.get('includeIdleDomainsOnRenewal') === 'on'
     };
 
     // Validation
@@ -240,7 +242,7 @@ async function saveRenewalSettings(e) {
     }
 
     try {
-        UIUtils.showNotification('Saving renewal settings...', 'info');
+        UIUtils.showToast('Saving renewal settings...', 'info');
 
         const response = await fetch('/api/settings/renewal', {
             method: 'PUT',
@@ -255,7 +257,7 @@ async function saveRenewalSettings(e) {
             throw new Error(`Failed to save settings: ${errorText}`);
         }
 
-        UIUtils.showNotification('Renewal settings saved successfully', 'success');
+        UIUtils.showToast('Renewal settings saved successfully', 'success');
 
         // Update global settings
         await loadSettings();
@@ -280,7 +282,7 @@ async function saveBackupSettings(e) {
     };
 
     try {
-        UIUtils.showNotification('Saving backup settings...', 'info');
+        UIUtils.showToast('Saving backup settings...', 'info');
 
         const response = await fetch('/api/settings/backup', {
             method: 'PUT',
@@ -295,7 +297,7 @@ async function saveBackupSettings(e) {
             throw new Error(`Failed to save settings: ${errorText}`);
         }
 
-        UIUtils.showNotification('Backup settings saved successfully', 'success');
+        UIUtils.showToast('Backup settings saved successfully', 'success');
 
         // Update global settings
         await loadSettings();

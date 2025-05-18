@@ -689,3 +689,87 @@ body[data-theme="dark"] .cert-footer {
 body[data-theme="dark"] .cert-footer-item:hover {
     background-color: var(--bg-dark, #2a2a2a);
 }
+
+/* Passphrase Management Section */
+.passphrase-management-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color, #eaeaea);
+}
+
+.passphrase-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.passphrase-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.passphrase-status i {
+  color: var(--primary-color, #4a6fa5);
+  font-size: 16px;
+}
+
+.passphrase-not-needed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted, #666);
+}
+
+.passphrase-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.passphrase-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background-color: var(--bg-light, #f5f5f5);
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-muted, #555);
+  margin-top: 8px;
+}
+
+.passphrase-info i {
+  color: var(--primary-color-light, #0088cc);
+  margin-top: 2px;
+}
+
+/* Dark mode adjustments */
+body[data-theme="dark"] .passphrase-info {
+  background-color: var(--bg-darker, #222);
+  color: var(--text-light, #bbb);
+}
+
+body[data-theme="dark"] .passphrase-not-needed {
+  color: var(--text-muted-dark, #999);
+}
+
+/* Passphrase modals */
+.passphrase-modal-content {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 0 10px;
+}
+
+.passphrase-form-group {
+  margin-bottom: 20px;
+}
+
+.passphrase-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+}

@@ -193,13 +193,16 @@ async function saveNpmSettings() {
       port: parseInt(document.getElementById('npm-port').value, 10),
       useHttps: document.getElementById('npm-https').checked,
       username: document.getElementById('npm-username').value,
-      password: document.getElementById('npm-password').value,
       // Keep existing tokens if they exist
       accessToken: deploymentSettings.nginxProxyManager?.accessToken || '',
       refreshToken: deploymentSettings.nginxProxyManager?.refreshToken || '',
       tokenExpiry: deploymentSettings.nginxProxyManager?.tokenExpiry || null
     };
     
+    if(document.getElementById('npm-password').value !== document.getElementById('npm-password').placeholder) {
+      npmSettings.password = document.getElementById('npm-password').value;
+    }
+
     const response = await fetch('/api/settings/deployment/nginx-proxy-manager', {
       method: 'PUT',
       headers: {
@@ -313,12 +316,14 @@ async function testNpmSettings() {
       port: parseInt(document.getElementById('npm-port').value, 10),
       useHttps: document.getElementById('npm-https').checked,
       username: document.getElementById('npm-username').value,
-      password: document.getElementById('npm-password').value,
-      // Keep existing tokens if they exist
+      
       accessToken: deploymentSettings.nginxProxyManager?.accessToken || '',
       refreshToken: deploymentSettings.nginxProxyManager?.refreshToken || '',
       tokenExpiry: deploymentSettings.nginxProxyManager?.tokenExpiry || null
     };
+    if(document.getElementById('npm-password').value !== document.getElementById('npm-password').placeholder) {
+      npmSettings.password = document.getElementById('npm-password').value;
+    }
     
     const response = await fetch('/api/settings/deployment/nginx-proxy-manager/test', {
       method: 'POST',
@@ -334,10 +339,10 @@ async function testNpmSettings() {
       throw new Error(data.message || `Server returned ${response.status}`);
     }
     
-    UIUtils.showToast(`Successfully connected to NPM. Found ${data.certificates} certificates.`, 'success');
+    UIUtils.showNotification('Successfully connected to NPM' `Found ${data.certificates} certificates.`, 'success');
   } catch (error) {
     Logger.error('Error testing NPM settings:', error);
-    UIUtils.showToast(`Failed to connect to NPM: ${error.message}`, 'error');
+    UIUtils.showError(`Failed to connect to NPM: ${error.message}`, 'error');
   }
 }
 

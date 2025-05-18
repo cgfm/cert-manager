@@ -105,6 +105,7 @@ const UIUtils = {
    * @param {string} options.buttons[].action - Button action (close, custom)
    * @param {string} [options.buttons[].class] - Additional button classes
    * @param {Object} [options.data] - Additional data to store with modal
+   * @param {Function} [options.onShow] - Callback to run when modal is shown
    */
   showModal: function (modalId, options = {}) {
     // First check if modal exists, create it if not
@@ -132,6 +133,14 @@ const UIUtils = {
 
     // Open the modal
     this.openModal(modalId);
+
+    // Run onShow callback if provided
+    if (typeof options.onShow === 'function') {
+      // Use setTimeout to ensure modal is fully rendered and visible
+      setTimeout(() => {
+        options.onShow(modal);
+      }, 50);
+    }
   },
 
 
@@ -355,6 +364,49 @@ const UIUtils = {
     if (messageElement) {
       messageElement.textContent = message;
     }
+  },
+
+  /**
+ * Show a loading modal with spinner and message
+ * @param {string} message - Primary message to display
+ * @param {Object} options - Additional options
+ * @param {string} [options.additionalText] - Secondary message below the primary message
+ * @param {boolean} [options.showSpinner=true] - Whether to show the spinner
+ * @param {string} [options.modalId='loading-modal'] - ID for the modal element
+ * @param {boolean} [options.closable=false] - Whether the modal can be closed by the user
+ * @returns {string} The ID of the created modal
+ */
+  showLoadingModal: function (message, options = {}) {
+    const {
+      additionalText = '',
+      showSpinner = true,
+      modalId = 'loading-modal',
+      closable = false
+    } = options;
+
+    // Create modal content
+    let contentHTML = `
+    <div class="loading-modal-content">
+      ${showSpinner ? '<div class="loading-spinner large"></div>' : ''}
+      <div class="loading-modal-text">
+        <h3>${this.escapeHTML(message)}</h3>
+        ${additionalText ? `<p>${this.escapeHTML(additionalText)}</p>` : ''}
+      </div>
+    </div>
+  `;
+
+    // Create modal options
+    const modalOptions = {
+      title: '', // No title needed for loading modal
+      content: contentHTML,
+      closable: closable,
+      buttons: [] // No buttons for loading modal
+    };
+
+    // Show the modal
+    this.showModal(modalId, modalOptions);
+
+    return modalId;
   },
 
   /**
