@@ -1,508 +1,503 @@
-<div class="modal-header">
-  <h3 class="modal-title">{{isEditing ? 'Edit' : 'Add'}} Deployment Action</h3>
-  <span class="close-modal" aria-label="Close">&times;</span>
-</div>
-<div class="modal-body">
-  <form id="deployment-action-form">
+<form id="deployment-action-form">
+  <div class="form-group">
+    <label for="deployment-action-name">Action Name</label>
+    <input type="text" id="deployment-action-name" class="form-control" placeholder="Enter a name for this action" required>
+  </div>
+  
+  <div class="form-group">
+    <label for="deployment-action-type">Action Type</label>
+    <select id="deployment-action-type" class="form-control" required>
+      <option value="">Select an action type</option>
+      <option value="copy">Copy File</option>
+      <option value="command">Execute Command</option>
+      <option value="docker-restart">Restart Docker Container</option>
+      <option value="nginx-proxy-manager">Update Nginx Proxy Manager</option>
+      <option value="ssh-copy">Copy via SSH</option>
+      <option value="smb-copy">Copy via SMB</option>
+      <option value="ftp-copy">Copy via FTP</option>
+      <option value="api-call">API Call</option>
+      <option value="webhook">Webhook</option>
+      <option value="email">Email Notification</option>
+    </select>
+  </div>
+  
+  <!-- Copy File Options -->
+  <div id="copy-action-options" class="action-type-options hidden">
     <div class="form-group">
-      <label for="deployment-action-name">Action Name</label>
-      <input type="text" id="deployment-action-name" class="form-control" placeholder="Enter a name for this action" required>
+      <label for="copy-source">Source</label>
+      <select id="copy-source" class="form-control">
+        <option value="cert">Certificate (CRT)</option>
+        <option value="key">Private Key</option>
+        <option value="chain">Certificate Chain</option>
+        <option value="fullchain">Full Chain</option>
+        <option value="p12">PKCS#12 (.p12)</option>
+        <option value="pem">PEM Format</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="copy-destination">Destination</label>
+      <div class="input-group">
+        <input type="text" id="copy-destination" class="form-control" placeholder="/path/to/destination/file.crt">
+        <button type="button" id="browse-copy-destination" class="button">Browse</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="copy-permissions">File Permissions (Unix Only)</label>
+      <input type="text" id="copy-permissions" class="form-control" placeholder="644">
+      <div class="help-text">Octal format (e.g., 644 for rw-r--r--)</div>
+    </div>
+  </div>
+  
+  <!-- Command Options -->
+  <div id="command-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="command-command">Command</label>
+      <textarea id="command-command" class="form-control" rows="3" placeholder="systemctl reload nginx"></textarea>
+      <div class="help-text">Use {cert_path}, {key_path}, etc. as placeholders</div>
+    </div>
+    <div class="form-group">
+      <label for="command-cwd">Working Directory</label>
+      <div class="input-group">
+        <input type="text" id="command-cwd" class="form-control" placeholder="/path/to/working/dir">
+        <button type="button" id="browse-command-cwd" class="button">Browse</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Options</label>
+      <div class="toggle-switch">
+        <input type="checkbox" id="command-verbose">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Log command output</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Docker Restart Options -->
+  <div id="docker-restart-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="docker-container-select">Select Container</label>
+      <select id="docker-container-select" class="form-control">
+        <option value="">Loading containers...</option>
+      </select>
+    </div>
+    <div class="section-divider"></div>
+    <div class="form-group">
+      <label for="docker-container-custom">Or Enter Container ID/Name</label>
+      <input type="text" id="docker-container-custom" class="form-control" placeholder="Enter container ID or name">
+      <div class="help-text">You can enter either the container ID or name if not listed above.</div>
+    </div>
+  </div>
+  
+  <!-- Nginx Proxy Manager Options -->
+  <div id="nginx-proxy-manager-action-options" class="action-type-options hidden">
+    <div id="npm-connection-status" class="npm-status-message">
+      <i class="fas fa-spinner fa-spin"></i> Checking connection to Nginx Proxy Manager...
     </div>
     
     <div class="form-group">
-      <label for="deployment-action-type">Action Type</label>
-      <select id="deployment-action-type" class="form-control" required>
-        <option value="">Select an action type</option>
-        <option value="copy">Copy File</option>
-        <option value="command">Execute Command</option>
-        <option value="docker-restart">Restart Docker Container</option>
-        <option value="nginx-proxy-manager">Update Nginx Proxy Manager</option>
-        <option value="ssh-copy">Copy via SSH</option>
-        <option value="smb-copy">Copy via SMB</option>
-        <option value="ftp-copy">Copy via FTP</option>
-        <option value="api-call">API Call</option>
-        <option value="webhook">Webhook</option>
-        <option value="email">Email Notification</option>
+      <label>Update Method</label>
+      <div class="toggle-options">
+        <label class="radio-option">
+          <input type="radio" id="npm-method-api" name="npm-method" value="api" checked>
+          <span></span>
+          NPM API
+        </label>
+        <label class="radio-option">
+          <input type="radio" id="npm-method-path" name="npm-method" value="path">
+          <span></span>
+          NPM Installation Path
+        </label>
+        <label class="radio-option">
+          <input type="radio" id="npm-method-docker" name="npm-method" value="docker">
+          <span></span>
+          NPM Docker Container
+        </label>
+      </div>
+    </div>
+    
+    <!-- Path installation method -->
+    <div id="npm-path-group">
+      <div class="form-group">
+        <label for="npm-path">Nginx Proxy Manager Path</label>
+        <div class="input-group">
+          <input type="text" id="npm-path" class="form-control" placeholder="/path/to/npm">
+          <button type="button" id="browse-npm-path" class="button">Browse</button>
+        </div>
+        <div class="help-text">Path to Nginx Proxy Manager installation</div>
+      </div>
+    </div>
+    
+    <!-- Docker container method -->
+    <div id="npm-docker-group" class="hidden">
+      <div class="form-group">
+        <label for="npm-docker-container">Docker Container Name</label>
+        <input type="text" id="npm-docker-container" class="form-control" placeholder="nginx-proxy-manager">
+        <div class="help-text">Name of the Nginx Proxy Manager container</div>
+      </div>
+    </div>
+    
+    <!-- API method -->
+    <div id="npm-api-group" class="hidden">
+      <div class="form-group">
+        <label for="npm-api-url">NPM API URL</label>
+        <input type="text" id="npm-api-url" class="form-control" placeholder="https://npm.example.com">
+        <div class="help-text">URL of your Nginx Proxy Manager instance</div>
+      </div>
+      
+      <div class="form-group">
+        <div class="connection-status" id="npm-api-status">
+          <span class="status-indicator"></span>
+          <span class="status-text">Checking connection...</span>
+        </div>
+        <button type="button" id="npm-test-connection" class="button secondary">Test Connection</button>
+        <button type="button" id="npm-request-token" class="button secondary hidden">Request Token</button>
+      </div>
+    </div>
+          
+    <!-- Certificate target selection -->
+    <div id="npm-certificate-selection" class="hidden">
+      <div class="section-divider"><span>Target Certificate</span></div>
+      
+      <div class="form-group">
+        <label for="npm-certificate-id">Target Certificate</label>
+        <select id="npm-certificate-id" class="form-control">
+          <option value="">Loading certificates...</option>
+        </select>
+        <div class="help-text">Select which NPM certificate to update</div>
+      </div>
+      
+      <!-- Certificate details preview -->
+      <div id="npm-certificate-preview" class="certificate-preview hidden">
+        <div class="preview-row">
+          <span class="preview-label">Domain:</span>
+          <span class="preview-value" id="npm-cert-domain">example.com</span>
+        </div>
+        <div class="preview-row">
+          <span class="preview-label">Expires:</span>
+          <span class="preview-value" id="npm-cert-expiry">2023-12-31</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Deployment options -->
+    <div id="npm-options" class="hidden">
+      <div class="section-divider"><span>Options</span></div>
+      
+      <div class="form-group">
+        <div class="toggle-switch">
+          <input type="checkbox" id="npm-restart-services" checked>
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Restart NPM services after update</span>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <div class="toggle-switch">
+          <input type="checkbox" id="npm-verify-update">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Verify certificate after update</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- SSH Copy Options -->
+  <div id="ssh-copy-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="ssh-host">SSH Host</label>
+      <input type="text" id="ssh-host" class="form-control" placeholder="example.com or 192.168.1.100">
+    </div>
+    
+    <div class="form-group">
+      <label for="ssh-port">SSH Port</label>
+      <input type="number" id="ssh-port" class="form-control" value="22">
+    </div>
+    
+    <div class="form-group">
+      <label for="ssh-username">Username</label>
+      <input type="text" id="ssh-username" class="form-control" placeholder="username">
+    </div>
+    
+    <div class="form-group">
+      <label>Authentication</label>
+      <div class="toggle-options">
+        <label class="radio-option">
+          <input type="radio" id="ssh-auth-password" name="ssh-auth" value="password" checked>
+          <span></span>
+          Password
+        </label>
+        <label class="radio-option">
+          <input type="radio" id="ssh-auth-key" name="ssh-auth" value="key">
+          <span></span>
+          Private Key
+        </label>
+      </div>
+    </div>
+    
+    <div id="ssh-password-group">
+      <div class="form-group">
+        <label for="ssh-password">Password</label>
+        <input type="password" id="ssh-password" class="form-control" placeholder="SSH password">
+      </div>
+    </div>
+    
+    <div id="ssh-key-group" class="hidden">
+      <div class="form-group">
+        <label for="ssh-private-key">Private Key File</label>
+        <div class="input-group">
+          <input type="text" id="ssh-private-key" class="form-control" placeholder="/path/to/id_rsa">
+          <button type="button" id="browse-ssh-key" class="button">Browse</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="ssh-passphrase">Key Passphrase (if any)</label>
+        <input type="password" id="ssh-passphrase" class="form-control" placeholder="Private key passphrase">
+      </div>
+    </div>
+    
+    <div class="section-divider"></div>
+    
+    <div class="form-group">
+      <label for="ssh-source">Source</label>
+      <select id="ssh-source" class="form-control">
+        <option value="cert">Certificate (CRT)</option>
+        <option value="key">Private Key</option>
+        <option value="chain">Certificate Chain</option>
+        <option value="fullchain">Full Chain</option>
+        <option value="p12">PKCS#12 (.p12)</option>
+        <option value="pem">PEM Format</option>
       </select>
     </div>
     
-    <!-- Copy File Options -->
-    <div id="copy-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="copy-source">Source</label>
-        <select id="copy-source" class="form-control">
-          <option value="cert">Certificate (CRT)</option>
-          <option value="key">Private Key</option>
-          <option value="chain">Certificate Chain</option>
-          <option value="fullchain">Full Chain</option>
-          <option value="p12">PKCS#12 (.p12)</option>
-          <option value="pem">PEM Format</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="copy-destination">Destination</label>
-        <div class="input-group">
-          <input type="text" id="copy-destination" class="form-control" placeholder="/path/to/destination/file.crt">
-          <button type="button" id="browse-copy-destination" class="button">Browse</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="copy-permissions">File Permissions (Unix Only)</label>
-        <input type="text" id="copy-permissions" class="form-control" placeholder="644">
-        <div class="help-text">Octal format (e.g., 644 for rw-r--r--)</div>
-      </div>
+    <div class="form-group">
+      <label for="ssh-destination">Remote Destination</label>
+      <input type="text" id="ssh-destination" class="form-control" placeholder="/etc/ssl/certs/server.crt">
     </div>
     
-    <!-- Command Options -->
-    <div id="command-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="command-command">Command</label>
-        <textarea id="command-command" class="form-control" rows="3" placeholder="systemctl reload nginx"></textarea>
-        <div class="help-text">Use {cert_path}, {key_path}, etc. as placeholders</div>
-      </div>
-      <div class="form-group">
-        <label for="command-cwd">Working Directory</label>
-        <div class="input-group">
-          <input type="text" id="command-cwd" class="form-control" placeholder="/path/to/working/dir">
-          <button type="button" id="browse-command-cwd" class="button">Browse</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Options</label>
-        <div class="toggle-switch">
-          <input type="checkbox" id="command-verbose">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Log command output</span>
-        </div>
-      </div>
+    <div class="form-group">
+      <label for="ssh-permissions">File Permissions</label>
+      <input type="text" id="ssh-permissions" class="form-control" placeholder="644">
+      <div class="help-text">Octal format (e.g., 644 for rw-r--r--)</div>
     </div>
     
-    <!-- Docker Restart Options -->
-    <div id="docker-restart-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="docker-container-select">Select Container</label>
-        <select id="docker-container-select" class="form-control">
-          <option value="">Loading containers...</option>
-        </select>
-      </div>
-      <div class="section-divider"></div>
-      <div class="form-group">
-        <label for="docker-container-custom">Or Enter Container ID/Name</label>
-        <input type="text" id="docker-container-custom" class="form-control" placeholder="Enter container ID or name">
-        <div class="help-text">You can enter either the container ID or name if not listed above.</div>
-      </div>
+    <div class="form-group">
+      <label for="ssh-command">Command After Upload (Optional)</label>
+      <textarea id="ssh-command" class="form-control" rows="2" placeholder="systemctl reload nginx"></textarea>
     </div>
     
-    <!-- Nginx Proxy Manager Options -->
-    <div id="nginx-proxy-manager-action-options" class="action-type-options hidden">
-      <div id="npm-connection-status" class="npm-status-message">
-        <i class="fas fa-spinner fa-spin"></i> Checking connection to Nginx Proxy Manager...
-      </div>
-      
-      <div class="form-group">
-        <label>Update Method</label>
-        <div class="toggle-options">
-          <label class="radio-option">
-            <input type="radio" id="npm-method-api" name="npm-method" value="api" checked>
-            <span></span>
-            NPM API
-          </label>
-          <label class="radio-option">
-            <input type="radio" id="npm-method-path" name="npm-method" value="path">
-            <span></span>
-            NPM Installation Path
-          </label>
-          <label class="radio-option">
-            <input type="radio" id="npm-method-docker" name="npm-method" value="docker">
-            <span></span>
-            NPM Docker Container
-          </label>
-        </div>
-      </div>
-      
-      <!-- Path installation method -->
-      <div id="npm-path-group">
-        <div class="form-group">
-          <label for="npm-path">Nginx Proxy Manager Path</label>
-          <div class="input-group">
-            <input type="text" id="npm-path" class="form-control" placeholder="/path/to/npm">
-            <button type="button" id="browse-npm-path" class="button">Browse</button>
-          </div>
-          <div class="help-text">Path to Nginx Proxy Manager installation</div>
-        </div>
-      </div>
-      
-      <!-- Docker container method -->
-      <div id="npm-docker-group" class="hidden">
-        <div class="form-group">
-          <label for="npm-docker-container">Docker Container Name</label>
-          <input type="text" id="npm-docker-container" class="form-control" placeholder="nginx-proxy-manager">
-          <div class="help-text">Name of the Nginx Proxy Manager container</div>
-        </div>
-      </div>
-      
-      <!-- API method -->
-      <div id="npm-api-group" class="hidden">
-        <div class="form-group">
-          <label for="npm-api-url">NPM API URL</label>
-          <input type="text" id="npm-api-url" class="form-control" placeholder="https://npm.example.com">
-          <div class="help-text">URL of your Nginx Proxy Manager instance</div>
-        </div>
-        
-        <div class="form-group">
-          <div class="connection-status" id="npm-api-status">
-            <span class="status-indicator"></span>
-            <span class="status-text">Checking connection...</span>
-          </div>
-          <button type="button" id="npm-test-connection" class="button secondary">Test Connection</button>
-          <button type="button" id="npm-request-token" class="button secondary hidden">Request Token</button>
-        </div>
-      </div>
-            
-      <!-- Certificate target selection -->
-      <div id="npm-certificate-selection" class="hidden">
-        <div class="section-divider"><span>Target Certificate</span></div>
-        
-        <div class="form-group">
-          <label for="npm-certificate-id">Target Certificate</label>
-          <select id="npm-certificate-id" class="form-control">
-            <option value="">Loading certificates...</option>
-          </select>
-          <div class="help-text">Select which NPM certificate to update</div>
-        </div>
-        
-        <!-- Certificate details preview -->
-        <div id="npm-certificate-preview" class="certificate-preview hidden">
-          <div class="preview-row">
-            <span class="preview-label">Domain:</span>
-            <span class="preview-value" id="npm-cert-domain">example.com</span>
-          </div>
-          <div class="preview-row">
-            <span class="preview-label">Expires:</span>
-            <span class="preview-value" id="npm-cert-expiry">2023-12-31</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Deployment options -->
-      <div id="npm-options" class="hidden">
-        <div class="section-divider"><span>Options</span></div>
-        
-        <div class="form-group">
-          <div class="toggle-switch">
-            <input type="checkbox" id="npm-restart-services" checked>
-            <span class="toggle-slider"></span>
-            <span class="toggle-label">Restart NPM services after update</span>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <div class="toggle-switch">
-            <input type="checkbox" id="npm-verify-update">
-            <span class="toggle-slider"></span>
-            <span class="toggle-label">Verify certificate after update</span>
-          </div>
-        </div>
+    <div class="form-group">
+      <label>Options</label>
+      <div class="toggle-switch">
+        <input type="checkbox" id="ssh-verbose">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Log verbose output</span>
       </div>
     </div>
-    
-    <!-- SSH Copy Options -->
-    <div id="ssh-copy-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="ssh-host">SSH Host</label>
-        <input type="text" id="ssh-host" class="form-control" placeholder="example.com or 192.168.1.100">
-      </div>
-      
-      <div class="form-group">
-        <label for="ssh-port">SSH Port</label>
-        <input type="number" id="ssh-port" class="form-control" value="22">
-      </div>
-      
-      <div class="form-group">
-        <label for="ssh-username">Username</label>
-        <input type="text" id="ssh-username" class="form-control" placeholder="username">
-      </div>
-      
-      <div class="form-group">
-        <label>Authentication</label>
-        <div class="toggle-options">
-          <label class="radio-option">
-            <input type="radio" id="ssh-auth-password" name="ssh-auth" value="password" checked>
-            <span></span>
-            Password
-          </label>
-          <label class="radio-option">
-            <input type="radio" id="ssh-auth-key" name="ssh-auth" value="key">
-            <span></span>
-            Private Key
-          </label>
-        </div>
-      </div>
-      
-      <div id="ssh-password-group">
-        <div class="form-group">
-          <label for="ssh-password">Password</label>
-          <input type="password" id="ssh-password" class="form-control" placeholder="SSH password">
-        </div>
-      </div>
-      
-      <div id="ssh-key-group" class="hidden">
-        <div class="form-group">
-          <label for="ssh-private-key">Private Key File</label>
-          <div class="input-group">
-            <input type="text" id="ssh-private-key" class="form-control" placeholder="/path/to/id_rsa">
-            <button type="button" id="browse-ssh-key" class="button">Browse</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="ssh-passphrase">Key Passphrase (if any)</label>
-          <input type="password" id="ssh-passphrase" class="form-control" placeholder="Private key passphrase">
-        </div>
-      </div>
-      
-      <div class="section-divider"></div>
-      
-      <div class="form-group">
-        <label for="ssh-source">Source</label>
-        <select id="ssh-source" class="form-control">
-          <option value="cert">Certificate (CRT)</option>
-          <option value="key">Private Key</option>
-          <option value="chain">Certificate Chain</option>
-          <option value="fullchain">Full Chain</option>
-          <option value="p12">PKCS#12 (.p12)</option>
-          <option value="pem">PEM Format</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="ssh-destination">Remote Destination</label>
-        <input type="text" id="ssh-destination" class="form-control" placeholder="/etc/ssl/certs/server.crt">
-      </div>
-      
-      <div class="form-group">
-        <label for="ssh-permissions">File Permissions</label>
-        <input type="text" id="ssh-permissions" class="form-control" placeholder="644">
-        <div class="help-text">Octal format (e.g., 644 for rw-r--r--)</div>
-      </div>
-      
-      <div class="form-group">
-        <label for="ssh-command">Command After Upload (Optional)</label>
-        <textarea id="ssh-command" class="form-control" rows="2" placeholder="systemctl reload nginx"></textarea>
-      </div>
-      
-      <div class="form-group">
-        <label>Options</label>
-        <div class="toggle-switch">
-          <input type="checkbox" id="ssh-verbose">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Log verbose output</span>
-        </div>
-      </div>
-    </div>
+  </div>
 
-    <!-- SMB Copy Options -->
-    <div id="smb-copy-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="smb-host">SMB/CIFS Server</label>
-        <input type="text" id="smb-host" class="form-control" placeholder="192.168.1.100">
+  <!-- SMB Copy Options -->
+  <div id="smb-copy-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="smb-host">SMB/CIFS Server</label>
+      <input type="text" id="smb-host" class="form-control" placeholder="192.168.1.100">
+    </div>
+    
+    <div class="form-group">
+      <label for="smb-share">Share Name</label>
+      <input type="text" id="smb-share" class="form-control" placeholder="share">
+    </div>
+    
+    <div class="form-group">
+      <label for="smb-username">Username</label>
+      <input type="text" id="smb-username" class="form-control" placeholder="username">
+    </div>
+    
+    <div class="form-group">
+      <label for="smb-password">Password</label>
+      <input type="password" id="smb-password" class="form-control" placeholder="password">
+    </div>
+    
+    <div class="form-group">
+      <label for="smb-domain">Domain (Optional)</label>
+      <input type="text" id="smb-domain" class="form-control" placeholder="domain">
+    </div>
+    
+    <div class="section-divider"></div>
+    
+    <div class="form-group">
+      <label for="smb-source">Source</label>
+      <select id="smb-source" class="form-control">
+        <option value="cert">Certificate (CRT)</option>
+        <option value="key">Private Key</option>
+        <option value="chain">Certificate Chain</option>
+        <option value="fullchain">Full Chain</option>
+        <option value="p12">PKCS#12 (.p12)</option>
+        <option value="pem">PEM Format</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="smb-destination">Remote Path</label>
+      <input type="text" id="smb-destination" class="form-control" placeholder="certs/server.crt">
+      <div class="help-text">Path relative to share root</div>
+    </div>
+    
+    <div class="form-group">
+      <label>Options</label>
+      <div class="toggle-switch">
+        <input type="checkbox" id="smb-verbose">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Log verbose output</span>
       </div>
-      
-      <div class="form-group">
-        <label for="smb-share">Share Name</label>
-        <input type="text" id="smb-share" class="form-control" placeholder="share">
-      </div>
-      
-      <div class="form-group">
-        <label for="smb-username">Username</label>
-        <input type="text" id="smb-username" class="form-control" placeholder="username">
-      </div>
-      
-      <div class="form-group">
-        <label for="smb-password">Password</label>
-        <input type="password" id="smb-password" class="form-control" placeholder="password">
-      </div>
-      
-      <div class="form-group">
-        <label for="smb-domain">Domain (Optional)</label>
-        <input type="text" id="smb-domain" class="form-control" placeholder="domain">
-      </div>
-      
-      <div class="section-divider"></div>
-      
-      <div class="form-group">
-        <label for="smb-source">Source</label>
-        <select id="smb-source" class="form-control">
-          <option value="cert">Certificate (CRT)</option>
-          <option value="key">Private Key</option>
-          <option value="chain">Certificate Chain</option>
-          <option value="fullchain">Full Chain</option>
-          <option value="p12">PKCS#12 (.p12)</option>
-          <option value="pem">PEM Format</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="smb-destination">Remote Path</label>
-        <input type="text" id="smb-destination" class="form-control" placeholder="certs/server.crt">
-        <div class="help-text">Path relative to share root</div>
-      </div>
-      
-      <div class="form-group">
-        <label>Options</label>
-        <div class="toggle-switch">
-          <input type="checkbox" id="smb-verbose">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Log verbose output</span>
-        </div>
+    </div>
+  </div>
+  
+  <!-- FTP Copy Options -->
+  <div id="ftp-copy-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="ftp-host">FTP Server</label>
+      <input type="text" id="ftp-host" class="form-control" placeholder="ftp.example.com">
+    </div>
+    
+    <div class="form-group">
+      <label for="ftp-port">Port</label>
+      <input type="number" id="ftp-port" class="form-control" value="21">
+    </div>
+    
+    <div class="form-group">
+      <label for="ftp-username">Username</label>
+      <input type="text" id="ftp-username" class="form-control" placeholder="username">
+    </div>
+    
+    <div class="form-group">
+      <label for="ftp-password">Password</label>
+      <input type="password" id="ftp-password" class="form-control" placeholder="password">
+    </div>
+    
+    <div class="form-group">
+      <label>Security</label>
+      <div class="toggle-switch">
+        <input type="checkbox" id="ftp-secure">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Use FTPS (Secure FTP)</span>
       </div>
     </div>
     
-    <!-- FTP Copy Options -->
-    <div id="ftp-copy-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="ftp-host">FTP Server</label>
-        <input type="text" id="ftp-host" class="form-control" placeholder="ftp.example.com">
-      </div>
-      
-      <div class="form-group">
-        <label for="ftp-port">Port</label>
-        <input type="number" id="ftp-port" class="form-control" value="21">
-      </div>
-      
-      <div class="form-group">
-        <label for="ftp-username">Username</label>
-        <input type="text" id="ftp-username" class="form-control" placeholder="username">
-      </div>
-      
-      <div class="form-group">
-        <label for="ftp-password">Password</label>
-        <input type="password" id="ftp-password" class="form-control" placeholder="password">
-      </div>
-      
-      <div class="form-group">
-        <label>Security</label>
-        <div class="toggle-switch">
-          <input type="checkbox" id="ftp-secure">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Use FTPS (Secure FTP)</span>
-        </div>
-      </div>
-      
-      <div class="section-divider"></div>
-      
-      <div class="form-group">
-        <label for="ftp-source">Source</label>
-        <select id="ftp-source" class="form-control">
-          <option value="cert">Certificate (CRT)</option>
-          <option value="key">Private Key</option>
-          <option value="chain">Certificate Chain</option>
-          <option value="fullchain">Full Chain</option>
-          <option value="p12">PKCS#12 (.p12)</option>
-          <option value="pem">PEM Format</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="ftp-destination">Remote Path</label>
-        <input type="text" id="ftp-destination" class="form-control" placeholder="/public_html/certs/server.crt">
-      </div>
+    <div class="section-divider"></div>
+    
+    <div class="form-group">
+      <label for="ftp-source">Source</label>
+      <select id="ftp-source" class="form-control">
+        <option value="cert">Certificate (CRT)</option>
+        <option value="key">Private Key</option>
+        <option value="chain">Certificate Chain</option>
+        <option value="fullchain">Full Chain</option>
+        <option value="p12">PKCS#12 (.p12)</option>
+        <option value="pem">PEM Format</option>
+      </select>
     </div>
     
-    <!-- API Call Options -->
-    <div id="api-call-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="api-url">API URL</label>
-        <input type="text" id="api-url" class="form-control" placeholder="https://api.example.com/endpoint">
-      </div>
-      
-      <div class="form-group">
-        <label for="api-method">HTTP Method</label>
-        <select id="api-method" class="form-control">
-          <option value="GET">GET</option>
-          <option value="POST" selected>POST</option>
-          <option value="PUT">PUT</option>
-          <option value="PATCH">PATCH</option>
-          <option value="DELETE">DELETE</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="api-content-type">Content Type</label>
-        <select id="api-content-type" class="form-control">
-          <option value="application/json" selected>application/json</option>
-          <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
-          <option value="multipart/form-data">multipart/form-data</option>
-          <option value="text/plain">text/plain</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="api-body">Request Body</label>
-        <textarea id="api-body" class="form-control" rows="4" placeholder='{"certificate": "{cert_content}"}'>{"certificate": "{cert_content}", "private_key": "{key_content}"}</textarea>
-        <div class="help-text">Use {cert_content}, {key_content}, etc. as placeholders</div>
-      </div>
-      
-      <div class="form-group">
-        <label for="api-headers">Headers (JSON format)</label>
-        <textarea id="api-headers" class="form-control" rows="3" placeholder='{"Authorization": "Bearer token"}'></textarea>
-      </div>
-      
-      <div class="section-divider"></div>
-      
-      <div class="form-group">
-        <label>Basic Authentication (Optional)</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <input type="text" id="api-auth-username" class="form-control" placeholder="Username">
-          <input type="password" id="api-auth-password" class="form-control" placeholder="Password">
-        </div>
-      </div>
+    <div class="form-group">
+      <label for="ftp-destination">Remote Path</label>
+      <input type="text" id="ftp-destination" class="form-control" placeholder="/public_html/certs/server.crt">
+    </div>
+  </div>
+  
+  <!-- API Call Options -->
+  <div id="api-call-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="api-url">API URL</label>
+      <input type="text" id="api-url" class="form-control" placeholder="https://api.example.com/endpoint">
     </div>
     
-    <!-- Webhook Options -->
-    <div id="webhook-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="webhook-url">Webhook URL</label>
-        <input type="text" id="webhook-url" class="form-control" placeholder="https://hooks.example.com/services/XXX/YYY/ZZZ">
-      </div>
-      
-      <div class="form-group">
-        <label for="webhook-method">HTTP Method</label>
-        <select id="webhook-method" class="form-control">
-          <option value="POST" selected>POST</option>
-          <option value="PUT">PUT</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="webhook-content-type">Content Type</label>
-        <select id="webhook-content-type" class="form-control">
-          <option value="application/json" selected>application/json</option>
-          <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="webhook-payload">Payload (JSON format)</label>
-        <textarea id="webhook-payload" class="form-control" rows="5" placeholder='{"text": "Certificate {cert_name} has been renewed", "attachments": [...]}'>{"text": "Certificate {cert_name} has been deployed", "fields": [{"title": "Certificate", "value": "{cert_name}", "short": true}, {"title": "Expiry", "value": "{cert_expiry}", "short": true}]}</textarea>
-        <div class="help-text">Use {cert_name}, {cert_expiry}, etc. as placeholders</div>
-      </div>
+    <div class="form-group">
+      <label for="api-method">HTTP Method</label>
+      <select id="api-method" class="form-control">
+        <option value="GET">GET</option>
+        <option value="POST" selected>POST</option>
+        <option value="PUT">PUT</option>
+        <option value="PATCH">PATCH</option>
+        <option value="DELETE">DELETE</option>
+      </select>
     </div>
     
-    <!-- Email Options -->
-    <div id="email-action-options" class="action-type-options hidden">
-      <div class="form-group">
-        <label for="email-to">Recipient Email</label>
-        <input type="email" id="email-to" class="form-control" placeholder="recipient@example.com">
+    <div class="form-group">
+      <label for="api-content-type">Content Type</label>
+      <select id="api-content-type" class="form-control">
+        <option value="application/json" selected>application/json</option>
+        <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+        <option value="multipart/form-data">multipart/form-data</option>
+        <option value="text/plain">text/plain</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="api-body">Request Body</label>
+      <textarea id="api-body" class="form-control" rows="4" placeholder='{"certificate": "{cert_content}"}'>{"certificate": "{cert_content}", "private_key": "{key_content}"}</textarea>
+      <div class="help-text">Use {cert_content}, {key_content}, etc. as placeholders</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="api-headers">Headers (JSON format)</label>
+      <textarea id="api-headers" class="form-control" rows="3" placeholder='{"Authorization": "Bearer token"}'></textarea>
+    </div>
+    
+    <div class="section-divider"></div>
+    
+    <div class="form-group">
+      <label>Basic Authentication (Optional)</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <input type="text" id="api-auth-username" class="form-control" placeholder="Username">
+        <input type="password" id="api-auth-password" class="form-control" placeholder="Password">
       </div>
-      
-      <div class="form-group">
-        <label for="email-subject">Subject</label>
-        <input type="text" id="email-subject" class="form-control" value="Certificate Update Notification">
-      </div>
-      
-      <div class="form-group">
-        <label for="email-body">Message</label>
-        <textarea id="email-body" class="form-control" rows="5" placeholder="Certificate has been updated.">The certificate for {cert_name} has been deployed.
+    </div>
+  </div>
+  
+  <!-- Webhook Options -->
+  <div id="webhook-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="webhook-url">Webhook URL</label>
+      <input type="text" id="webhook-url" class="form-control" placeholder="https://hooks.example.com/services/XXX/YYY/ZZZ">
+    </div>
+    
+    <div class="form-group">
+      <label for="webhook-method">HTTP Method</label>
+      <select id="webhook-method" class="form-control">
+        <option value="POST" selected>POST</option>
+        <option value="PUT">PUT</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="webhook-content-type">Content Type</label>
+      <select id="webhook-content-type" class="form-control">
+        <option value="application/json" selected>application/json</option>
+        <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="webhook-payload">Payload (JSON format)</label>
+      <textarea id="webhook-payload" class="form-control" rows="5" placeholder='{"text": "Certificate {cert_name} has been renewed", "attachments": [...]}'>{"text": "Certificate {cert_name} has been deployed", "fields": [{"title": "Certificate", "value": "{cert_name}", "short": true}, {"title": "Expiry", "value": "{cert_expiry}", "short": true}]}</textarea>
+      <div class="help-text">Use {cert_name}, {cert_expiry}, etc. as placeholders</div>
+    </div>
+  </div>
+  
+  <!-- Email Options -->
+  <div id="email-action-options" class="action-type-options hidden">
+    <div class="form-group">
+      <label for="email-to">Recipient Email</label>
+      <input type="email" id="email-to" class="form-control" placeholder="recipient@example.com">
+    </div>
+    
+    <div class="form-group">
+      <label for="email-subject">Subject</label>
+      <input type="text" id="email-subject" class="form-control" value="Certificate Update Notification">
+    </div>
+    
+    <div class="form-group">
+      <label for="email-body">Message</label>
+      <textarea id="email-body" class="form-control" rows="5" placeholder="Certificate has been updated.">The certificate for {cert_name} has been deployed.
 
 Details:
 - Domain: {cert_domains}
@@ -510,22 +505,17 @@ Details:
 - Fingerprint: {cert_fingerprint}
 
 This is an automated message from Certificate Manager.</textarea>
-        <div class="help-text">Use {cert_name}, {cert_domains}, {cert_expiry}, etc. as placeholders</div>
-      </div>
-      
-      <div class="form-group">
-        <label>Attachments</label>
-        <div class="toggle-switch">
-          <input type="checkbox" id="email-attach-cert">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Attach certificate files</span>
-        </div>
-      </div>
+      <div class="help-text">Use {cert_name}, {cert_domains}, {cert_expiry}, etc. as placeholders</div>
     </div>
     
-  </form>
-</div>
-<div class="modal-footer">
-  <button type="button" class="button" id="close-deploy-action-btn">Cancel</button>
-  <button type="button" class="button primary" id="save-deploy-action-btn">Save Action</button>
-</div>
+    <div class="form-group">
+      <label>Attachments</label>
+      <div class="toggle-switch">
+        <input type="checkbox" id="email-attach-cert">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Attach certificate files</span>
+      </div>
+    </div>
+  </div>
+  
+</form>

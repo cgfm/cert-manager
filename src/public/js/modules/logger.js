@@ -5,14 +5,16 @@
 const Logger = {
   // Log levels
   LEVELS: {
-    DEBUG: 0,
-    INFO: 1,
-    WARN: 2,
-    ERROR: 3
+    FINEST: 0,
+    FINE: 1,
+    DEBUG: 2,
+    INFO: 3,
+    WARN: 4,
+    ERROR: 5
   },
 
   // Current log level
-  currentLevel: 1, // INFO by default
+  currentLevel: 3, // INFO by default
 
   /**
    * Set the logging level
@@ -77,6 +79,28 @@ const Logger = {
     }
   },
 
+  /**
+   * Log an finest message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  finest: function (message, data) {
+    if (this.currentLevel <= this.LEVELS.FINEST) {
+      this._log('finest', message, data);
+    }
+  },
+  
+  /**
+   * Log an fine message
+   * @param {string} message - Message to log
+   * @param {*} data - Optional data to include
+   */
+  fine: function (message, data) {
+    if (this.currentLevel <= this.LEVELS.FINE) {
+      this._log('FINE', message, data);
+    }
+  },
+  
   /**
    * Log an info message
    * @param {string} message - Message to log

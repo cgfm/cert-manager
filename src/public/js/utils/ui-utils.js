@@ -31,29 +31,6 @@ const UIUtils = {
   },
 
   /**
-   * Initialize modal functionality
-   */
-  /*initialize: function () {
-    // Remove any existing modal backdrops
-    const existingBackdrops = document.querySelectorAll('.modal-backdrop');
-    existingBackdrops.forEach(backdrop => {
-      backdrop.parentNode.removeChild(backdrop);
-    });
-
-    // Make sure all modals have proper event listeners
-    document.querySelectorAll('.modal').forEach(modal => {
-      // Add click listener to close when clicking outside content
-      modal.addEventListener('click', (event) => {
-        if (event.target === modal) {
-          this.closeModal(modal.id);
-        }
-      });
-    });
-
-    Logger.debug('ModalUtils initialized, removed redundant backdrops');
-  },*/
-
-  /**
    * Open a modal by ID
    * @param {string} modalId - ID of the modal to open
    */
