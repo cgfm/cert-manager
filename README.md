@@ -63,3 +63,26 @@ Visit http://localhost:3000 to access the certificate management interface.
 - Support for certificate chains
 - Easy integration with ESP32's networking libraries
 - Certificate validation and expiration checking
+
+
+## Timezone Configuration
+
+You can configure the timezone for the application in the following ways:
+
+### Using docker-compose
+Edit the `docker-compose.yml` file and set the `TZ` environment variable:
+
+```yaml
+environment:
+  - TZ=Europe/Berlin  # Change to your desired timezone
+```
+
+Common timezone values:
+- UTC (Default)
+- America/New_York
+- Europe/London
+- Europe/Berlin
+- Asia/Tokyo
+- Australia/Sydney
+
+For a complete list of timezone identifiers, see the [IANA Time Zone Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).

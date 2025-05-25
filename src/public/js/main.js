@@ -21,11 +21,7 @@ const state = {
 async function handleUnauthorizedResponse(response) {
   if (response.status === 401) {
     Logger.debug('Session expired, redirecting to login');
-    showToast('Your session has expired. Please log in again.', 'warning');
-    // Redirect to login page after a short delay
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 2000);
+    window.location.href = '/login';
     return true;
   }
   return false;
@@ -306,7 +302,9 @@ async function loadDashboard() {
     Logger.error('Error loading dashboard:', error);
 
     // Display error in each section
-    const errorMessage = UIUtils.sanitizeErrorMessage(error);
+    const errorMessage = UIUtils && UIUtils.sanitizeErrorMessage ? 
+      UIUtils.sanitizeErrorMessage(error) : 
+      (error.message || 'Unknown error');
 
     const sections = [
       'cert-stats',
@@ -318,13 +316,11 @@ async function loadDashboard() {
     sections.forEach(id => {
       const container = document.getElementById(id);
       if (container) {
-        container.innerHTML = UIUtils.safeTemplate(`
+        container.innerHTML = `
           <div class="error-message">
-            <p>Failed to load data: \${errorMessage}</p>
+            <p>Failed to load data: ${errorMessage}</p>
           </div>
-        `, {
-          errorMessage
-        });
+        `;
       }
     });
 
@@ -363,7 +359,7 @@ async function loadCertificates() {
 
     // Fetch certificates from API
     const response = await fetch('/api/certificates');
-    
+
     // Check for unauthorized response first
     if (await handleUnauthorizedResponse(response)) {
       return;
@@ -372,15 +368,15 @@ async function loadCertificates() {
     if (!response.ok) {
       throw new Error(`Failed to load certificates: ${response.status}`);
     }
-    
+
     // Parse the response JSON once
     const data = await response.json();
-    
+
     // Check if still initializing
     if (data.initializing) {
       // Show a loading message in the UI
       showLoadingState("Certificate manager is still initializing...");
-      
+
       // Try again in a few seconds
       setTimeout(loadCertificates, 3000);
       return;
@@ -388,9 +384,9 @@ async function loadCertificates() {
 
     // Get certificates from response - handle both formats
     // (either data is the array itself or it has a certificates property)
-    const certificates = Array.isArray(data) ? data : 
-                         (data.certificates && Array.isArray(data.certificates)) ? data.certificates : 
-                         [];
+    const certificates = Array.isArray(data) ? data :
+      (data.certificates && Array.isArray(data.certificates)) ? data.certificates :
+        [];
 
     // Update state
     state.certificates = certificates;
@@ -491,17 +487,17 @@ async function loadAllCertificates() {
 
     // Parse once and handle different response formats
     const data = await response.json();
-    
+
     // Check if still initializing
-    if (data.initializing) {
+    if (data && data.initializing) {
       Logger.info('Certificate manager still initializing');
       return [];
     }
-    
+
     // Get certificates from response - handle both formats
-    const certificates = Array.isArray(data) ? data : 
-                         (data.certificates && Array.isArray(data.certificates)) ? data.certificates : 
-                         [];
+    const certificates = Array.isArray(data) ? data :
+      (data && data.certificates && Array.isArray(data.certificates)) ? data.certificates :
+        [];
 
     // Update state
     state.certificates = certificates;
@@ -509,7 +505,7 @@ async function loadAllCertificates() {
 
     return certificates;
   } catch (error) {
-    Logger.error('Error loading certificates data', error);
+    Logger.error('Error loading certificates data:', error);
     return []; // Return empty array on error
   }
 }
@@ -528,7 +524,7 @@ function renderDashboard() {
  */
 function renderCertificateStats() {
   const certificates = state.certificates || [];
-  
+
   // Ensure certificates is an array
   if (!Array.isArray(certificates)) {
     Logger.error('certificates is not an array:', certificates);
@@ -546,7 +542,7 @@ function renderCertificateStats() {
     Logger.warn('cert-stats container not found');
     return;
   }
-  
+
   statsContainer.innerHTML = UIUtils.safeTemplate(`
     <div class="stats-card">
       <div class="stat-item">
@@ -734,7 +730,7 @@ async function loadSettings() {
 
     // Check for unauthorized response
     if (await handleUnauthorizedResponse(response)) {
-      return;
+      return {};  // Return empty object if unauthorized
     }
 
     if (!response.ok) {
@@ -752,7 +748,11 @@ async function loadSettings() {
     Logger.info('Settings loaded');
     return settings;
   } catch (error) {
-    UIUtils.showError('Failed to load settings', error);
+    if (window.UIUtils && typeof UIUtils.showError === 'function') {
+      UIUtils.showError('Failed to load settings', error);
+    } else {
+      Logger.error('Failed to load settings:', error);
+    }
     return {};
   }
 }
@@ -989,120 +989,120 @@ function renderBlockView(certificates, container) {
     details.appendChild(actions);
 
     const footer = document.createElement('div');
-footer.className = 'cert-footer';
+    footer.className = 'cert-footer';
 
-// 1. Number of renews (calculated from previousVersions)
-const renewsCount = Array.isArray(cert.previousVersions) ? cert.previousVersions.length : 0;
-const renewsElem = document.createElement('div');
-renewsElem.className = 'cert-footer-item cert-renewals';
-renewsElem.title = 'Renewal History';
-renewsElem.innerHTML = `<i class="fas fa-history"></i> <span class="footer-count">${renewsCount}</span>`;
-renewsElem.addEventListener('click', () => {
-  // Open certificate details modal with renew history tab active
-  showCertificateDetails(cert.fingerprint, 'renew-history-tab');
-});
-footer.appendChild(renewsElem);
+    // 1. Number of renews (calculated from previousVersions)
+    const renewsCount = Array.isArray(cert.previousVersions) ? cert.previousVersions.length : 0;
+    const renewsElem = document.createElement('div');
+    renewsElem.className = 'cert-footer-item cert-renewals';
+    renewsElem.title = 'Renewal History';
+    renewsElem.innerHTML = `<i class="fas fa-history"></i> <span class="footer-count">${renewsCount}</span>`;
+    renewsElem.addEventListener('click', () => {
+      // Open certificate details modal with renew history tab active
+      showCertificateDetails(cert.fingerprint, 'renew-history-tab');
+    });
+    footer.appendChild(renewsElem);
 
-// 2. Number of deploy Actions
-const deployCount = Array.isArray(cert.config.deployActions) ? cert.config.deployActions.length : 0;
-const deployElem = document.createElement('div');
-deployElem.className = 'cert-footer-item cert-deploy-actions';
-deployElem.title = 'Deployment Actions';
-deployElem.innerHTML = `<i class="fas fa-rocket"></i> <span class="footer-count">${deployCount}</span>`;
-deployElem.addEventListener('click', () => {
-  // Open certificate details modal with deployment actions tab active
-  showCertificateDetails(cert.fingerprint, 'deploy-actions-tab');
-});
-footer.appendChild(deployElem);
+    // 2. Number of deploy Actions
+    const deployCount = Array.isArray(cert.config.deployActions) ? cert.config.deployActions.length : 0;
+    const deployElem = document.createElement('div');
+    deployElem.className = 'cert-footer-item cert-deploy-actions';
+    deployElem.title = 'Deployment Actions';
+    deployElem.innerHTML = `<i class="fas fa-rocket"></i> <span class="footer-count">${deployCount}</span>`;
+    deployElem.addEventListener('click', () => {
+      // Open certificate details modal with deployment actions tab active
+      showCertificateDetails(cert.fingerprint, 'deploy-actions-tab');
+    });
+    footer.appendChild(deployElem);
 
-// 3. Has passphrase 
-const hasPassphrase = cert.needsPassphrase || false;
-const passphraseElem = document.createElement('div');
-passphraseElem.className = 'cert-footer-item cert-passphrase';
-passphraseElem.title = hasPassphrase ? 'Protected with passphrase' : 'No passphrase protection';
-const passphraseIcon = document.createElement('i');
-passphraseIcon.className = hasPassphrase ? 'fas fa-lock security-icon secure' : 'fas fa-unlock security-icon insecure';
-passphraseElem.appendChild(passphraseIcon);
-passphraseElem.addEventListener('click', () => {
-  // Open certificate details modal with management tab active (which contains passphrase settings)
-  showCertificateDetails(cert.fingerprint, 'management-tab');
-});
-footer.appendChild(passphraseElem);
+    // 3. Has passphrase 
+    const hasPassphrase = cert.needsPassphrase || false;
+    const passphraseElem = document.createElement('div');
+    passphraseElem.className = 'cert-footer-item cert-passphrase';
+    passphraseElem.title = hasPassphrase ? 'Protected with passphrase' : 'No passphrase protection';
+    const passphraseIcon = document.createElement('i');
+    passphraseIcon.className = hasPassphrase ? 'fas fa-lock security-icon secure' : 'fas fa-unlock security-icon insecure';
+    passphraseElem.appendChild(passphraseIcon);
+    passphraseElem.addEventListener('click', () => {
+      // Open certificate details modal with management tab active (which contains passphrase settings)
+      showCertificateDetails(cert.fingerprint, 'management-tab');
+    });
+    footer.appendChild(passphraseElem);
 
-// 4. Certificate type indicator
-const certTypeElem = document.createElement('div');
-certTypeElem.className = 'cert-footer-item cert-type';
+    // 4. Certificate type indicator
+    const certTypeElem = document.createElement('div');
+    certTypeElem.className = 'cert-footer-item cert-type';
 
-let certTypeIcon, certTypeTooltip;
-switch(cert.certType) {
-  case 'rootCA':
-    certTypeIcon = 'fas fa-certificate';
-    certTypeTooltip = 'Root CA Certificate';
-    break;
-  case 'intermediateCA':
-    certTypeIcon = 'fas fa-sitemap';
-    certTypeTooltip = 'Intermediate CA Certificate';
-    break;
-  default:
-    certTypeIcon = 'fas fa-id-card';
-    certTypeTooltip = 'Standard Certificate';
-}
+    let certTypeIcon, certTypeTooltip;
+    switch (cert.certType) {
+      case 'rootCA':
+        certTypeIcon = 'fas fa-certificate';
+        certTypeTooltip = 'Root CA Certificate';
+        break;
+      case 'intermediateCA':
+        certTypeIcon = 'fas fa-sitemap';
+        certTypeTooltip = 'Intermediate CA Certificate';
+        break;
+      default:
+        certTypeIcon = 'fas fa-id-card';
+        certTypeTooltip = 'Standard Certificate';
+    }
 
-certTypeElem.title = certTypeTooltip;
-const typeIcon = document.createElement('i');
-typeIcon.className = certTypeIcon;
-certTypeElem.appendChild(typeIcon);
-certTypeElem.addEventListener('click', () => {
-  // Open certificate details modal with details tab active
-  showCertificateDetails(cert.fingerprint, 'details-tab');
-});
-footer.appendChild(certTypeElem);
+    certTypeElem.title = certTypeTooltip;
+    const typeIcon = document.createElement('i');
+    typeIcon.className = certTypeIcon;
+    certTypeElem.appendChild(typeIcon);
+    certTypeElem.addEventListener('click', () => {
+      // Open certificate details modal with details tab active
+      showCertificateDetails(cert.fingerprint, 'details-tab');
+    });
+    footer.appendChild(certTypeElem);
 
-// 5. Auto-renew indicator
-if (cert.config && cert.config.hasOwnProperty('autoRenew')) {
-  const autoRenewElem = document.createElement('div');
-  autoRenewElem.className = 'cert-footer-item cert-auto-renew';
-  autoRenewElem.title = cert.config.autoRenew ? 'Auto-renewal enabled' : 'Auto-renewal disabled';
-  
-  const renewIcon = document.createElement('i');
-  renewIcon.className = cert.config.autoRenew ? 'fas fa-sync-alt feature-icon enabled' : 'fas fa-sync-alt feature-icon disabled';
-  autoRenewElem.appendChild(renewIcon);
-  autoRenewElem.addEventListener('click', () => {
-    // Open certificate details modal with renew settings tab active
-    showCertificateDetails(cert.fingerprint, 'renew-settings-tab');
-  });
-  footer.appendChild(autoRenewElem);
-}
+    // 5. Auto-renew indicator
+    if (cert.config && cert.config.hasOwnProperty('autoRenew')) {
+      const autoRenewElem = document.createElement('div');
+      autoRenewElem.className = 'cert-footer-item cert-auto-renew';
+      autoRenewElem.title = cert.config.autoRenew ? 'Auto-renewal enabled' : 'Auto-renewal disabled';
 
-// 6. Key strength indicator
-if (cert.keyLength) {
-  const keyStrengthElem = document.createElement('div');
-  keyStrengthElem.className = 'cert-footer-item cert-key-strength';
-  
-  let strengthClass = 'strength-unknown';
-  let strengthTooltip = 'Unknown key strength';
-  
-  if (cert.keyLength >= 4096) {
-    strengthClass = 'strength-high';
-    strengthTooltip = `Strong key (${cert.keyLength} bits)`;
-  } else if (cert.keyLength >= 2048) {
-    strengthClass = 'strength-medium';
-    strengthTooltip = `Medium key strength (${cert.keyLength} bits)`;
-  } else if (cert.keyLength > 0) {
-    strengthClass = 'strength-low';
-    strengthTooltip = `Weak key (${cert.keyLength} bits)`;
-  }
-  
-  keyStrengthElem.title = strengthTooltip;
-  const strengthIcon = document.createElement('i');
-  strengthIcon.className = `fas fa-shield-alt ${strengthClass}`;
-  keyStrengthElem.appendChild(strengthIcon);
-  keyStrengthElem.addEventListener('click', () => {
-    // Open certificate details modal with details tab active
-    showCertificateDetails(cert.fingerprint, 'details-tab');
-  });
-  footer.appendChild(keyStrengthElem);
-}
+      const renewIcon = document.createElement('i');
+      renewIcon.className = cert.config.autoRenew ? 'fas fa-sync-alt feature-icon enabled' : 'fas fa-sync-alt feature-icon disabled';
+      autoRenewElem.appendChild(renewIcon);
+      autoRenewElem.addEventListener('click', () => {
+        // Open certificate details modal with renew settings tab active
+        showCertificateDetails(cert.fingerprint, 'renew-settings-tab');
+      });
+      footer.appendChild(autoRenewElem);
+    }
+
+    // 6. Key strength indicator
+    if (cert.keyLength) {
+      const keyStrengthElem = document.createElement('div');
+      keyStrengthElem.className = 'cert-footer-item cert-key-strength';
+
+      let strengthClass = 'strength-unknown';
+      let strengthTooltip = 'Unknown key strength';
+
+      if (cert.keyLength >= 4096) {
+        strengthClass = 'strength-high';
+        strengthTooltip = `Strong key (${cert.keyLength} bits)`;
+      } else if (cert.keyLength >= 2048) {
+        strengthClass = 'strength-medium';
+        strengthTooltip = `Medium key strength (${cert.keyLength} bits)`;
+      } else if (cert.keyLength > 0) {
+        strengthClass = 'strength-low';
+        strengthTooltip = `Weak key (${cert.keyLength} bits)`;
+      }
+
+      keyStrengthElem.title = strengthTooltip;
+      const strengthIcon = document.createElement('i');
+      strengthIcon.className = `fas fa-shield-alt ${strengthClass}`;
+      keyStrengthElem.appendChild(strengthIcon);
+      keyStrengthElem.addEventListener('click', () => {
+        // Open certificate details modal with details tab active
+        showCertificateDetails(cert.fingerprint, 'details-tab');
+      });
+      footer.appendChild(keyStrengthElem);
+    }
 
     // 7. Days until expiry counter (if not expired)
     if (!cert.isExpired) {
@@ -1646,15 +1646,6 @@ function setupCertificateActions() {
     .getElementById("renew-cert-btn")
     ?.addEventListener("click", renewSelectedCertificate);
 
-  // Deployment actions
-  if (typeof initializeDeploymentActionButton === "function") {
-    initializeDeploymentActionButton(
-      document.getElementById("add-deployment-action-btn")
-    );
-  } else {
-    Logger.error("initializeDeploymentActionButton function not found");
-  }
-
   // Refresh buttons
   document
     .getElementById("refresh-certs")
@@ -1886,11 +1877,8 @@ function initViewModeSelector() {
   const viewModeButton = document.getElementById('view-mode-button');
   if (!viewModeButton) return;
 
-  // Get current view mode from localStorage
-  const currentViewMode = localStorage.getItem('certificateViewMode') || 'block';
-
   // Update button icon based on current view mode
-  updateViewModeButtonIcon(viewModeButton, currentViewMode);
+  updateViewModeButtonIcon(viewModeButton, localStorage.getItem('certificateViewMode') || 'block');
 
   // Create dropdown menu for view mode selection
   viewModeButton.addEventListener('click', function (e) {
@@ -1929,6 +1917,9 @@ function initViewModeSelector() {
       { id: 'list', label: 'List View', icon: 'fa-list' },
       { id: 'hierarchy', label: 'Hierarchy View', icon: 'fa-sitemap' }
     ];
+
+    // Get current view mode from localStorage
+    const currentViewMode = localStorage.getItem('certificateViewMode') || 'block';
 
     viewModes.forEach(mode => {
       const option = document.createElement('div');
@@ -2116,7 +2107,9 @@ function updateCertificateFiltering() {
   renderCertificatesList(state.certificates);
 }
 
-// Add this function to check authentication status on page load
+/**
+ * Check authentication status on page load
+ */
 function checkAuthentication() {
   fetch('/api/setup/status')
     .then(response => response.json())
@@ -2142,15 +2135,15 @@ function checkAuthentication() {
           return response.json();
         });
     })
-    .then(data => {
-      if (data.authDisabled) {
+    .then(userData => {
+      if (userData && userData.authDisabled) {
         // Auth is disabled, nothing to do
         return;
       }
 
       // User is authenticated, update UI with user info
-      if (data.success && data.user) {
-        updateUserInterface(data.user);
+      if (userData && userData.success && userData.user) {
+        updateUserInterface(userData.user);
       }
     })
     .catch(error => {
@@ -2158,13 +2151,15 @@ function checkAuthentication() {
       // Only redirect if we're not in setup mode and not in disabled auth mode
       fetch('/api/setup/status')
         .then(response => response.json())
-        .then(data => {
-          if (!data.setupNeeded && !data.authDisabled) {
+        .then(setupData => {
+          if (setupData && !setupData.setupNeeded && !setupData.authDisabled) {
             window.location.href = '/login';
           }
         })
-        .catch(() => {
-          // Fallback - don't redirect if we can't determine status
+        .catch(setupError => {
+          Logger.error('Failed to check setup status:', setupError);
+          // In case of error, redirect to login as a safe default
+          window.location.href = '/login';
         });
     });
 }
@@ -2189,4 +2184,7 @@ window.loadDashboard = loadDashboard;
 window.loadCertificates = loadCertificates;
 window.loadCACertificates = loadCACertificates;
 window.loadSettings = loadSettings;
+window.renderBlockView = renderBlockView;
+window.renderListView = renderListView;
+window.renderHierarchyView = renderHierarchyView;
 window.state = state;

@@ -1314,7 +1314,8 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            description: Action ID (can be numeric index or UUID)
       responses:
         "200":
           description: Deployment action removed
@@ -1349,7 +1350,8 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            description: Action ID (can be numeric index or UUID)
       requestBody:
         required: true
         content:
@@ -4143,19 +4145,32 @@ components:
               description: Docker container name
 
     NginxProxyManagerAction:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum: [nginx-proxy-manager]
-        npmPath:
-          type: string
-          description: Path to Nginx Proxy Manager installation
-        dockerContainer:
-          type: string
-          description: Nginx Proxy Manager docker container name
+      allOf:
+        - $ref: "#/components/schemas/DeploymentAction"
+        - type: object
+          properties:
+            npmPath:
+              type: string
+              description: Path to Nginx Proxy Manager installation
+            dockerContainer:
+              type: string
+              description: Nginx Proxy Manager docker container name
+            certificateId:
+              type: integer
+              description: ID of the certificate in NPM
+            npmUrl:
+              type: string
+              description: Custom Nginx Proxy Manager URL
+            method:
+              type: string
+              enum: [path, docker, api]
+              description: Method to use for NPM certificate update
+            restartServices:
+              type: boolean
+              description: Whether to restart NPM services
+            verifyUpdate:
+              type: boolean
+              description: Whether to verify the update was successful
 
     SshCopyAction:
       allOf:

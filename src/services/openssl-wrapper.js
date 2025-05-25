@@ -123,10 +123,13 @@ class OpenSSLWrapper {
       }
 
       // Log the command completion
-      const stdoutPreview = stdout && stdout.length > 100 ?
-        stdout.substring(0, 97) + '...' : stdout;
-      logger.fine(`OpenSSL command completed successfully: ${stdoutPreview || '(no output)'}`, null, FILENAME, instance);
-
+      if(logger.isLevelEnabled('finest', FILENAME)) {
+        logger.finest('OpenSSL command completed successfully', stdout, FILENAME, instance);
+      } else if(logger.isLevelEnabled('fine', FILENAME)) {
+        const stdoutPreview = stdout && stdout.length > 100 ?
+          stdout.substring(0, 97) + '...' : stdout;
+        logger.fine(`OpenSSL command completed successfully: ${stdoutPreview || '(no output)'}`, null, FILENAME, instance);
+      }
       return stdout.trim();
     } catch (error) {
       // Enhance error logging to provide more context
@@ -539,27 +542,84 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
       const commonName = cnMatch ? cnMatch[1].trim() : null;
       logger.fine(`Certificate CN: ${commonName}`, null, FILENAME, instance);
 
+      // Extract serial number
+      const serialMatch = certText.match(/Serial Number:\s*(?:.*\n\s*)?([0-9a-fA-F:]+)/);
+      const serialNumber = serialMatch ? serialMatch[1].replace(/:/g, '') : null;
+      logger.fine(`Certificate serial number: ${serialNumber}`, null, FILENAME, instance);
+
+      // Extract key identifier (Subject Key Identifier)
+      const keyIdMatch = certText.match(/X509v3 Subject Key Identifier:\s*\n\s*([0-9A-F:]+)/i);
+      const keyId = keyIdMatch ? keyIdMatch[1].replace(/:/g, '') : null;
+      logger.fine(`Certificate key ID: ${keyId}`, null, FILENAME, instance);
+
+      // Extract authority key identifier
+      const authKeyIdMatch = certText.match(/X509v3 Authority Key Identifier:\s*\n\s*([0-9A-F:]+)/i);
+      const authorityKeyId = authKeyIdMatch ? authKeyIdMatch[1].replace(/:/g, '').trim() : null;
+      logger.fine(`Certificate authority key ID: ${authorityKeyId}`, null, FILENAME, instance);
+
+      // Extract signature algorithm
+      const sigAlgMatch = certText.match(/Signature Algorithm:\s*([^\n]+)/);
+      const sigAlg = sigAlgMatch ? sigAlgMatch[1].trim() : null;
+      logger.fine(`Certificate signature algorithm: ${sigAlg}`, null, FILENAME, instance);
+
+      // Extract public key type and size
+      const keyTypeMatch = certText.match(/Public Key Algorithm:\s*([^\n]+)/);
+      const keyType = keyTypeMatch ? keyTypeMatch[1].trim() : null;
+      
+      let keySize = null;
+      
+      // RSA key size
+      const rsaKeySizeMatch = certText.match(/Public-Key:\s*\((\d+)\s*bit\)/);
+      if (rsaKeySizeMatch) {
+        keySize = parseInt(rsaKeySizeMatch[1], 10);
+      } 
+      // EC key size
+      else {
+        const ecKeySizeMatch = certText.match(/ASN1 OID:\s*([^\n]+)/);
+        if (ecKeySizeMatch && ecKeySizeMatch[1].includes('secp')) {
+          const ecCurve = ecKeySizeMatch[1].trim();
+          // Extract bit size from common EC curves
+          if (ecCurve.includes('secp256')) {
+            keySize = 256;
+          } else if (ecCurve.includes('secp384')) {
+            keySize = 384;
+          } else if (ecCurve.includes('secp521')) {
+            keySize = 521;
+          }
+        }
+      }
+      
+      logger.fine(`Certificate key type: ${keyType}, size: ${keySize}`, null, FILENAME, instance);
+
       // Extract alternative names
       const domains = [];
       const ips = [];
+      
+      if(commonName) {
+        domains.push(commonName);
+      }
 
-      const sanMatch = certText.match(/X509v3 Subject Alternative Name:[^]*?DNS:([^]*?)(?:\n\s*[A-Za-z]|\n\n)/);
+      const sanMatch = certText.match(/X509v3 Subject Alternative Name:[^]*?(DNS:[^]*?)(?:\n\s*[A-Za-z]|\n\n)/);
       if (sanMatch) {
         const sanText = sanMatch[1].trim();
+        logger.finest(`Extracting SANs from certificate`, {sanText}, FILENAME, instance);
 
         // Extract all DNS names
         const dnsMatches = sanText.matchAll(/DNS:([^,\s]+)/g);
         for (const match of dnsMatches) {
           domains.push(match[1].trim());
         }
+        domains.sort();
 
         // Extract all IP addresses
         const ipMatches = sanText.matchAll(/IP Address:([^,\s]+)/g);
         for (const match of ipMatches) {
           ips.push(match[1].trim());
         }
+        ips.sort();
 
         logger.fine(`Certificate SANs: ${domains.length} domains, ${ips.length} IPs`, null, FILENAME, instance);
+        logger.finest(`Certificate SANs: domains: ${domains.join(', ')}, IPs: ${ips.join(', ')}`, null, FILENAME, instance);
       }
 
       // Extract CA information
@@ -577,11 +637,13 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
         }
       }
 
+      const isRootCA = isCA && !pathLengthConstraint;
+
       // Get fingerprint (SHA-256)
       const fingerprint = await this._getCertificateFingerprint(certPath, instance);
-      logger.fine(`Certificate fingerprint: ${fingerprint}`, null, FILENAME, instance);
-
-      return {
+      
+      // Build complete result object with all certificate information
+      let result = {
         subject,
         issuer,
         commonName,
@@ -590,10 +652,21 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
         isSelfSigned,
         fingerprint,
         isCA,
+        isRootCA,
         pathLengthConstraint,
-        domains,
-        ips
+        serialNumber,
+        keyId,
+        authorityKeyId,
+        keyType,
+        keySize,
+        sigAlg,
+        sans:{
+          domains: [...domains],
+          ips: [...ips]
+        }
       };
+      logger.fine(`Got certificate info from ${certPath}`, result, FILENAME, instance);
+      return result;
     } catch (error) {
       logger.error(`Failed to get certificate info from ${certPath}: ${error.message}`, error, FILENAME, instance);
       throw new Error(`Failed to get certificate info: ${error.message}`);

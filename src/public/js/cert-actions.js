@@ -443,20 +443,6 @@ async function showCertificateDetails(fingerprint, activeTab = null, ca = false)
         loadCertificateTabData(certificate);
 
         initializePassphraseManagement(state.currentCertificate);
-        
-        // Also explicitly add event listeners for the problematic buttons
-        const addActionBtn = document.getElementById('add-deployment-action-btn');
-        if (addActionBtn) {
-          Logger.debug("Attaching click handler to Add Action button");
-          addActionBtn.onclick = function () {
-            if (typeof showDeploymentActionForm === 'function') {
-              showDeploymentActionForm();
-            } else {
-              Logger.error("showDeploymentActionForm function not found");
-              UIUtils.showToast("Deployment action form functionality not available", "error");
-            }
-          };
-        }
 
         const createBackupBtn = document.getElementById('create-backup-btn');
         if (createBackupBtn) {
@@ -607,6 +593,7 @@ function setupCertificateEditFunctionality() {
   if (editDetailsBtn && cancelEditBtn && saveDetailsBtn) {
     editDetailsBtn.addEventListener("click", () => {
       document.getElementById("cert-details-table").classList.add("hidden");
+      document.getElementById("passphrase-management-section").classList.add("hidden");
       document.getElementById("cert-details-edit").classList.remove("hidden");
       document.getElementById("edit-cert-details-btn").classList.add("hidden");
     });
@@ -614,6 +601,7 @@ function setupCertificateEditFunctionality() {
     cancelEditBtn.addEventListener("click", () => {
       document.getElementById("cert-details-edit").classList.add("hidden");
       document.getElementById("cert-details-table").classList.remove("hidden");
+      document.getElementById("passphrase-management-section").classList.remove("hidden");
       document.getElementById("edit-cert-details-btn").classList.remove("hidden");
     });
 
@@ -659,10 +647,10 @@ function addCertificateButtonHandlers(fingerprint) {
 function initializePassphraseManagement(certificate) {
   const container = document.getElementById('passphrase-content-container');
   if (!container) return;
-  
+
   // Generate HTML based on certificate properties
   let contentHtml = '';
-  
+
   if (certificate.needsPassphrase) {
     contentHtml = `
       <div class="passphrase-status">
@@ -693,28 +681,28 @@ function initializePassphraseManagement(certificate) {
       </div>
     `;
   }
-  
+
   // Set the generated HTML
   container.innerHTML = contentHtml;
-  
+
   // Get buttons based on presence of stored passphrase
   const storePassphraseBtn = document.getElementById('store-passphrase-btn');
   const removePassphraseBtn = document.getElementById('remove-passphrase-btn');
   const changePassphraseBtn = document.getElementById('change-passphrase-btn');
-  
+
   // Add event listeners
   if (storePassphraseBtn) {
     storePassphraseBtn.addEventListener('click', () => {
       showStorePassphraseModal(certificate.fingerprint);
     });
   }
-  
+
   if (removePassphraseBtn) {
     removePassphraseBtn.addEventListener('click', () => {
       confirmRemovePassphrase(certificate.fingerprint);
     });
   }
-  
+
   if (changePassphraseBtn) {
     changePassphraseBtn.addEventListener('click', () => {
       showChangePassphraseModal(certificate.fingerprint);
@@ -727,13 +715,13 @@ function initializePassphraseManagement(certificate) {
  */
 function showStorePassphraseModal(fingerprint) {
   Logger.debug(`Opening store passphrase modal for certificate: ${fingerprint}`);
-  
+
   // First, ensure any existing modal is removed
   const existingModal = document.getElementById('store-passphrase-modal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   UIUtils.showModal('store-passphrase-modal', {
     title: "Store Certificate Passphrase",
     content: `
@@ -776,7 +764,7 @@ function showStorePassphraseModal(fingerprint) {
     ],
     onShow: () => {
       setupTogglePasswordVisibility();
-      
+
       // Directly add click handler for the submit button
       const submitBtn = document.getElementById('submit-passphrase-btn');
       if (submitBtn) {
@@ -795,13 +783,13 @@ function showStorePassphraseModal(fingerprint) {
  */
 function showChangePassphraseModal(fingerprint) {
   Logger.debug(`Opening change passphrase modal for certificate: ${fingerprint}`);
-  
+
   // First, ensure any existing modal is removed
   const existingModal = document.getElementById('change-passphrase-modal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   UIUtils.showModal('change-passphrase-modal', {
     title: "Change Certificate Passphrase",
     content: `
@@ -839,7 +827,7 @@ function showChangePassphraseModal(fingerprint) {
     ],
     onShow: () => {
       setupTogglePasswordVisibility();
-      
+
       // Directly add click handler for the submit button
       const submitBtn = document.getElementById('submit-change-btn');
       if (submitBtn) {
@@ -862,13 +850,13 @@ function setupTogglePasswordVisibility() {
     document.querySelectorAll(".toggle-password-btn").forEach(btn => {
       // Remove existing listeners to prevent duplicates
       btn.removeEventListener("click", null); // Remove any existing listeners
-      
+
       // Add the event listener to the new button
       btn.addEventListener("click", (event) => {
         const targetId = btn.getAttribute("data-target");
         const input = document.getElementById(targetId);
         const icon = btn.querySelector("i");
-        
+
         if (input && icon) {
           if (input.type === "password") {
             input.type = "text";
@@ -880,7 +868,7 @@ function setupTogglePasswordVisibility() {
             icon.classList.add("fa-eye");
           }
         }
-        
+
         // Prevent event from bubbling up and triggering modal buttons
         event.stopPropagation();
       });
@@ -947,7 +935,7 @@ async function submitPassphraseForm(fingerprint, action) {
     // Make API request based on action type
     const method = "POST";
     const url = `/api/certificates/${encodedFingerprint}/passphrase`;
-    
+
     // Add a debug log for the request
     Logger.debug(`Making ${method} request to: ${url}`);
 
@@ -997,12 +985,12 @@ function addInputError(input, message) {
 
   // Add error class to input
   input.classList.add('error');
-  
+
   // Find the appropriate container to add the error to
-  const formGroup = input.closest('.passphrase-form-group') || 
-                    input.closest('.form-group') || 
-                    input.parentNode;
-  
+  const formGroup = input.closest('.passphrase-form-group') ||
+    input.closest('.form-group') ||
+    input.parentNode;
+
   // Create error element
   const errorEl = document.createElement('div');
   errorEl.className = 'input-error';
@@ -1010,7 +998,7 @@ function addInputError(input, message) {
   errorEl.style.color = 'var(--error-color, #dc3545)';
   errorEl.style.fontSize = '0.875rem';
   errorEl.style.marginTop = '4px';
-  
+
   // Append to form group
   formGroup.appendChild(errorEl);
 }
@@ -1022,12 +1010,12 @@ function addInputError(input, message) {
 function removeInputErrors(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
-  
+
   // Remove error classes from inputs
   modal.querySelectorAll('input.error').forEach(input => {
     input.classList.remove('error');
   });
-  
+
   // Remove error messages
   modal.querySelectorAll('.input-error').forEach(errorEl => {
     errorEl.remove();
@@ -1075,20 +1063,20 @@ function confirmRemovePassphrase(fingerprint) {
 async function refreshCertificateDetails(fingerprint) {
   try {
     Logger.debug(`Refreshing certificate details for fingerprint: ${fingerprint}`);
-    
+
     // Show loading indicator
     UIUtils.showToast("Refreshing certificate information...", "info");
-    
+
     // Fetch the latest certificate data from the server
     const encodedFingerprint = encodeAPIFingerprint(fingerprint);
     const response = await fetch(`/api/certificates/${encodedFingerprint}`);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to refresh certificate details: ${response.status}`);
     }
-    
+
     const certificateData = await response.json();
-    
+
     // Update the certificate in state
     if (window.state && window.state.certificates) {
       const index = window.state.certificates.findIndex(c => c.fingerprint === fingerprint);
@@ -1096,16 +1084,16 @@ async function refreshCertificateDetails(fingerprint) {
         window.state.certificates[index] = certificateData;
       }
     }
-    
+
     // Update the current certificate if it's the one we're viewing
-    if (window.state && window.state.currentCertificate && 
-        window.state.currentCertificate.fingerprint === fingerprint) {
+    if (window.state && window.state.currentCertificate &&
+      window.state.currentCertificate.fingerprint === fingerprint) {
       window.state.currentCertificate = certificateData;
     }
-    
+
     // Re-render the certificate details view
     showCertificateDetails(fingerprint);
-    
+
     Logger.debug(`Certificate details refreshed successfully`);
   } catch (error) {
     Logger.error(`Failed to refresh certificate details: ${error.message}`, error);
@@ -1153,6 +1141,272 @@ function loadCertificateTabData(certificate) {
     loadCertificateHistory(certificate.fingerprint);
     initializeSettingsForm(certificate);
   }, 100);
+}
+
+/**
+ * Load deployment actions for the certificate
+ * @param {string|Object} fingerprint - Certificate fingerprint or certificate object
+ */
+function loadCertificateDeploymentActions(certificate) {
+  // Handle case where a full certificate object is passed
+  let fingerprint;
+  if (typeof certificate === "object" && certificate !== null) {
+    fingerprint = certificate.fingerprint;
+  } else {
+    fingerprint = certificate;
+  }
+
+  // Ensure fingerprint is valid
+  if (!fingerprint) {
+    Logger.error("Invalid fingerprint provided to loadCertificateDeploymentActions");
+    return;
+  }
+
+  const container = document.getElementById("deployment-actions-list");
+  if (!container) {
+    Logger.warn("Deployment actions container not found");
+    return;
+  }
+
+  // Show loading spinner
+  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading deployment actions...", "small");
+
+  // Fetch deployment actions for this certificate
+  fetch(`/api/certificates/${encodeAPIFingerprint(fingerprint)}/deploy-actions`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to load deployment actions: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+
+      // Render the deployment actions list
+      renderDeploymentActionsList(data || [], container, fingerprint);
+    })
+    .catch(error => {
+      Logger.error("Error loading deployment actions:", error);
+      UIUtils.removeLoadingSpinner(loadingSpinner);
+
+      // Show error message
+      container.innerHTML = `
+        <div class="error-state">
+          <p>Failed to load deployment actions: ${UIUtils.sanitizeErrorMessage(error)}</p>
+          <button class="button small retry-btn">Retry</button>
+        </div>
+      `;
+
+      // Add retry button handler
+      container.querySelector('.retry-btn')?.addEventListener('click', () => {
+        loadCertificateDeploymentActions(fingerprint);
+      });
+    });
+}
+
+/**
+ * Render deployment actions list
+ * @param {Array} actions - List of deployment actions
+ * @param {HTMLElement} container - Container element
+ * @param {string} certificateId - Certificate fingerprint
+ */
+function renderDeploymentActionsList(actions, container, certificateId) {
+  // Handle empty case
+  if (!actions || actions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>No deployment actions configured for this certificate.</p>
+        <button id="add-deployment-action-btn" class="button primary">
+          <i class="fas fa-plus"></i> Add Deployment Action
+        </button>
+      </div>
+    `;
+
+    // Add event listener to add button
+    const addButton = document.getElementById("add-deployment-action-btn");
+    if (addButton) {
+      addButton.addEventListener("click", () => {
+        // Make sure window.DeploymentActions exists before calling
+        if (window.DeploymentActions && typeof window.DeploymentActions.showActionForm === 'function') {
+          window.DeploymentActions.showActionForm();
+        } else {
+          Logger.error("DeploymentActions.showActionForm is not available");
+          UIUtils.showToast("Deployment actions module not loaded properly", "error");
+        }
+      });
+    }
+
+    return;
+  }
+
+  // Create HTML for actions list
+  let html = `
+    <div id="deployment-actions-list" class="deployment-actions-list">
+      <div class="sortable-actions">
+  `;
+
+  // Add each action
+  actions.forEach((action) => {
+    html += `
+      <div class="deployment-action-item" data-action-id="${action.id}" data-type="${action.type || 'unknown'}">
+        <div class="action-header">
+          <div class="drag-handle" title="Drag to reorder">
+            <i class="fas fa-grip-lines"></i>
+          </div>
+          <h4 class="action-name">${action.name || "Unnamed Action"}</h4>
+          <span class="action-type-badge">${formatActionType(action.type)}</span>
+        </div>
+        <div class="action-buttons">
+          <button class="button small test-action-btn" data-action="test" data-id="${action.id}">
+            <i class="fas fa-vial"></i> Test
+          </button>
+          <button class="button small edit-action-btn" data-action="edit" data-id="${action.id}">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button class="button small danger delete-action-btn" data-action="delete" data-id="${action.id}">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+    </div>
+  `;
+
+  // Update container
+  container.innerHTML = html;
+
+  // Add event listeners for action buttons
+  container.querySelectorAll("[data-action]").forEach(button => {
+    button.addEventListener("click", (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.getAttribute("data-action");
+      const actionId = button.getAttribute("data-id");
+
+      if (!actionId) {
+        Logger.error("Invalid action ID");
+        return;
+      }
+
+      // Make sure window.DeploymentActions exists
+      if (!window.DeploymentActions) {
+        Logger.error("DeploymentActions module not loaded");
+        UIUtils.showToast("Deployment actions module not loaded properly", "error");
+        return;
+      }
+
+      switch (action) {
+        case "test":
+          // Call the test method from the module
+          if (typeof window.DeploymentActions.testAction === 'function') {
+            window.DeploymentActions.testAction(actionId);
+          } else {
+            Logger.error("DeploymentActions.testAction function not found");
+          }
+          break;
+
+        case "edit":
+          // Call the edit method from the module
+          if (typeof window.DeploymentActions.editAction === 'function') {
+            window.DeploymentActions.editAction(actionId);
+          } else {
+            Logger.error("DeploymentActions.editAction function not found");
+          }
+          break;
+
+        case "delete":
+          // Call the delete method from the module
+          if (typeof window.DeploymentActions.deleteAction === 'function') {
+            window.DeploymentActions.deleteAction(actionId);
+          } else {
+            Logger.error("DeploymentActions.deleteAction function not found");
+          }
+          break;
+      }
+    });
+  });
+
+  // Add event listener to add button
+  const addButton = document.getElementById("add-deployment-action-btn");
+  if (addButton) {
+    addButton.addEventListener("click", () => {
+      // Check if the function exists
+      if (window.DeploymentActions && typeof window.DeploymentActions.showActionForm === 'function') {
+        window.DeploymentActions.showActionForm();
+      } else {
+        Logger.error("DeploymentActions.showActionForm function not found");
+        UIUtils.showToast("Deployment actions module not loaded properly", "error");
+      }
+    });
+  }
+  
+  // Initialize sortable if there's more than one action
+  if (actions.length > 1 && typeof window.initDeployActionsSortable === 'function') {
+    // Give the DOM a moment to render completely
+    setTimeout(() => {
+      window.initDeployActionsSortable(certificateId);
+    }, 100);
+  }
+}
+
+/**
+ * Format action type for display
+ * @param {string} type - Action type
+ * @returns {string} Formatted action type
+ */
+function formatActionType(type) {
+  if (!type) return "Unknown";
+
+  switch (type) {
+    case "docker-restart":
+      return "Docker Restart";
+    case "copy":
+      return "Copy Files";
+    case "command":
+      return "Run Command";
+    case "nginx-proxy-manager":
+      return "Nginx Proxy Manager";
+    case "ssh-copy":
+      return "SSH Copy";
+    case "smb-copy":
+      return "SMB Copy";
+    case "ftp-copy":
+      return "FTP Copy";
+    case "api-call":
+      return "API Call";
+    case "webhook":
+      return "Webhook";
+    case "email":
+      return "Email";
+    default:
+      // Format case (e.g. some-service → Some Service)
+      return type
+        .split("-")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+  }
+}
+
+/**
+ * Refresh deployment actions list after changes
+ * @param {string} certificateId - Certificate fingerprint
+ */
+function refreshDeploymentActionsList(certificateId) {
+  // If not provided, try to get from current certificate
+  if (!certificateId && window.state && window.state.currentCertificate) {
+    certificateId = window.state.currentCertificate.fingerprint;
+  }
+
+  if (certificateId) {
+    loadCertificateDeploymentActions(certificateId);
+  } else {
+    Logger.error("Cannot refresh deployment actions: no certificate ID");
+  }
 }
 
 /**
@@ -1345,11 +1599,13 @@ function initializeCertificateDetailsTabs(container) {
       const detailsTable = container.querySelector("#cert-details-table");
       const detailsEdit = container.querySelector("#cert-details-edit");
       const detailsEditButton = container.querySelector("#edit-cert-details-btn");
+      const passphraseSection = container.querySelector("#passphrase-management-section");
 
       if (detailsTable && detailsEdit) {
         detailsTable.classList.add("hidden");
         detailsEditButton.classList.add("hidden");
         detailsEdit.classList.remove("hidden");
+        passphraseSection.classList.add("hidden");
       } else {
         Logger.error("Certificate details elements not found", {
           detailsTableExists: !!detailsTable,
@@ -1364,11 +1620,13 @@ function initializeCertificateDetailsTabs(container) {
       const detailsEdit = container.querySelector("#cert-details-edit");
       const detailsTable = container.querySelector("#cert-details-table");
       const detailsEditButton = container.querySelector("#edit-cert-details-btn");
+      const passphraseSection = container.querySelector("#passphrase-management-section");
 
       if (detailsEdit && detailsTable) {
         detailsEdit.classList.add("hidden");
         detailsTable.classList.remove("hidden");
         detailsEditButton.classList.remove("hidden");
+        passphraseSection.classList.remove("hidden");
       } else {
         Logger.error("Certificate details elements not found when canceling edit mode");
       }
@@ -1552,6 +1810,7 @@ async function saveCertificateDetails(certificate) {
     // Switch back to view mode
     document.getElementById("cert-details-edit").classList.add("hidden");
     document.getElementById("cert-details-table").classList.remove("hidden");
+    document.getElementById("passphrase-management-section").classList.remove("hidden");
     document.getElementById("edit-cert-details-btn").classList.remove("hidden");
 
     // Update the view with new data
@@ -1568,16 +1827,13 @@ async function saveCertificateDetails(certificate) {
 
     // Refresh the certificates list if it's visible, preserving the current view mode
     if (document.getElementById("certificates-list")) {
-      // Check which view mode is currently active
-      const currentViewMode = getCurrentViewMode();
-
       // Update the certificates in state
       if (typeof loadCertificates === 'function') {
         await loadCertificates(true);
       }
 
-      // Render using the appropriate view mode
-      renderCertificatesByViewMode(currentViewMode);
+      // Re-render the certificates list
+      renderCertificatesList(state.certificates);
     }
   } catch (error) {
     Logger.error("Error saving certificate details:", error);
@@ -1590,71 +1846,6 @@ async function saveCertificateDetails(certificate) {
       saveBtn.disabled = false;
     }
   }
-}
-
-
-/**
- * Get the currently active view mode
- * @returns {string} - 'list', 'block', or 'hierarchy'
- */
-function getCurrentViewMode() {
-  // Look for the active view button
-  const listViewBtn = document.querySelector('.view-btn[data-view="list"]');
-  const blockViewBtn = document.querySelector('.view-btn[data-view="block"]');
-  const hierarchyViewBtn = document.querySelector('.view-btn[data-view="hierarchy"]');
-
-  if (listViewBtn?.create - cert - btncreate - cert - btn.contains('active')) {
-    return 'list';
-  } else if (blockViewBtn?.classList.contains('active')) {
-    return 'block';
-  } else if (hierarchyViewBtn?.classList.contains('active')) {
-    return 'hierarchy';
-  }
-
-  // Default to list view if we can't determine
-  return 'list';
-}
-
-/**
- * Render certificates using the specified view mode
- * @param {string} viewMode - The view mode to use ('list', 'block', or 'hierarchy')
- */
-function renderCertificatesByViewMode(viewMode) {
-  const container = document.getElementById("certificates-list");
-  if (!container) return;
-
-  // Clear the container
-  container.innerHTML = '';
-
-  switch (viewMode) {
-    case 'block':
-      if (typeof renderBlockView === 'function') {
-        renderBlockView(state.certificates, container);
-      } else {
-        renderCertificatesListDetailed(state.certificates);
-      }
-      break;
-    case 'hierarchy':
-      if (typeof renderHierarchyView === 'function') {
-        renderHierarchyView(state.certificates, container);
-      } else {
-        renderCertificatesListDetailed(state.certificates);
-      }
-      break;
-    case 'list':
-    default:
-      renderCertificatesListDetailed(state.certificates);
-      break;
-  }
-
-  // Update the active state of view buttons
-  document.querySelectorAll('.view-btn').forEach(btn => {
-    if (btn.getAttribute('data-view') === viewMode) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
 }
 
 /**
@@ -2613,7 +2804,6 @@ async function loadCertificateDetails(fingerprint, showInModal = false) {
   }
 }
 
-
 /**
  * Render certificate details into the details panel
  * @param {Object} certificate - Certificate data
@@ -3267,7 +3457,7 @@ async function deleteCertificate(certId) {
 
     // If we're on the certificates tab, re-render the list
     if (document.getElementById('certificates-list')) {
-      renderCertificatesListDetailed(window.state.certificates);
+      renderCertificatesList(window.state.certificates);
     }
 
     // If we're on the CA tab and this was a CA certificate, reload that list too
@@ -4808,9 +4998,6 @@ function loadVersionFiles(certFingerprint, versionFingerprint, container) {
     return;
   }
 
-  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
-  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
-
   // Show available files based on version data (from the history API)
   const historyItem = container.closest('.history-item');
   if (!historyItem) return;
@@ -4925,3 +5112,6 @@ window.startCertificateRenewal = startCertificateRenewal;
 window.showCreateCertificateModal = showCreateCertificateModal;
 window.showCreateCAModal = showCreateCAModal;
 window.showCertificateDetails = showCertificateDetails;
+
+// Expose this function globally for the deployment-actions.js to call
+window.refreshDeploymentActionsList = refreshDeploymentActionsList;

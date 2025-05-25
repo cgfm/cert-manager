@@ -29,7 +29,7 @@ function initActivityRouter(deps) {
         activities: activities // Make sure activities is an array here
       });
     } catch (error) {
-      logger.error('Error getting activities', { error: error.message }, FILENAME);
+      logger.error('Error getting activities', error, FILENAME);
       res.status(500).json({
         success: false,
         message: 'Error retrieving activities',
@@ -56,7 +56,7 @@ function initActivityRouter(deps) {
         message: 'All activities cleared'
       });
     } catch (error) {
-      logger.error('Error clearing activities', { error: error.message }, FILENAME);
+      logger.error('Error clearing activities', error, FILENAME);
       res.status(500).json({
         success: false,
         message: 'Error clearing activities',

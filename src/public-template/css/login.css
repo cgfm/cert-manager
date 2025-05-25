@@ -56,18 +56,18 @@
   border: 1px solid var(--success-color);
 }
 
-.form-group {
+#login-form .form-group {
   margin-bottom: 20px;
 }
 
-.form-group label {
+#login-form .form-group label {
   display: block;
   margin-bottom: 8px;
   font-size: 14px;
   color: var(--text-color);
 }
 
-.form-group input {
+#login-form .form-group input {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--border-color);
@@ -78,7 +78,7 @@
   transition: all 0.3s ease;
 }
 
-.form-group input:focus {
+#login-form .form-group input:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.2);

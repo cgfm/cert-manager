@@ -128,7 +128,7 @@ const Logger = {
    * @param {string} message - Message to log
    * @param {*} data - Optional data to include
    */
-  error: function (message, data) {
+  error: function (message, error) {
     if (this.currentLevel <= this.LEVELS.ERROR) {
       this._log('ERROR', message, data);
     }

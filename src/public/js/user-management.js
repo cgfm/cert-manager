@@ -407,7 +407,7 @@ function setupUserFormHandlers() {
  * @param {string} username - Username to delete
  */
 function confirmDeleteUser(username) {
-  UIUtils.confirm(
+  UIUtils.confirmDialog(
     'Delete User', 
     `Are you sure you want to delete user "${username}"? This action cannot be undone.`,
     async () => {
@@ -739,7 +739,7 @@ function setupTokenCreatedModal() {
  * @param {Object} token - Token to delete
  */
 function confirmDeleteToken(token) {
-  UIUtils.confirm(
+  UIUtils.confirmDialog(
     'Delete API Token', 
     `Are you sure you want to delete the API token "${token.name}"? This action cannot be undone.`,
     async () => {

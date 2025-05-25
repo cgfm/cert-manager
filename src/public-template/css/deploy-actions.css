@@ -26,15 +26,15 @@
 }
 
 /* Common form elements */
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.form-group:last-child {
+#deployment-action-form .form-group {
   margin-bottom: 0;
 }
 
-.form-group label {
+#deployment-action-form .form-group:last-child {
+  margin-bottom: 0;
+}
+
+#deployment-action-form .form-group label {
   display: block;
   font-weight: 500;
   margin-bottom: 0.5rem;
@@ -42,166 +42,62 @@
 }
 
 /* Responsive input groups for path selection */
-.input-group {
+#deployment-action-form .input-group {
   display: flex;
   width: 100%;
 }
 
-.input-group input {
+#deployment-action-form .input-group input {
   flex: 1;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-.input-group .button {
+#deployment-action-form .input-group .button {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left: none;
 }
 
-/* Radio and checkbox styling */
-.toggle-options {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
-}
-
-/* Modern toggle switch */
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  margin-right: 1.5rem;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-  background-color: var(--border-color);
-  border-radius: 20px;
-  margin-right: 10px;
-  transition: .4s;
-}
-
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: white;
-  border-radius: 50%;
-  transition: .4s;
-}
-
-input:checked + .toggle-slider {
-  background-color: var(--primary-color);
-}
-
-input:focus + .toggle-slider {
-  box-shadow: 0 0 1px var(--primary-color);
-}
-
-input:checked + .toggle-slider:before {
-  transform: translateX(20px);
-}
-
-/* Radio button styling */
-.radio-option {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 1.5rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.radio-option input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-}
-
-.radio-option span {
-  position: relative;
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
-  background: var(--card-bg);
-  vertical-align: middle;
-}
-
-.radio-option span:after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.2s;
-}
-
-.radio-option input[type="radio"]:checked + span:after {
-  opacity: 1;
-  transform: scale(1);
-}
-
 /* Section dividers */
-.section-divider {
+#deployment-action-form .section-divider {
   margin: 1.5rem 0;
   border-top: 1px solid var(--border-color);
   padding-top: 1.5rem;
 }
 
 /* Action type options */
-.action-type-options {
-  margin-top: 1rem;
+#deployment-action-form .action-type-options {
   padding: 1.25rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   background-color: var(--bg-color);
 }
 
-.action-type-options.hidden {
+#deployment-action-form .action-type-options.hidden {
   display: none;
 }
 
 /* Help text styling */
-.help-text {
+#deployment-action-form .help-text {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 6px;
 }
 
 /* Form validation */
-.form-control.is-invalid {
+#deployment-action-form .form-control.is-invalid {
   border-color: var(--danger-color);
 }
 
-.invalid-feedback {
+#deployment-action-form .invalid-feedback {
   color: var(--danger-color);
   font-size: 0.8rem;
   margin-top: 4px;
   display: none;
 }
 
-.form-control.is-invalid + .invalid-feedback {
+#deployment-action-form .form-control.is-invalid + .invalid-feedback {
   display: block;
 }
 
@@ -216,86 +112,11 @@ input:checked + .toggle-slider:before {
   min-width: 100px;
 }
 
-#docker-loading {
-  display: none;
-  margin-top: 8px;
-}
-
-/* Action list styling */
-.deploy-action-list {
-  margin-top: 1.5rem;
-}
-
-.deploy-action-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  margin-bottom: 0.75rem;
-  background-color: var(--card-bg);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.deploy-action-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
-  background-color: var(--hover-bg);
-}
-
-.deploy-action-info {
-  flex: 1;
-}
-
-.deploy-action-name {
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-}
-
-.deploy-action-type {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  background-color: var(--primary-light);
-  color: var(--primary-color);
-}
-
-.deploy-action-details {
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-  color: var(--text-muted);
-}
-
-.deploy-action-buttons {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.empty-actions-message {
-  text-align: center;
-  padding: 2.5rem;
-  color: var(--text-muted);
-  background-color: var(--card-bg);
-  border-radius: var(--border-radius);
-  border: 1px dashed var(--border-color);
-}
-
 /* Responsive design */
 @media (max-width: 768px) {
   #deployment-action-modal .modal-content {
     height: 95vh;
     max-height: none;
-  }
-  
-  .toggle-options {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  
-  .radio-option {
-    margin-bottom: 0.5rem;
   }
 }
 
@@ -340,49 +161,61 @@ select.form-control {
   margin-bottom: 20px;
 }
 
-
 .deployment-action-item {
-  display: flex;
-  align-items: center;
-  background: var(--bg-lighter, white);
-  border: 1px solid var(--border-color, #ddd);
-  margin-bottom: 8px;
+  position: relative;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding-right: 12px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  background-color: var(--card-bg);
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .deployment-action-item.dragging {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  background-color: var(--hover-bg);
   z-index: 100;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-  opacity: 0.9;
-  background-color: var(--bg-light, #f5f5f5);
-  position: relative;
 }
 
 .deployment-action-item.placeholder {
-  background-color: var(--bg-lighter, #f0f0f0);
-  border: 1px dashed var(--border-color, #ccc);
-  box-shadow: none;
+  border: 2px dashed var(--border-color);
+  background-color: var(--highlight-bg);
 }
 
-.deployment-action-item.drag-over {
-  border-top: 2px dashed var(--accent-color);
-  padding-top: 11px;
+.deployment-action-item .action-header .action-name {
+  margin: 0;
+  font-size: 1.1em;
+  color: var(--text-color);
+}
+
+.sortable-actions {
+  min-height: 50px;
+}
+
+.action-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .drag-handle {
   cursor: grab;
-  padding: 8px;
-  color: var(--text-muted, #999);
+  margin-right: 10px;
+  color: var(--text-muted);
+  padding: 5px;
 }
 
 .drag-handle:hover {
-  color: var(--primary-color, #0078D4);
+  color: var(--text-color);
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+.action-order-info {
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: var(--info-light-bg);
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--info-color);
 }
 
 .deployment-action-info {
@@ -422,20 +255,6 @@ select.form-control {
 .deployment-action-buttons {
   display: flex;
   gap: 5px;
-}
-
-.action-order-info {
-  background-color: var(--info-bg, #e6f7ff);
-  border: 1px solid var(--info-border, #91d5ff);
-  padding: 8px 12px;
-  margin-bottom: 10px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: var(--info-text, #1890ff);
-}
-
-.action-order-info i {
-  margin-right: 6px;
 }
 
 /* Add this to your main CSS file */

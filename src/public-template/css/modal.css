@@ -931,6 +931,52 @@ input:checked+.toggle-slider:before {
     user-select: none;
 }
 
+
+/* Radio button styling */
+.radio-option {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 1.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+}
+
+.radio-option span {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--card-bg);
+  vertical-align: middle;
+}
+
+.radio-option span:after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.2s;
+}
+
+.radio-option input[type="radio"]:checked + span:after {
+  opacity: 1;
+  transform: scale(1);
+}
+
 /* ===============================
    11. GROUP SELECTION
    =============================== */
@@ -984,6 +1030,15 @@ option[value="__new__"] {
     #cert-details-modal .cert-details-table th,
     #cert-details-modal .cert-files-table th {
         width: 120px;
+    }
+    
+    .toggle-options {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .radio-option {
+        margin-bottom: 0.5rem;
     }
 }
 

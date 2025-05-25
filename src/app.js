@@ -27,6 +27,11 @@ const ejs = require('ejs');
 const initSetupRouter = require('./api/routes/setup');
 const initPublicRouter = require('./api/routes/public');
 
+// Log timezone information
+const timezone = process.env.TZ || 'Not set with env var TZ (using system default)';
+console.log(`Server running with timezone: ${timezone}`);
+console.log(`Current server time: ${new Date().toLocaleString()}`);
+
 // Initialize app
 const app = express();
 
@@ -63,7 +68,7 @@ async function startApp() {
     } catch (error) {
       logger.error(`Config directory is not writable: ${error.message}`, null, FILENAME);
       logger.error(`This may prevent certificates.json and other configuration files from being saved.`, null, FILENAME);
-      logger.error(`Please check your Docker volume mounts and container permissions.`, null, FILENAME);
+      logger.error(`Please check your Docker volume mounts and container permissions.`, error, FILENAME);
     }
 
     const logsDir = process.env.LOGS_DIR || '/logs';

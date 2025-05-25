@@ -20,6 +20,7 @@ function initDeploymentActionsRouter(deps) {
 
   // Get all deployment actions for a certificate
   router.get('/', async (req, res) => {
+    logger.debug(`API received GET request for /api/certificates/${req.params.fingerprint}/deploy-actions`, null, FILENAME);
     try {
       const { fingerprint } = req.params;
       const cert = certificateManager.getCertificate(fingerprint);
@@ -30,9 +31,14 @@ function initDeploymentActionsRouter(deps) {
 
       // Access deployment actions from the consistent structure
       const deployActions = cert._config?.deployActions || [];
+      if (logger.isLevelEnabled('fine', FILENAME)) {
+        logger.fine(`Found ${deployActions.length} deployment actions for certificate: ${fingerprint}`, deployActions, FILENAME);
+      } else {
+        logger.debug(`Found ${deployActions.length} deployment actions for certificate: ${fingerprint}`, null, FILENAME);
+      }
       res.json(deployActions);
     } catch (error) {
-      logger.error('Error getting deployment actions:', error);
+      logger.error('Error getting deployment actions:', error, FILENAME);
       res.status(500).json({ error: 'Failed to get deployment actions' });
     }
   });
@@ -76,7 +82,7 @@ function initDeploymentActionsRouter(deps) {
         message: 'Deployment action added successfully'
       });
     } catch (error) {
-      logger.error('Error adding deployment action:', error);
+      logger.error('Error adding deployment action:', error, FILENAME);
       res.status(500).json({ 
         success: false, 
         error: 'Failed to add deployment action',
@@ -88,7 +94,7 @@ function initDeploymentActionsRouter(deps) {
   // Update a deployment action
   router.put('/:actionIndex', async (req, res) => {
     try {
-      const { fingerprint, actionId } = req.params;
+      const { fingerprint, actionIndex } = req.params; // Changed from actionId to actionIndex
       const updatedAction = req.body;
 
       if (!updatedAction || !updatedAction.type) {
@@ -104,19 +110,23 @@ function initDeploymentActionsRouter(deps) {
       if (!cert._config) cert._config = {};
       if (!Array.isArray(cert._config.deployActions)) cert._config.deployActions = [];
 
-      // Find the action index
-      const actionIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
+      // Find the action by ID (which is stored in actionIndex parameter)
+      const actionId = actionIndex; // This is the UUID coming from the client
+      const actionArrayIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
 
-      if (actionIndex === -1) {
+      if (actionArrayIndex === -1) {
+        logger.warn(`Deployment action with ID ${actionId} not found for certificate ${fingerprint}`, null, FILENAME);
         return res.status(404).json({ success: false, error: 'Deployment action not found' });
       }
 
       // Update the action with the new properties
-      cert._config.deployActions[actionIndex] = {
-        ...cert._config.deployActions[actionIndex],
+      cert._config.deployActions[actionArrayIndex] = {
+        ...cert._config.deployActions[actionArrayIndex],
         ...updatedAction,
         id: actionId // Ensure ID remains the same
       };
+
+      logger.debug(`Updating deployment action at index ${actionArrayIndex} with ID ${actionId}:`, updatedAction, FILENAME);
 
       // Save the updated certificate
       await certificateManager.saveCertificateConfigs();
@@ -124,11 +134,11 @@ function initDeploymentActionsRouter(deps) {
       // Return success property along with the updated action
       res.json({
         success: true,
-        action: cert._config.deployActions[actionIndex],
+        action: cert._config.deployActions[actionArrayIndex],
         message: 'Deployment action updated successfully'
       });
     } catch (error) {
-      logger.error('Error updating deployment action:', error);
+      logger.error('Error updating deployment action:', error, FILENAME);
       res.status(500).json({ 
         success: false, 
         error: 'Failed to update deployment action',
@@ -140,7 +150,7 @@ function initDeploymentActionsRouter(deps) {
   // Delete a deployment action
   router.delete('/:actionIndex', async (req, res) => {
     try {
-      const { fingerprint, actionId } = req.params;
+      const { fingerprint, actionIndex } = req.params; // Changed from actionId to actionIndex
 
       const cert = certificateManager.getCertificate(fingerprint);
       if (!cert) {
@@ -152,22 +162,28 @@ function initDeploymentActionsRouter(deps) {
         return res.status(404).json({ error: 'No deployment actions found' });
       }
 
-      // Find the action index
-      const actionIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
+      // Find the action by ID (which is stored in actionIndex parameter)
+      const actionId = actionIndex; // This is the UUID coming from the client
+      const actionArrayIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
 
-      if (actionIndex === -1) {
+      if (actionArrayIndex === -1) {
+        logger.warn(`Deployment action with ID ${actionId} not found for certificate ${fingerprint}`, null, FILENAME);
         return res.status(404).json({ error: 'Deployment action not found' });
       }
 
       // Remove the action
-      cert._config.deployActions.splice(actionIndex, 1);
+      cert._config.deployActions.splice(actionArrayIndex, 1);
 
       // Save the updated certificate
       await certificateManager.saveCertificateConfigs();
 
-      res.json({ success: true, message: 'Deployment action deleted' });
+      res.json({ 
+        success: true, 
+        message: 'Deployment action deleted',
+        remainingActions: cert._config.deployActions.length
+      });
     } catch (error) {
-      logger.error('Error deleting deployment action:', error);
+      logger.error('Error deleting deployment action:', error, FILENAME);
       res.status(500).json({ error: 'Failed to delete deployment action' });
     }
   });

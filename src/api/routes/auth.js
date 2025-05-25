@@ -79,7 +79,7 @@ function initAuthRouter(deps) {
                 user: userWithoutPassword
             });
         } catch (error) {
-            logger.error('Login error', { error: error.message }, FILENAME);
+            logger.error('Login error', error, FILENAME);
             res.status(500).json({
                 success: false,
                 message: 'An error occurred during login',
@@ -159,7 +159,7 @@ function initAuthRouter(deps) {
                 message: 'Password changed successfully. Please log in again.'
             });
         } catch (error) {
-            logger.error('Error changing password', { error: error.message }, FILENAME);
+            logger.error('Error changing password', error, FILENAME);
             return res.status(400).json({
                 success: false,
                 message: error.message
@@ -184,7 +184,7 @@ function initAuthRouter(deps) {
                 users
             });
         } catch (error) {
-            logger.error('Error getting users', { error: error.message }, FILENAME);
+            logger.error('Error getting users', error, FILENAME);
             return res.status(500).json({
                 success: false,
                 message: 'Internal server error'
@@ -232,7 +232,7 @@ function initAuthRouter(deps) {
                 user
             });
         } catch (error) {
-            logger.error('Error creating user', { error: error.message }, FILENAME);
+            logger.error('Error creating user', error, FILENAME);
             return res.status(400).json({
                 success: false,
                 message: error.message
@@ -266,7 +266,7 @@ function initAuthRouter(deps) {
                 user
             });
         } catch (error) {
-            logger.error('Error updating user', { error: error.message }, FILENAME);
+            logger.error('Error updating user', error, FILENAME);
             return res.status(400).json({
                 success: false,
                 message: error.message
@@ -301,7 +301,7 @@ function initAuthRouter(deps) {
                 message: 'User deleted successfully'
             });
         } catch (error) {
-            logger.error('Error deleting user', { error: error.message }, FILENAME);
+            logger.error('Error deleting user', error, FILENAME);
             return res.status(400).json({
                 success: false,
                 message: error.message
@@ -347,7 +347,7 @@ function initAuthRouter(deps) {
                 tokens: sanitizedTokens
             });
         } catch (error) {
-            logger.error('Error getting API tokens', { error: error.message }, FILENAME);
+            logger.error('Error getting API tokens', error, FILENAME);
             return res.status(500).json({
                 success: false,
                 message: 'Error retrieving API tokens',
@@ -435,7 +435,7 @@ function initAuthRouter(deps) {
                 }
             });
         } catch (error) {
-            logger.error('Error creating API token', { error: error.message }, FILENAME);
+            logger.error('Error creating API token', error, FILENAME);
             return res.status(500).json({
                 success: false,
                 message: 'Error creating API token',
@@ -490,7 +490,7 @@ function initAuthRouter(deps) {
                 message: 'API token deleted successfully'
             });
         } catch (error) {
-            logger.error('Error deleting API token', { error: error.message }, FILENAME);
+            logger.error('Error deleting API token', error, FILENAME);
             return res.status(500).json({
                 success: false,
                 message: 'Error deleting API token',
@@ -538,7 +538,7 @@ function initAuthRouter(deps) {
                 message: `Token '${token.name}' for user ${token.username} successfully revoked`
             });
         } catch (error) {
-            logger.error('Error revoking token', { error: error.message }, FILENAME);
+            logger.error('Error revoking token', error, FILENAME);
             return res.status(500).json({
                 success: false,
                 message: 'Error revoking token',

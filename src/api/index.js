@@ -41,7 +41,7 @@ try {
   certificatesRouter = require('./routes/certificates');
   logger.debug('Loaded certificates router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load certificates router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load certificates router: ${error.message}`, error, FILENAME);
   certificatesRouter = null;
 }
 
@@ -49,7 +49,7 @@ try {
   caRouter = require('./routes/ca');
   logger.debug('Loaded CA router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load CA router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load CA router: ${error.message}`, error, FILENAME);
   caRouter = null;
 }
 
@@ -57,7 +57,7 @@ try {
   dockerRoutes = require('./routes/docker');
   logger.debug('Loaded Docker router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load Docker router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load Docker router: ${error.message}`, error, FILENAME);
   dockerRoutes = null;
 }
 
@@ -65,7 +65,7 @@ try {
   securityRouter = require('./routes/security');
   logger.debug('Loaded security router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load security router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load security router: ${error.message}`, error, FILENAME);
   securityRouter = null;
 }
 
@@ -73,7 +73,7 @@ try {
   renewalRouter = require('./routes/renewal');
   logger.debug('Loaded renewal router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load renewal router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load renewal router: ${error.message}`, error, FILENAME);
   renewalRouter = null;
 }
 
@@ -81,7 +81,7 @@ try {
   settingsRouter = require('./routes/settings');
   logger.debug('Loaded settings router', null, FILENAME);
 } catch (error) {
-  logger.error(`Failed to load settings router: ${error.message}`, null, FILENAME);
+  logger.error(`Failed to load settings router: ${error.message}`, error, FILENAME);
   settingsRouter = null;
 }
 
@@ -206,7 +206,7 @@ function setupApi(deps) {
         }
       }
     } catch (error) {
-      logger.error(`Error setting up OpenAPI: ${error.message}`, null, FILENAME);
+      logger.error(`Error setting up OpenAPI: ${error.message}`, error, FILENAME);
     }
   } else {
     logger.warn('OpenAPI dependencies not available. API documentation and validation are disabled.', "swaggerUi: " + swaggerUi + ", expressOpenApiValidator: " + expressOpenApiValidator + ", OpenApiValidator: " + OpenApiValidator + ", yaml: " + yaml, null, FILENAME);

@@ -37,7 +37,13 @@ class NpmIntegrationService {
             const npmSettings = deploymentSettings.nginxProxyManager || {};
             
             if (Object.keys(npmSettings).length > 0) {
-                logger.debug('Loading NPM settings from config service', npmSettings, FILENAME);
+                if(logger.isLevelEnabled('fine', FILENAME)) {
+                    let logNpmSettings = {...npmSettings};
+                    if (logNpmSettings.password) logNpmSettings.password = '********'; 
+                    logger.debug('NPM settings loaded from config service', logNpmSettings, FILENAME);
+                 } else {
+                    logger.debug('Loading NPM settings from config service', null, FILENAME);
+                 }
                 this.settings = {
                     ...this.settings,
                     ...npmSettings
@@ -220,7 +226,7 @@ class NpmIntegrationService {
                 
                 // NPM returns 401 when unauthorized, which means the API is reachable
                 if (response.status === 401) {
-                    logger.debug('NPM API is reachable (401 unauthorized)', null, FILENAME);
+                    logger.debug('NPM API is reachable (401 unauthorized)', response, FILENAME);
                     return {
                         success: true,
                         message: 'API is reachable'
@@ -231,15 +237,39 @@ class NpmIntegrationService {
                         success: true,
                         message: 'API is reachable and responding'
                     };
+                } else if (response.status === 400) {
+                    // 400 Bad Request can be valid for some NPM API versions or configurations
+                    logger.debug('NPM API is reachable (400 Bad Request)', response.data, FILENAME);
+                    return {
+                        success: true,
+                        message: 'API is reachable'
+                    };
                 } else {
-                    logger.warn(`Unexpected status code from NPM API: ${response.status}`, null, FILENAME);
+                    logger.warn(`Unexpected status code from NPM API: ${response.status}`, response, FILENAME);
+                    
+                    // Extract error message from response if available
+                    let errorMessage = `Unexpected response from API: ${response.status}`;
+                    if (response.data?.error?.message) {
+                        errorMessage += ` - ${response.data.error.message}`;
+                    }
+                    
                     return {
                         success: false,
-                        message: `Unexpected response from API: ${response.status}`
+                        message: errorMessage,
+                        statusCode: response.status
                     };
                 }
             } catch (axiosError) {
                 logger.debug(`Axios test failed: ${axiosError.message}`, axiosError, FILENAME);
+                
+                // Check if there's a response with a 400 status (which can be okay for NPM)
+                if (axiosError.response && axiosError.response.status === 400) {
+                    logger.debug('NPM API is reachable (400 Bad Request via error handler)', axiosError.response.data, FILENAME);
+                    return {
+                        success: true,
+                        message: 'API is reachable'
+                    };
+                }
                 
                 // If axios failed, try curl for HTTPS connections
                 if (npmSettings.useHttps) {
@@ -254,7 +284,7 @@ class NpmIntegrationService {
                         
                         logger.debug(`Curl response status: ${statusCode}`, null, FILENAME);
                         
-                        if (statusCode === '401' || statusCode === '200') {
+                        if (statusCode === '401' || statusCode === '200' || statusCode === '400') {
                             return {
                                 success: true,
                                 message: 'API is reachable (verified with curl)'
@@ -327,6 +357,15 @@ class NpmIntegrationService {
             try {
                 const config = this.createRequestConfig(npmSettings);
                 
+                // Add more detailed logging about the request
+                logger.debug(`Making authentication request to ${apiUrl}tokens`, {
+                    host: npmSettings.host,
+                    port: npmSettings.port,
+                    username: npmSettings.username,
+                    useHttps: npmSettings.useHttps,
+                    rejectUnauthorized: npmSettings.rejectUnauthorized
+                }, FILENAME);
+                
                 const response = await this.axios.post(`${apiUrl}tokens`, {
                     identity: npmSettings.username,
                     secret: npmSettings.password
@@ -370,13 +409,23 @@ class NpmIntegrationService {
                     };
                 }
             } catch (error) {
-                // Handle specific error cases
+                // Handle specific error cases with more detailed logging
                 if (error.response) {
+                    logger.debug(`NPM auth error response: ${error.response.status}`, error.response.data, FILENAME);
+                    
                     if (error.response.status === 401 || error.response.status === 403) {
                         logger.warn('NPM authentication failed: Invalid credentials', null, FILENAME);
+                        
+                        // Check if error has detailed message and log it
+                        const errorMessage = error.response.data?.error?.message || 
+                                           error.response.data?.message || 
+                                           'Invalid credentials';
+                        
+                        // Credentials might have changed on the NPM server
                         return {
                             success: false,
-                            message: 'Invalid credentials'
+                            message: `Invalid credentials: ${errorMessage}`,
+                            needsReconfiguration: true
                         };
                     }
                 }
@@ -594,6 +643,15 @@ class NpmIntegrationService {
                 const tokenResult = await this.getAuthToken(npmSettings);
                 
                 if (!tokenResult.success) {
+                    // Check if credentials need to be updated in the UI
+                    if (tokenResult.needsReconfiguration) {
+                        return {
+                            success: false,
+                            message: tokenResult.message,
+                            needsReconfiguration: true
+                        };
+                    }
+                    
                     return {
                         success: false,
                         message: `Failed to refresh expired token: ${tokenResult.message}`
@@ -619,6 +677,12 @@ class NpmIntegrationService {
             // Try getting certificates with axios
             try {
                 const config = this.createRequestConfig(npmSettings);
+                
+                // Add more detailed logging about the request
+                logger.debug(`Making certificate request to ${apiUrl}nginx/certificates`, {
+                    useHttps: npmSettings.useHttps,
+                    rejectUnauthorized: npmSettings.rejectUnauthorized
+                }, FILENAME);
                 
                 // NPM API has "nginx/certificates" endpoint for certificates
                 const response = await this.axios.get(`${apiUrl}nginx/certificates`, config);
@@ -648,47 +712,56 @@ class NpmIntegrationService {
                     // Force refresh token
                     const newTokenResult = await this.getAuthToken(npmSettings);
                     
-                    if (newTokenResult.success) {
-                        // If we got a new token, try fetching certificates again with the new token
-                        logger.debug('Successfully refreshed token, retrying certificate fetch', null, FILENAME);
-                        
-                        try {
-                            // Update settings with the new token for this request
-                            const settingsWithNewToken = { 
-                                ...npmSettings, 
-                                accessToken: newTokenResult.token 
-                            };
-                            const configWithNewToken = this.createRequestConfig(settingsWithNewToken);
-                            
-                            const retryResponse = await this.axios.get(`${apiUrl}nginx/certificates`, configWithNewToken);
-                            logger.debug('NPM API response received after token refresh', retryResponse.data, FILENAME);
-
-                            if (Array.isArray(retryResponse.data)) {
-                                logger.debug(`Successfully fetched ${retryResponse.data.length} NPM certificates after token refresh`, null, FILENAME);
-                                return {
-                                    success: true,
-                                    certificates: retryResponse.data,
-                                    message: `Retrieved ${retryResponse.data.length} certificates after token refresh`
-                                };
-                            } else {
-                                logger.warn('NPM API response not an array after token refresh', retryResponse.data, FILENAME);
-                                return {
-                                    success: false,
-                                    message: 'Invalid API response format after token refresh'
-                                };
-                            }
-                        } catch (retryError) {
-                            logger.error(`Certificate fetch failed after token refresh: ${retryError.message}`, retryError, FILENAME);
+                    if (!newTokenResult.success) {
+                        // Check if credentials need to be updated in the UI
+                        if (newTokenResult.needsReconfiguration) {
                             return {
                                 success: false,
-                                message: `Failed to fetch certificates after token refresh: ${retryError.message}`
+                                message: "Your NPM credentials appear to be invalid or have changed. Please update them in the settings.",
+                                needsReconfiguration: true
                             };
                         }
-                    } else {
-                        logger.error('Failed to refresh token', null, FILENAME);
+                        
+                        logger.error('Failed to refresh token', newTokenResult, FILENAME);
                         return {
                             success: false,
                             message: `Failed to refresh token: ${newTokenResult.message}`
+                        };
+                    }
+                    
+                    // If we got a new token, try fetching certificates again with the new token
+                    logger.debug('Successfully refreshed token, retrying certificate fetch', null, FILENAME);
+                    
+                    try {
+                        // Update settings with the new token for this request
+                        const settingsWithNewToken = { 
+                            ...npmSettings, 
+                            accessToken: newTokenResult.token 
+                        };
+                        const configWithNewToken = this.createRequestConfig(settingsWithNewToken);
+                        
+                        const retryResponse = await this.axios.get(`${apiUrl}nginx/certificates`, configWithNewToken);
+                        logger.debug('NPM API response received after token refresh', retryResponse.data, FILENAME);
+
+                        if (Array.isArray(retryResponse.data)) {
+                            logger.debug(`Successfully fetched ${retryResponse.data.length} NPM certificates after token refresh`, null, FILENAME);
+                            return {
+                                success: true,
+                                certificates: retryResponse.data,
+                                message: `Retrieved ${retryResponse.data.length} certificates after token refresh`
+                            };
+                        } else {
+                            logger.warn('NPM API response not an array after token refresh', retryResponse.data, FILENAME);
+                            return {
+                                success: false,
+                                message: 'Invalid API response format after token refresh'
+                            };
+                        }
+                    } catch (retryError) {
+                        logger.error(`Certificate fetch failed after token refresh: ${retryError.message}`, retryError, FILENAME);
+                        return {
+                            success: false,
+                            message: `Failed to fetch certificates after token refresh: ${retryError.message}`
                         };
                     }
                 }

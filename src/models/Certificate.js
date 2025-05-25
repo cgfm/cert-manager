@@ -26,6 +26,7 @@ class Certificate {
 
         // Basic metadata
         this._name = null;
+        this._commonName = null;
         this._fingerprint = null;
         this._subject = null;
         this._issuer = null;
@@ -44,6 +45,7 @@ class Certificate {
         this._keyId = null;            // Subject Key Identifier
         this._authorityKeyId = null;   // Authority Key Identifier
         this._selfSigned = false;
+        this._isCA = false;
         this._isRootCA = false;
         this._pathLenConstraint = null; // Path Length Constraint
 
@@ -104,6 +106,8 @@ class Certificate {
         try {
             // Basic properties
             this._name = data.name || null;
+            this._commonName = data.commonName || null;
+            if (!this._name && this._commonName) this._name = this._commonName;
             this._fingerprint = data.fingerprint || null;
             this._subject = data.subject || null;
             this._issuer = data.issuer || null;
@@ -122,6 +126,7 @@ class Certificate {
             if (data.keyId) this._keyId = data.keyId;                           // Added Subject Key ID
             if (data.authorityKeyId) this._authorityKeyId = data.authorityKeyId; // Added Authority Key ID
             if (data.selfSigned !== undefined) this._selfSigned = data.selfSigned;
+            if (data.isCA !== undefined) this._isCA = data.isCA;
             if (data.isRootCA !== undefined) this._isRootCA = data.isRootCA;
             if (data.pathLenConstraint !== undefined) this._pathLenConstraint = data.pathLenConstraint;
 
@@ -236,7 +241,7 @@ class Certificate {
             this._modificationTime = data.modificationTime || Date.now();
 
             // Add domain from name if we have a name but no domains
-            if (this._name && this._sans.domains.length === 0) {
+            if (this._commonName && this._sans.domains.length === 0) {
                 this._addDomainFromName();
             }
 
@@ -261,6 +266,8 @@ class Certificate {
         // Update basic properties
         if (data.fingerprint) this._fingerprint = data.fingerprint;
         if (data.name) this._name = data.name;
+        if (data.commonName) this._commonName = data.commonName;
+        if (!this._name && this._commonName) this._name = this._commonName;
         if (data.subject) this._subject = data.subject;
         if (data.issuer) this._issuer = data.issuer;
         if (data.validFrom) this._validFrom = data.validFrom;
@@ -278,6 +285,7 @@ class Certificate {
         if (data.keyId) this._keyId = data.keyId;
         if (data.authorityKeyId) this._authorityKeyId = data.authorityKeyId;
         if (data.selfSigned !== undefined) this._selfSigned = data.selfSigned;
+        if (data.isCA !== undefined) this._isCA = data.isCA;
         if (data.isRootCA !== undefined) this._isRootCA = data.isRootCA;
         if (data.pathLenConstraint !== undefined) this._pathLenConstraint = data.pathLenConstraint;
 
@@ -355,23 +363,6 @@ class Certificate {
                 logger.fine(`Reset certificate config to defaults while preserving deployActions`, null, FILENAME, this._name);
             }
 
-            // Handle top-level properties (for backward compatibility)
-            if (data.autoRenew !== undefined) {
-                this._config.autoRenew = data.autoRenew;
-            }
-            if (data.renewDaysBeforeExpiry) {
-                this._config.renewDaysBeforeExpiry = data.renewDaysBeforeExpiry;
-            }
-            if (data.signWithCA !== undefined) {
-                this._config.signWithCA = data.signWithCA;
-            }
-            if (data.caFingerprint) {
-                this._config.caFingerprint = data.caFingerprint;
-            }
-            if (data.caName) {
-                this._config.caName = data.caName;
-            }
-
             // Handle top-level deployActions (for backward compatibility)
             if (Array.isArray(data.deployActions)) {
                 this._config.deployActions = [...data.deployActions];
@@ -401,11 +392,11 @@ class Certificate {
      */
     _addDomainFromName() {
         try {
-            if (!this._name) {
+            if (!this._commonName) {
                 return;
             }
             
-            const name = this._name.toLowerCase();
+            const name = this._commonName.toLowerCase();
             
             // Don't add if it's already in the domains list
             if (this._sans.domains.includes(name)) {
@@ -489,6 +480,7 @@ class Certificate {
             return {
                 // Basic metadata
                 name: this._name,
+                commonName: this.commonName,
                 description: this._description,
                 fingerprint: this._fingerprint,
                 subject: this._subject,
@@ -512,6 +504,7 @@ class Certificate {
                 authorityKeyId: this._authorityKeyId, // Added Authority Key ID
                 selfSigned: this._selfSigned,
                 isRootCA: this._isRootCA,
+                isCA: this._isCA,
                 pathLenConstraint: this._pathLenConstraint,
 
                 // Passphrase information
@@ -834,7 +827,7 @@ class Certificate {
             warningThreshold.setDate(warningThreshold.getDate() + days);
 
             const now = new Date();
-            const result = !this.isExpired() && expiryDate <= warningThreshold;
+            const result = expiryDate >= now && expiryDate <= warningThreshold;
 
             if (result) {
                 const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
@@ -1205,6 +1198,15 @@ class Certificate {
     set name(value) {
         logger.finest(`Setting name from '${this._name}' to '${value}'`, null, FILENAME, this._name);
         this._name = value;
+    }
+
+    get commonName() {
+        return this._commonName;
+    }
+
+    set commonName(value) {
+        logger.finest(`Setting commonName from '${this._commonName}' to '${value}'`, null, FILENAME, this._name);
+        this._commonName = value;
         this._addDomainFromName();
     }
 
@@ -1329,7 +1331,11 @@ class Certificate {
     }
 
     get isCA() {
-        return this._certType === 'rootCA' || this._certType === 'intermediateCA';
+        return this._isCA;
+    }
+
+    get isRootCA() {
+        return this._isRootCa;
     }
 
     get acmeSettings() {

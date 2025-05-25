@@ -31,6 +31,55 @@ const UIUtils = {
   },
 
   /**
+   * Show a modal with content and options
+   * @param {string} modalId - ID of the modal to show
+   * @param {Object} options - Modal options
+   * @param {string} options.title - Modal title
+   * @param {string} options.content - Modal HTML content
+   * @param {Object[]} options.buttons - Button definitions
+   * @param {string} options.buttons[].text - Button text
+   * @param {string} options.buttons[].id - Button ID
+   * @param {string} options.buttons[].action - Button action (close, custom)
+   * @param {string} [options.buttons[].class] - Additional button classes
+   * @param {Object} [options.data] - Additional data to store with modal
+   * @param {Function} [options.onShow] - Callback to run when modal is shown
+   */
+  showModal: function (modalId, options = {}) {
+    let modal = document.getElementById(modalId);
+
+    if (!modal) {
+      // Create new modal element
+      modal = document.createElement('div');
+      modal.id = modalId;
+      modal.className = 'modal hidden';
+      document.body.appendChild(modal);
+
+      // Add click handler to close when clicking outside content
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          this.closeModal(modalId);
+        }
+      });
+
+      Logger.debug(`Created new modal with ID: ${modalId}`);
+    }
+
+    // Update the modal content with new options
+    this.updateModal(modalId, options);
+
+    // Open the modal
+    this.openModal(modalId);
+
+    // Run onShow callback if provided
+    if (typeof options.onShow === 'function') {
+      // Use setTimeout to ensure modal is fully rendered and visible
+      setTimeout(() => {
+        options.onShow(modal);
+      }, 50);
+    }
+  },
+
+  /**
    * Open a modal by ID
    * @param {string} modalId - ID of the modal to open
    */
@@ -71,57 +120,6 @@ const UIUtils = {
   },
 
   /**
-   * Show a modal with content and options
-   * @param {string} modalId - ID of the modal to show
-   * @param {Object} options - Modal options
-   * @param {string} options.title - Modal title
-   * @param {string} options.content - Modal HTML content
-   * @param {Object[]} options.buttons - Button definitions
-   * @param {string} options.buttons[].text - Button text
-   * @param {string} options.buttons[].id - Button ID
-   * @param {string} options.buttons[].action - Button action (close, custom)
-   * @param {string} [options.buttons[].class] - Additional button classes
-   * @param {Object} [options.data] - Additional data to store with modal
-   * @param {Function} [options.onShow] - Callback to run when modal is shown
-   */
-  showModal: function (modalId, options = {}) {
-    // First check if modal exists, create it if not
-    let modal = document.getElementById(modalId);
-
-    if (!modal) {
-      // Create new modal element
-      modal = document.createElement('div');
-      modal.id = modalId;
-      modal.className = 'modal hidden';
-      document.body.appendChild(modal);
-
-      // Add click handler to close when clicking outside content
-      modal.addEventListener('click', (event) => {
-        if (event.target === modal) {
-          this.closeModal(modalId);
-        }
-      });
-
-      Logger.debug(`Created new modal with ID: ${modalId}`);
-    }
-
-    // Update the modal content with new options
-    this.updateModal(modalId, options);
-
-    // Open the modal
-    this.openModal(modalId);
-
-    // Run onShow callback if provided
-    if (typeof options.onShow === 'function') {
-      // Use setTimeout to ensure modal is fully rendered and visible
-      setTimeout(() => {
-        options.onShow(modal);
-      }, 50);
-    }
-  },
-
-
-  /**
    * Update modal content
    * @param {string} modalId - ID of the modal to update
    * @param {Object} options - Modal options (same as showModal)
@@ -157,10 +155,13 @@ const UIUtils = {
     if (options.buttons && options.buttons.length) {
       contentHTML += `<div class="modal-footer">`;
 
-      options.buttons.forEach(button => {
+      options.buttons.forEach((button, index) => {
+        // Generate a unique ID for each button if not provided
+        const btnId = button.id || `modal-btn-${modalId}-${index}`;
+        const btnType = button.type || 'default';
         const btnClass = button.class ? ` ${button.class}` : '';
-        const btnId = button.id || '';
-        contentHTML += `<button id="${btnId}" class="button${btnClass}">${UIUtils.escapeHTML(button.text)}</button>`;
+        
+        contentHTML += `<button id="${btnId}" class="button ${btnType}${btnClass}" data-button-index="${index}">${UIUtils.escapeHTML(button.text)}</button>`;
       });
 
       contentHTML += `</div>`;
@@ -181,27 +182,40 @@ const UIUtils = {
 
     // Set up button event handlers
     if (options.buttons && options.buttons.length) {
-      options.buttons.forEach(button => {
-        if (!button.id) return;
-
-        const buttonElement = document.getElementById(button.id);
-        if (!buttonElement) return;
-
-        buttonElement.addEventListener('click', () => {
-          if (button.action === 'close') {
-            this.closeModal(modalId);
-          }
-
-          // Dispatch custom event for any button click
-          modal.dispatchEvent(new CustomEvent('buttonClick', {
-            detail: {
-              buttonId: button.id,
-              action: button.action
+      const footer = modal.querySelector('.modal-footer');
+      if (footer) {
+        footer.querySelectorAll('button').forEach(buttonElement => {
+          const index = parseInt(buttonElement.getAttribute('data-button-index'), 10);
+          const buttonConfig = options.buttons[index];
+          
+          if (!buttonConfig) return;
+          
+          buttonElement.addEventListener('click', (event) => {
+            // Handle close action
+            if (buttonConfig.action === 'close') {
+              this.closeModal(modalId);
             }
-          }));
+            // Handle function action
+            else if (typeof buttonConfig.action === 'function') {
+              try {
+                buttonConfig.action(event);
+              } catch (error) {
+                Logger.error('Error in modal button action:', error);
+              }
+            }
+            
+            // Dispatch custom event for any button click
+            modal.dispatchEvent(new CustomEvent('buttonClick', {
+              detail: {
+                buttonId: buttonElement.id,
+                buttonIndex: index,
+                action: buttonConfig.action
+              }
+            }));
+          });
         });
-      });
-    };
+      }
+    }
 
     // Setup close handlers
     this.setupCloseHandlers(modal);
@@ -407,69 +421,6 @@ const UIUtils = {
     };
 
     document.addEventListener('keydown', handleEscapeKey);
-  },
-
-  /**
-   * Create and show a confirm dialog
-   * @param {string} title - Dialog title
-   * @param {string} message - Dialog message
-   * @param {Function} onConfirm - Callback on confirm
-   * @param {Function} onCancel - Callback on cancel
-   */
-  confirm: function (title, message, onConfirm, onCancel) {
-    // Create modal if it doesn't exist
-    if (!document.getElementById('confirm-modal')) {
-      const modal = document.createElement('div');
-      modal.id = 'confirm-modal';
-      modal.className = 'modal hidden';
-      modal.innerHTML = this.safeTemplate(`
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 id="confirm-title"></h2>
-            <button class="close-modal">&times;</button>
-          </div>
-          <div class="modal-body">
-            <p id="confirm-message"></p>
-          </div>
-          <div class="modal-footer">
-            <button id="confirm-cancel" class="button">Cancel</button>
-            <button id="confirm-ok" class="button primary">Confirm</button>
-          </div>
-        </div>
-      `, {});
-
-      document.body.appendChild(modal);
-    }
-
-    // Set content safely
-    document.getElementById('confirm-title').textContent = title;
-    document.getElementById('confirm-message').textContent = message;
-
-    // Set up events
-    const modal = document.getElementById('confirm-modal');
-
-    const confirmBtn = document.getElementById('confirm-ok');
-    const cancelBtn = document.getElementById('confirm-cancel');
-
-    const handleConfirm = () => {
-      this.closeModal('confirm-modal');
-      if (onConfirm) onConfirm();
-      confirmBtn.removeEventListener('click', handleConfirm);
-      cancelBtn.removeEventListener('click', handleCancel);
-    };
-
-    const handleCancel = () => {
-      this.closeModal('confirm-modal');
-      if (onCancel) onCancel();
-      confirmBtn.removeEventListener('click', handleConfirm);
-      cancelBtn.removeEventListener('click', handleCancel);
-    };
-
-    confirmBtn.addEventListener('click', handleConfirm);
-    cancelBtn.addEventListener('click', handleCancel);
-
-    // Open modal
-    this.openModal('confirm-modal');
   },
 
   /**

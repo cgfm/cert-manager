@@ -14,16 +14,16 @@
   overflow: hidden; /* Prevent double scrollbars */
 }
 
-.form-group {
+#log-settings-form .form-group {
   margin-bottom: 20px;
   flex-shrink: 0; /* Prevent form groups from shrinking */
 }
 
-.form-group-header {
+#log-settings-form .form-group-header {
     margin-bottom: 10px;
 }
 
-.form-group label {
+#log-settings-form .form-group label {
   display: block;
   margin-bottom: 5px;
   font-weight: 500;

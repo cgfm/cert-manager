@@ -15,8 +15,8 @@ class ActivityService {
    */
   constructor(config) {
     this.config = config;
-    this.dataDir = config.dataDir || path.join(process.cwd(), 'data');
-    this.activitiesFile = path.join(this.dataDir, 'activities.json');
+    this.configDir = config.configDir || path.join(process.cwd(), 'config');
+    this.activitiesFile = config.activity?.storageFile || path.join(this.configDir, 'activities.json');
     this.activities = [];
     this.loaded = false;
     this.maxActivities = config.activity?.maxItems || 1000; // Max number of activities to store

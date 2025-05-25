@@ -134,6 +134,68 @@ function initIntegrationsRouter(deps) {
     });
 
     /**
+     * Reconfigure NPM credentials
+     * POST /api/integrations/npm/reconfigure
+     */
+    router.post('/npm/reconfigure', async (req, res) => {
+        try {
+            logger.debug('POST /api/integrations/npm/reconfigure', null, FILENAME); // Don't log credentials
+            const { email, password } = req.body;
+
+            if (!npmIntegrationService) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'NPM integration service not available'
+                });
+            }
+            
+            if (!email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email and password are required'
+                });
+            }
+            
+            // Get current settings
+            let settings = getNpmSettings();
+            
+            // Update credentials
+            settings.username = email;
+            settings.password = password;
+            
+            // Try to authenticate with new credentials
+            const result = await npmIntegrationService.getAuthToken(settings);
+            
+            if (result.success && result.token) {
+                // Save updated settings (without password)
+                const { password, ...settingsToSave } = settings;
+                settingsToSave.accessToken = result.token;
+                settingsToSave.refreshToken = result.refreshToken || '';
+                settingsToSave.tokenExpiry = result.tokenExpiry;
+                
+                await saveNpmSettings(settingsToSave);
+                
+                return res.json({
+                    success: true,
+                    message: 'Credentials updated and authenticated successfully'
+                });
+            }
+            
+            // Authentication failed
+            return res.status(401).json({
+                success: false,
+                message: result.message || 'Authentication failed with new credentials'
+            });
+        } catch (error) {
+            logger.error(`Error in reconfigure: ${error.message}`, error, FILENAME);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    });
+
+    /**
      * Request NPM authentication token
      * POST /api/integrations/npm/request-token
      */
@@ -235,7 +297,6 @@ function initIntegrationsRouter(deps) {
     router.get('/npm/certificates', async (req, res) => {
         try {
             logger.debug('GET /api/integrations/npm/certificates', null, FILENAME);
-
             if (!npmIntegrationService) {
                 return res.status(500).json({
                     success: false,
@@ -243,15 +304,45 @@ function initIntegrationsRouter(deps) {
                 });
             }
             
-            // Get certificates
             const result = await npmIntegrationService.getCertificates();
             
-            return res.json(result);
+            // Handle authentication issues specifically
+            if (!result.success) {
+                // Check if we have an explicit auth error
+                if (result.authError) {
+                    return res.status(401).json({
+                        success: false,
+                        message: result.message || 'Authentication failed',
+                        needsReconfiguration: true,
+                        authError: result.authError
+                    });
+                }
+                // Handle other credential issues
+                else if (result.needsReconfiguration) {
+                    return res.status(401).json({
+                        success: false,
+                        message: result.message || 'Credentials need reconfiguration',
+                        needsReconfiguration: true
+                    });
+                }
+                
+                // Other non-auth errors
+                return res.status(result.statusCode || 400).json({
+                    success: false,
+                    message: result.message || 'Failed to fetch certificates'
+                });
+            }
+            
+            // Success case - return certificates
+            return res.json({
+                success: true,
+                certificates: result.certificates || []
+            });
         } catch (error) {
-            logger.error(`Error in get-certificates: ${error.message}`, error, FILENAME);
+            logger.error(`Error in GET /npm/certificates: ${error.message}`, error, FILENAME);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: `Server error: ${error.message}`
             });
         }
     });
