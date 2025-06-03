@@ -129,24 +129,6 @@ class Logger {
             finest: 'gray'
         });
 
-        if (process.env.DEBUG_LOGGER_FILTER) {
-            // Debug Winston logger configuration
-            console.log('Winston logger configuration:');
-            console.log(`- Default level: ${this.logger.level}`);
-            this.logger.transports.forEach((transport, idx) => {
-                console.log(`- Transport ${idx+1}: ${transport.name}, level: ${transport.level}`);
-            });
-
-            // Test each level to verify
-            const testFilename = 'models/CertificateManager.js';
-            ['error', 'warn', 'info', 'debug', 'fine', 'finest'].forEach(level => {
-                console.log(`Testing '${level}' for ${testFilename}: ${this.isLevelEnabled(level, testFilename)}`);
-                
-                // Log a test message
-                this.log(level, `TEST MESSAGE - ${level}`, null, testFilename);
-            });
-        }
-
         return this.logger;
     }
 
@@ -247,34 +229,8 @@ class Logger {
                 // Set file-specific log levels
                 const fileLogLevels = config.fileLogLevels || config.logging?.fileLogLevels;
                 if (fileLogLevels && typeof fileLogLevels === 'object') {
-                    this.fileLogLevels = {};
-
-                    // Store all variations of the filename for more flexible matching
-                    Object.entries(fileLogLevels).forEach(([filename, level]) => {
-                        // Original filename
-                        this.fileLogLevels[filename] = level;
-                        
-                        // Filename without extension
-                        const nameWithoutExt = filename.replace(/\.[cm]?js$/, '');
-                        if (nameWithoutExt !== filename) {
-                            this.fileLogLevels[nameWithoutExt] = level;
-                        }
-                        
-                        // Just the basename
-                        const baseName = path.basename(filename);
-                        if (baseName !== filename) {
-                            this.fileLogLevels[baseName] = level;
-                        }
-                        
-                        // Basename without extension
-                        const baseNameWithoutExt = path.basename(nameWithoutExt);
-                        if (baseNameWithoutExt !== nameWithoutExt) {
-                            this.fileLogLevels[baseNameWithoutExt] = level;
-                        }
-                    });
-
+                    this.fileLogLevels = {...fileLogLevels};
                     console.log(`Loaded ${Object.keys(fileLogLevels).length} file-specific log levels`);
-                    console.log('Expanded to mappings:', Object.keys(this.fileLogLevels).length);
                 }
             } else {
                 console.log('No log configuration found');

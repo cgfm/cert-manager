@@ -30,14 +30,9 @@ function initCARouter(deps) {
   // Get all CA certificates
   router.get('/', async (req, res) => {
     try {
-      await certificateManager.loadCertificates();
-      const caCerts = certificateManager.getCAcertificates();
+      const caCerts = deps.certificateManager.handleFrontendRefresh({ caOnly:true });
       
-      const response = caCerts.map(cert => 
-        cert.toJSON(certificateManager.passphraseManager)
-      );
-      
-      res.json(response);
+      res.json(caCerts);
     } catch (error) {
       logger.error('Error getting CA certificates:', error, FILENAME);
       res.status(500).json({ message: 'Failed to retrieve CA certificates', statusCode: 500 });

@@ -3,7 +3,9 @@ const path = require('path');
 const fs = require('fs');
 const setupApi = require('./api');
 const CertificateManager = require('./models/CertificateManager');
+const ForgeCryptoService = require('./services/forge-crypto-service'); 
 const OpenSSLWrapper = require('./services/openssl-wrapper');
+const HybridCryptoService = require('./services/hybrid-crypto-service'); // Import the new service
 const RenewalService = require('./services/renewal-service');
 const logger = require('./services/logger');
 const configService = require('./services/config-service');
@@ -56,6 +58,7 @@ async function startApp() {
     logger.setLevel(config.logLevel || 'info', null, FILENAME);
 
     logger.info('Starting Certificate Manager...', null, FILENAME);
+    logger.info(`Selected crypto backend: ${config.cryptoBackend || 'node-forge'}`, null, FILENAME);
 
     // Check if config directory is writable
     try {
@@ -90,7 +93,27 @@ async function startApp() {
     // Initialize shared Docker service - create once and reuse
     const dockerService = DockerService;
 
-    const openSSL = new OpenSSLWrapper();
+    // --- Initialize Crypto Service based on configuration ---
+    const forgeServiceInstance = new ForgeCryptoService();
+    const opensslServiceInstance = new OpenSSLWrapper();
+    let cryptoService;
+
+    switch (config.cryptoBackend) {
+      case 'openssl':
+        cryptoService = opensslServiceInstance;
+        logger.info('Using OpenSSLWrapper as the crypto backend.', null, FILENAME);
+        break;
+      case 'node-forge-fallback':
+        cryptoService = new HybridCryptoService(forgeServiceInstance, opensslServiceInstance);
+        logger.info('Using HybridCryptoService (Forge with OpenSSL fallback).', null, FILENAME);
+        break;
+      case 'node-forge':
+      default:
+        cryptoService = forgeServiceInstance;
+        logger.info('Using ForgeCryptoService as the crypto backend.', null, FILENAME);
+        break;
+    }
+    // --- End Crypto Service Initialization ---
 
     const npmIntegrationService = new NpmIntegrationService({
         configService: configService
@@ -98,10 +121,8 @@ async function startApp() {
 
     // Initialize services
     const certificateManager = new CertificateManager(
-      config.certPath,
-      path.join(configService.configDir, 'certificates.json'),
-      configService.configDir,
-      openSSL,
+      configService,
+      cryptoService,
       activityService
     );
 
@@ -113,14 +134,19 @@ async function startApp() {
     });
 
     // Initialize renewal service
-    const renewalService = new RenewalService(certificateManager, {
-      renewalSchedule: config.renewalSchedule,
-      enableWatcher: config.enableFileWatch,
-      disableRenewalCron: !config.enableAutoRenewalJob,
-      checkOnStart: false
-    });
-
-    openSSL.setRenewalService(renewalService);
+    const renewalService = new RenewalService(
+      certificateManager, 
+      cryptoService, 
+      configService, 
+      activityService, 
+      dockerService, 
+      npmIntegrationService
+    );
+    
+    // Set renewal service on the cryptoService (Hybrid will propagate if needed)
+    if (typeof cryptoService.setRenewalService === 'function') {
+        cryptoService.setRenewalService(renewalService);
+    }
 
     // Record system startup
     await activityService.recordSystemActivity('startup', {
@@ -247,7 +273,7 @@ async function startApp() {
     // API routes
     app.use('/api', setupApi({
       certificateManager,
-      openSSL,
+      cryptoService,
       renewalService,
       configService,
       activityService,
@@ -279,7 +305,7 @@ async function startApp() {
       logger.info(`OpenAPI documentation available at http://localhost:${config.port || 3000}/api/docs`, null, FILENAME);
 
       // Log configuration details
-      logger.info(`Certificates directory: ${config.certPath}`, null, FILENAME);
+      logger.info(`Certificates directory: ${config.certsDir}`, null, FILENAME);
       logger.info(`Auto-renewal: ${config.enableAutoRenewalJob ? 'enabled' : 'disabled'}`, null, FILENAME);
       logger.info(`Renewal schedule: ${config.renewalSchedule}`, null, FILENAME);
       logger.info(`File watcher: ${config.enableFileWatch ? 'enabled' : 'disabled'}`, null, FILENAME);

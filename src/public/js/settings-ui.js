@@ -84,15 +84,25 @@ function setupSettingsUI() {
  */
 function applySettingsToUI(settings) {
     // General settings
-    document.getElementById('cert-path').value = settings.certPath || '';
+    document.getElementById('cert-path').value = settings.certsDir || '';
     document.getElementById('log-level').value = settings.logLevel || 'info';
     document.getElementById('openssl-path').value = settings.openSSLPath || '';
+    document.getElementById('server-port').value = settings.port || 3000;
+    document.getElementById('sign-standard-certs-with-ca').checked = settings.signStandardCertsWithCA || false;
+    document.getElementById('auto-renew-by-default').checked = settings.autoRenewByDefault !== undefined ? settings.autoRenewByDefault : true;
+
 
     // Security settings
     document.getElementById('enable-https').checked = settings.enableHttps || false;
     document.getElementById('https-port').value = settings.httpsPort || 4443;
     document.getElementById('https-cert').value = settings.httpsCertPath || '';
     document.getElementById('https-key').value = settings.httpsKeyPath || '';
+    // Nested security settings
+    const securitySettings = settings.security || {};
+    document.getElementById('disable-auth').checked = securitySettings.disableAuth || false;
+    document.getElementById('auth-mode').value = securitySettings.authMode || 'basic';
+    document.getElementById('token-expiration').value = securitySettings.tokenExpiration || '8h';
+
 
     // Update HTTPS fields visibility
     const httpsFields = document.querySelectorAll('.https-settings');
@@ -106,6 +116,12 @@ function applySettingsToUI(settings) {
     document.getElementById('renew-days').value = settings.renewDaysBeforeExpiry || 30;
     document.getElementById('enable-file-watch').checked = settings.enableFileWatch || false;
     document.getElementById('include-idle-domains').checked = settings.includeIdleDomainsOnRenewal !== false;
+    // CA Validity Periods
+    const caValidity = settings.caValidityPeriod || {};
+    document.getElementById('validity-root-ca').value = caValidity.rootCA || 3650;
+    document.getElementById('validity-intermediate-ca').value = caValidity.intermediateCA || 1825;
+    document.getElementById('validity-standard-cert').value = caValidity.standard || 90;
+
 
     // Backup settings
     document.getElementById('enable-backups').checked = settings.enableCertificateBackups || false;
@@ -131,7 +147,14 @@ async function saveGeneralSettings(e) {
     const data = {};
 
     for (const [key, value] of formData.entries()) {
-        data[key] = value;
+        if (key === 'port') {
+            data[key] = parseInt(value, 10);
+        } else if (form.elements[key]?.type === 'checkbox') {
+            data[key] = form.elements[key].checked;
+        } 
+        else {
+            data[key] = value;
+        }
     }
 
     try {
@@ -169,11 +192,21 @@ async function saveSecuritySettings(e) {
     const form = e.target;
     const formData = new FormData(form);
     const data = {
-        enableHttps: formData.get('enableHttps') === 'on',
+        enableHttps: formData.get('enableHttps') === 'on', // This will be true if checked, false otherwise
         httpsPort: parseInt(formData.get('httpsPort') || '4443'),
-        httpsCertPath: formData.get('httpsCertPath') || '',
-        httpsKeyPath: formData.get('httpsKeyPath') || ''
+        httpsCertPath: formData.get('httpsCertPath') || null,
+        httpsKeyPath: formData.get('httpsKeyPath') || null,
+        security: {
+            disableAuth: formData.get('security.disableAuth') === 'on',
+            authMode: formData.get('security.authMode'),
+            tokenExpiration: formData.get('security.tokenExpiration')
+        }
     };
+    
+    // Correctly get checkbox values
+    data.enableHttps = form.elements['enableHttps'].checked;
+    data.security.disableAuth = form.elements['security.disableAuth'].checked;
+
 
     // Validation
     if (data.enableHttps) {
@@ -228,11 +261,16 @@ async function saveRenewalSettings(e) {
     const form = e.target;
     const formData = new FormData(form);
     const data = {
-        enableAutoRenewalJob: formData.get('enableAutoRenewalJob') === 'on',
+        enableAutoRenewalJob: form.elements['enableAutoRenewalJob'].checked,
         renewalSchedule: formData.get('renewalSchedule') || '0 0 * * *',
         renewDaysBeforeExpiry: parseInt(formData.get('renewDaysBeforeExpiry') || '30'),
-        enableFileWatch: formData.get('enableFileWatch') === 'on',
-        includeIdleDomainsOnRenewal: formData.get('includeIdleDomainsOnRenewal') === 'on'
+        enableFileWatch: form.elements['enableFileWatch'].checked,
+        includeIdleDomainsOnRenewal: form.elements['includeIdleDomainsOnRenewal'].checked,
+        caValidityPeriod: {
+            rootCA: parseInt(formData.get('caValidityPeriod.rootCA') || '3650'),
+            intermediateCA: parseInt(formData.get('caValidityPeriod.intermediateCA') || '1825'),
+            standard: parseInt(formData.get('caValidityPeriod.standard') || '90')
+        }
     };
 
     // Validation

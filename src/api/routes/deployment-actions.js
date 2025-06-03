@@ -503,7 +503,7 @@ function initDeploymentActionsRouter(deps) {
       logger.debug(`Reordering actions from [${deployActions.map(a => a.name || a.type).join(', ')}] to [${newActions.map(a => a.name || a.type).join(', ')}]`, null, FILENAME);
 
       // Update certificate using the sync method
-      await certificateManager.updateCertificateConfigAndSync(fingerprint, {
+      await certificateManager.updateCertificateConfig(fingerprint, {
         deployActions: newActions
       });
 
@@ -591,7 +591,7 @@ function initDeploymentActionsRouter(deps) {
       actions[index].enabled = enabled;
 
       // Save changes
-      await certificateManager.updateCertificateConfigAndSync(fingerprint, {
+      await certificateManager.updateCertificateConfig(fingerprint, {
         deployActions: actions
       });
 

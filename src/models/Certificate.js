@@ -3,8 +3,10 @@
  * Represents a certificate in the system with all its properties and methods
  * @module models/Certificate
  * @requires fs - File system module for file operations
+ * @requires path - Path module for path operations
+ * @requires crypto - Crypto module for generating unique IDs
  * @requires services/logger - Logger service for logging messages
- * @version 0.0.3
+ * @version 0.0.4
  * @license MIT
  * @author Christian Meiners
  * @description This module exports a Certificate class that represents a certificate with various properties and methods.
@@ -13,8 +15,46 @@
 
 const logger = require('../services/logger');
 const fs = require('fs');
+const path = require('path'); // Added path module
+const crypto = require('crypto'); // Added crypto module
 
 const FILENAME = 'models/Certificate.js';
+
+
+/**
+ * @typedef {Object} SnapshotFilePaths
+ * @property {string} [crt] - Path to the certificate file (.crt)
+ * @property {string} [key] - Path to the private key file (.key)
+ * @property {string} [pem] - Path to the PEM file (cert + key)
+ * @property {string} [chain] - Path to the chain file
+ * @property {string} [fullchain] - Path to the fullchain file
+ * // Add other relevant file types like p12, csr if they are part of a snapshot
+ */
+
+/**
+ * @typedef {'version' | 'backup'} SnapshotType
+ * Represents the type of snapshot.
+ */
+
+/**
+ * @typedef {'initial-creation' | 'pre-renewal' | 'pre-restore' | 'pre-delete' | 'manual'} SnapshotTrigger
+ * Represents the event or reason that triggered the snapshot creation.
+ */
+
+/**
+ * @typedef {Object} SnapshotEntry
+ * @property {string} id - Unique identifier for the snapshot (e.g., timestamp-nanoseconds or crypto-generated).
+ * @property {SnapshotType} type - Distinguishes automatic versions from manual backups.
+ * @property {string} createdAt - ISO 8601 timestamp of when the snapshot was created.
+ * @property {SnapshotTrigger} [trigger] - Context for why it was created.
+ * @property {string} [description] - User-provided description, primarily for 'backup' type.
+ * @property {number} versionNumber - A sequential number for 'version' types. 'backup' types will be associated with a 'version's number.
+ * @property {string} archiveDirectory - Path to the directory where this snapshot's files are stored.
+ * @property {string} sourceFingerprint - The fingerprint of the certificate at the time this snapshot was taken.
+ * @property {string} [sourceCommonName] - Common Name at the time of snapshot (for quick display).
+ * @property {string} [sourceValidTo] - Valid-to date at the time of snapshot (for quick display).
+ * @property {SnapshotFilePaths} paths - Paths to the archived certificate files for this snapshot.
+ */
 
 class Certificate {
     /**
@@ -38,12 +78,12 @@ class Certificate {
         this._certType = 'standard'; // standard, rootCA, intermediateCA, acme
         this._keyType = 'RSA';
         this._keySize = 2048;
-        this._sigAlg = null;
+        this._signatureAlgorithm = null;
     
         // Key identifiers
         this._serialNumber = null;     // Serial Number
-        this._keyId = null;            // Subject Key Identifier
-        this._authorityKeyId = null;   // Authority Key Identifier
+        this._subjectKeyIdentifier = null;            // Subject Key Identifier
+        this._authorityKeyIdentifier = null;   // Authority Key Identifier
         this._selfSigned = false;
         this._isCA = false;
         this._isRootCA = false;
@@ -78,8 +118,10 @@ class Certificate {
             deployActions: []
         };
 
-        // Version history
-        this._previousVersions = {};
+        /** @type {SnapshotEntry[]} */
+        this._snapshots = [];
+        this._currentVersionNumber = 0; // Start at 0, first 'version' snapshot will make it 1
+        
         this._modificationTime = Date.now();
 
         // Initialize from data object if provided
@@ -119,12 +161,12 @@ class Certificate {
             this._certType = data.certType || 'standard';
             this._keyType = data.keyType || 'RSA';
             this._keySize = data.keySize || 2048;
-            this._sigAlg = data.sigAlg || null;
+            this._signatureAlgorithm = data.signatureAlgorithm || null;
 
             // Additional certificate technical details
             if (data.serialNumber) this._serialNumber = data.serialNumber;
-            if (data.keyId) this._keyId = data.keyId;                           // Added Subject Key ID
-            if (data.authorityKeyId) this._authorityKeyId = data.authorityKeyId; // Added Authority Key ID
+            if (data.subjectKeyIdentifier) this._subjectKeyIdentifier = data.subjectKeyIdentifier;                           // Added Subject Key ID
+            if (data.authorityKeyIdentifier) this._authorityKeyIdentifier = data.authorityKeyIdentifier; // Added Authority Key ID
             if (data.selfSigned !== undefined) this._selfSigned = data.selfSigned;
             if (data.isCA !== undefined) this._isCA = data.isCA;
             if (data.isRootCA !== undefined) this._isRootCA = data.isRootCA;
@@ -231,11 +273,13 @@ class Certificate {
                 logger.fine(`Loaded ${this._config.deployActions.length} deployment actions from top-level.`, null, FILENAME, this._name);
             }
 
-            // Previous versions
-            this._previousVersions = {};
-            if (data.previousVersions && typeof data.previousVersions === 'object') {
-                this._previousVersions = { ...data.previousVersions };
+            if (Array.isArray(data._snapshots)) {
+                // Basic validation could be added here if desired, e.g., checking for required fields
+                this._snapshots = data._snapshots.map(s => ({ ...s })); // Shallow copy
+            } else {
+                this._snapshots = [];
             }
+            this._currentVersionNumber = typeof data._currentVersionNumber === 'number' ? data._currentVersionNumber : 0;
 
             // Modification time
             this._modificationTime = data.modificationTime || Date.now();
@@ -259,7 +303,7 @@ class Certificate {
      * @param {boolean} options.preserveConfig - Whether to preserve configuration settings
      * @returns {Certificate} - Returns this for method chaining
      */
-    updateFromData(data, options = {}) {
+    updateConfig(data, options = {}) {
         const preserveConfig = options.preserveConfig !== false;
         logger.fine(`Updating certificate data for ${this._name || data.name}`, data, FILENAME);
 
@@ -278,12 +322,12 @@ class Certificate {
         if (data.certType) this._certType = data.certType;
         if (data.keyType) this._keyType = data.keyType;
         if (data.keySize) this._keySize = data.keySize;
-        if (data.sigAlg) this._sigAlg = data.sigAlg;
+        if (data.signatureAlgorithm) this._signatureAlgorithm = data.signatureAlgorithm;
 
         // Additional certificate technical details
         if (data.serialNumber) this._serialNumber = data.serialNumber;
-        if (data.keyId) this._keyId = data.keyId;
-        if (data.authorityKeyId) this._authorityKeyId = data.authorityKeyId;
+        if (data.subjectKeyIdentifier) this._subjectKeyIdentifier = data.subjectKeyIdentifier;
+        if (data.authorityKeyIdentifier) this._authorityKeyIdentifier = data.authorityKeyIdentifier;
         if (data.selfSigned !== undefined) this._selfSigned = data.selfSigned;
         if (data.isCA !== undefined) this._isCA = data.isCA;
         if (data.isRootCA !== undefined) this._isRootCA = data.isRootCA;
@@ -496,12 +540,12 @@ class Certificate {
                 certType: this._certType,
                 keyType: this._keyType,
                 keySize: this._keySize,
-                sigAlg: this._sigAlg,
-
+                signatureAlgorithm: this._signatureAlgorithm,
+                originalEncoding: this._originalEncoding,
                 // Key identifiers
                 serialNumber: this._serialNumber,
-                keyId: this._keyId,                 // Added Subject Key ID
-                authorityKeyId: this._authorityKeyId, // Added Authority Key ID
+                subjectKeyIdentifier: this._subjectKeyIdentifier,                 // Added Subject Key ID
+                authorityKeyIdentifier: this._authorityKeyIdentifier, // Added Authority Key ID
                 selfSigned: this._selfSigned,
                 isRootCA: this._isRootCA,
                 isCA: this._isCA,
@@ -535,8 +579,9 @@ class Certificate {
                     deployActions: [...this._config.deployActions]
                 },
 
-                // Version history
-                previousVersions: { ...this._previousVersions },
+                snapshots: this._snapshots.map(s => ({ ...s })), // Shallow copy for serialization
+                currentVersionNumber: this._currentVersionNumber,
+
                 modificationTime: this._modificationTime
             };
         } catch (error) {
@@ -642,64 +687,350 @@ class Certificate {
     }
 
     /**
-     * Add a new version of the certificate to previous versions
-     * @param {string} fingerprint - Old certificate fingerprint
-     * @param {Object} versionData - Certificate version data
+     * Creates a snapshot of the current certificate state (files and metadata).
+     * @param {SnapshotType} type - The type of snapshot ('version' or 'backup').
+     * @param {SnapshotTrigger} trigger - The reason for creating the snapshot.
+     * @param {string} [description=''] - A user-provided description, mainly for 'backup' type.
+     * @param {string} archiveBaseDir - The base directory where all archives are stored (e.g., config/archive).
+     * @returns {Promise<SnapshotEntry|null>} The created SnapshotEntry object or null on failure.
      */
-    addPreviousVersion(fingerprint, versionData) {
-        if (!fingerprint || !versionData) {
-            logger.warn(`Failed to add previous version: missing fingerprint or data`, null, FILENAME, this._name);
-            return false;
+    async createSnapshot(type, trigger, description = '', archiveBaseDir) {
+        logger.info(`Creating snapshot for certificate '${this.name}': type='${type}', trigger='${trigger}'`, null, FILENAME, this.name);
+
+        if (!this.name) {
+            logger.error('Cannot create snapshot: Certificate name is missing.', null, FILENAME);
+            return null;
+        }
+        if (!this.fingerprint) {
+            logger.warn(`Creating snapshot for certificate '${this.name}' which has no fingerprint yet. This might be for an initial creation.`, null, FILENAME, this.name);
+            // Allow proceeding, but sourceFingerprint will be null or a placeholder
         }
 
+        const snapshotId = crypto.randomBytes(16).toString('hex'); // Generates a 32-character hex string
+        const createdAt = new Date().toISOString();
+        let versionNumberToAssign = this._currentVersionNumber;
+
+        if (type === 'version') {
+            this._currentVersionNumber += 1;
+            versionNumberToAssign = this._currentVersionNumber;
+        }
+        // For 'backup' type, it uses the current _currentVersionNumber
+
+        // Sanitize certificate name for use in directory path
+        const sanitizedCertName = this.name.replace(/[^\w.-]/g, '_');
+        const certArchiveDir = path.join(archiveBaseDir, sanitizedCertName);
+        const snapshotSpecificDir = path.join(certArchiveDir, 'snapshots', snapshotId);
+
         try {
-            // Initialize previous versions if needed
-            if (!this._previousVersions) {
-                this._previousVersions = {};
+            // Ensure certificate-specific archive directory and snapshots subdirectory exist
+            await fs.promises.mkdir(snapshotSpecificDir, { recursive: true });
+            logger.debug(`Ensured snapshot directory exists: ${snapshotSpecificDir}`, null, FILENAME, this.name);
+
+            const snapshotFilePaths = {};
+            const filesToCopy = [];
+
+            // Identify current live files to copy
+            for (const [fileKey, livePath] of Object.entries(this._paths)) {
+                if (livePath && typeof livePath === 'string' && fs.existsSync(livePath)) {
+                    const destFileName = path.basename(livePath);
+                    const destPath = path.join(snapshotSpecificDir, destFileName);
+                    filesToCopy.push({ src: livePath, dest: destPath });
+                    snapshotFilePaths[fileKey] = destPath; // Store the path within the snapshot dir
+                } else {
+                    logger.fine(`Skipping snapshot for path key '${fileKey}': path '${livePath}' does not exist or is invalid.`, null, FILENAME, this.name);
+                }
             }
 
-            // Add basic version metadata if not provided
-            if (!versionData.archivedAt) {
-                versionData.archivedAt = new Date().toISOString();
+            if (filesToCopy.length === 0) {
+                logger.warn(`No valid files found to copy for snapshot ${snapshotId} of certificate '${this.name}'. Snapshot will be metadata-only.`, null, FILENAME, this.name);
             }
 
-            if (!versionData.version) {
-                versionData.version = Object.keys(this._previousVersions).length + 1;
+            // Copy files
+            for (const file of filesToCopy) {
+                await fs.promises.copyFile(file.src, file.dest);
+                logger.fine(`Copied for snapshot: ${file.src} -> ${file.dest}`, null, FILENAME, this.name);
             }
 
-            // Store the previous version
-            this._previousVersions[fingerprint] = versionData;
+            /** @type {SnapshotEntry} */
+            const snapshotEntry = {
+                id: snapshotId,
+                type: type,
+                createdAt: createdAt,
+                trigger: trigger,
+                description: description || (type === 'backup' ? `Manual backup created on ${createdAt.split('T')[0]}` : ''),
+                versionNumber: versionNumberToAssign,
+                archiveDirectory: snapshotSpecificDir, // Path to this specific snapshot's files
+                sourceFingerprint: this.fingerprint || 'N/A', // Use current fingerprint
+                sourceCommonName: this.commonName || this.name,
+                sourceValidTo: this.validTo,
+                paths: snapshotFilePaths,
+            };
 
-            // Update modification time
-            this._modificationTime = Date.now();
+            // Save snapshot-info.json within the snapshot's directory
+            const snapshotInfoPath = path.join(snapshotSpecificDir, 'snapshot-info.json');
+            await fs.promises.writeFile(snapshotInfoPath, JSON.stringify(snapshotEntry, null, 2));
+            logger.debug(`Saved snapshot metadata to ${snapshotInfoPath}`, null, FILENAME, this.name);
 
-            logger.info(`Added previous version ${versionData.version} with fingerprint ${fingerprint} to certificate ${this._name}`, null, FILENAME, this._name);
+            this._snapshots.push(snapshotEntry);
+            this._modificationTime = Date.now(); // Update modification time of the certificate
 
-            return true;
+            logger.info(`Successfully created snapshot ${snapshotId} (version ${versionNumberToAssign}) for certificate '${this.name}'`, null, FILENAME, this.name);
+            return snapshotEntry;
+
         } catch (error) {
-            logger.error(`Error adding previous version: ${error.message}`, null, FILENAME, this._name);
-            return false;
+            logger.error(`Error creating snapshot ${snapshotId} for certificate '${this.name}':`, error, FILENAME, this.name);
+            // Attempt to clean up partially created snapshot directory if error occurs
+            try {
+                if (fs.existsSync(snapshotSpecificDir)) {
+                    await fs.promises.rm(snapshotSpecificDir, { recursive: true, force: true });
+                    logger.info(`Cleaned up partially created snapshot directory: ${snapshotSpecificDir}`, null, FILENAME, this.name);
+                }
+            } catch (cleanupError) {
+                logger.error(`Error cleaning up snapshot directory '${snapshotSpecificDir}':`, cleanupError, FILENAME, this.name);
+            }
+            return null;
         }
     }
 
     /**
-     * Get previous versions of this certificate
-     * @returns {Array} Array of previous versions
+     * Get snapshots for this certificate, optionally filtered by type and sorted.
+     * @param {SnapshotType | 'all'} [snapshotType='all'] - Type of snapshots to retrieve ('backup', 'version', or 'all').
+     * @param {'asc' | 'desc'} [sortByDate='desc'] - Sort order by creation date.
+     * @returns {SnapshotEntry[]}
      */
-    getPreviousVersions() {
-        if (!this._previousVersions) {
-            return [];
+    getSnapshots(snapshotType = 'all', sortByDate = 'desc') {
+        let filteredSnapshots;
+
+        if (snapshotType === 'backup') {
+            filteredSnapshots = this._snapshots.filter(s => s.type === 'backup');
+        } else if (snapshotType === 'version') {
+            filteredSnapshots = this._snapshots.filter(s => s.type === 'version');
+        } else { // 'all' or any other value
+            filteredSnapshots = [...this._snapshots];
         }
 
-        return Object.entries(this._previousVersions)
-            .map(([fingerprint, data]) => ({
-                fingerprint,
-                ...data,
-                // Ensure these fields are present
-                archivedAt: data.archivedAt || data.renewedAt || null,
-                version: data.version || 0
-            }))
-            .sort((a, b) => (b.version || 0) - (a.version || 0)); // Sort by version, newest first
+        const sortedSnapshots = filteredSnapshots.sort((a, b) => {
+            const dateA = new Date(a.createdAt).getTime();
+            const dateB = new Date(b.createdAt).getTime();
+            return sortByDate === 'desc' ? dateB - dateA : dateA - dateB;
+        });
+        return sortedSnapshots;
+    }
+
+    /**
+     * Restores the certificate's live files from a given snapshot.
+     * Note: This method only copies files. The CertificateManager is responsible for
+     * creating a pre-restore snapshot and then calling refreshPropertiesFromFiles() on this instance.
+     * @param {string} snapshotId - The ID of the snapshot to restore from.
+     * @returns {Promise<boolean>} True if files were successfully copied, false otherwise.
+     */
+    async restoreFromSnapshot(snapshotId) {
+        logger.info(`Attempting to restore certificate '${this.name}' from snapshot ID '${snapshotId}'`, null, FILENAME, this.name);
+
+        const snapshotEntry = this._snapshots.find(s => s.id === snapshotId);
+        if (!snapshotEntry) {
+            logger.error(`Snapshot ID '${snapshotId}' not found for certificate '${this.name}'. Cannot restore.`, null, FILENAME, this.name);
+            return false;
+        }
+
+        if (!snapshotEntry.archiveDirectory || !fs.existsSync(snapshotEntry.archiveDirectory)) {
+            logger.error(`Archive directory for snapshot '${snapshotId}' ('${snapshotEntry.archiveDirectory}') does not exist. Cannot restore.`, null, FILENAME, this.name);
+            return false;
+        }
+        if (!snapshotEntry.paths || Object.keys(snapshotEntry.paths).length === 0) {
+            logger.warn(`Snapshot ID '${snapshotId}' for certificate '${this.name}' has no file paths defined. Nothing to restore.`, null, FILENAME, this.name);
+            return false; // Or true if "nothing to do" is considered success
+        }
+
+        try {
+            // Ensure target directories for live files exist
+            for (const livePathKey of Object.keys(this._paths)) {
+                const livePath = this._paths[livePathKey];
+                if (livePath) {
+                    const liveDir = path.dirname(livePath);
+                    if (!fs.existsSync(liveDir)) {
+                        await fs.promises.mkdir(liveDir, { recursive: true });
+                        logger.fine(`Ensured live directory exists: ${liveDir}`, null, FILENAME, this.name);
+                    }
+                }
+            }
+
+            let filesRestoredCount = 0;
+            for (const [snapshotFileKey, archivedPath] of Object.entries(snapshotEntry.paths)) {
+                const livePath = this._paths[snapshotFileKey]; // Get the corresponding live path key
+
+                if (livePath && fs.existsSync(archivedPath)) {
+                    await fs.promises.copyFile(archivedPath, livePath);
+                    logger.fine(`Restored: ${archivedPath} -> ${livePath}`, null, FILENAME, this.name);
+                    filesRestoredCount++;
+                } else {
+                    if (!livePath) {
+                        logger.warn(`No corresponding live path for snapshot file key '${snapshotFileKey}' in certificate '${this.name}'. Skipping restore for this file from snapshot '${snapshotId}'.`, null, FILENAME, this.name);
+                    }
+                    if (livePath && !fs.existsSync(archivedPath)) {
+                        logger.warn(`Archived file '${archivedPath}' for snapshot '${snapshotId}' does not exist. Skipping restore for this file.`, null, FILENAME, this.name);
+                    }
+                }
+            }
+
+            if (filesRestoredCount === 0) {
+                logger.warn(`No files were actually restored for certificate '${this.name}' from snapshot '${snapshotId}'. Check live path configuration and snapshot contents.`, null, FILENAME, this.name);
+                // Depending on strictness, you might return false here.
+                // For now, if no errors occurred, we'll say the copy operation itself was "successful".
+            }
+
+            this._modificationTime = Date.now();
+            logger.info(`File copy phase for restore of certificate '${this.name}' from snapshot '${snapshotId}' completed. Certificate object requires property refresh.`, null, FILENAME, this.name);
+            return true;
+        } catch (error) {
+            logger.error(`Error during file copy phase for restoring certificate '${this.name}' from snapshot '${snapshotId}':`, error, FILENAME, this.name);
+            return false;
+        }
+    }
+
+
+    /**
+     * Refreshes the certificate's internal properties by parsing its live files.
+     * This method should be called after certificate files are created, renewed, or restored.
+     * @param {object} cryptoServiceService - An instance of the cryptoService service capable of parsing certificate files.
+     * @returns {Promise<void>}
+     * @throws {Error} if parsing or updating fails, or if essential services/files are missing.
+     */
+    async refreshPropertiesFromFiles(cryptoServiceService) {
+        logger.info(`Refreshing properties from files for certificate '${this.name}'...`, null, FILENAME, this.name);
+
+        if (!cryptoServiceService || typeof cryptoServiceService.getCertificateInfo !== 'function') {
+            logger.error(`cryptoService service is not available or 'getCertificateInfo' method is missing. Cannot refresh properties for '${this.name}'.`, null, FILENAME, this.name);
+            throw new Error('cryptoService service unavailable for refreshing certificate properties.');
+        }
+
+        // Determine the primary certificate file to parse.
+        // Prioritize .pem, then .crt. Add other fallbacks if necessary.
+        let primaryCertPath = null;
+        if (this._paths.pemPath && fs.existsSync(this._paths.pemPath)) {
+            primaryCertPath = this._paths.pemPath;
+        } else if (this._paths.crtPath && fs.existsSync(this._paths.crtPath)) {
+            primaryCertPath = this._paths.crtPath;
+        }
+        // Add more specific checks if needed, e.g., for ACME certs that might only have .cer
+        // else if (this._paths.cerPath && fs.existsSync(this._paths.cerPath)) {
+        //     primaryCertPath = this._paths.cerPath;
+        // }
+
+
+        if (!primaryCertPath) {
+            logger.error(`No primary certificate file (pem, crt) found in paths for certificate '${this.name}'. Cannot refresh properties. Paths: ${JSON.stringify(this._paths)}`, null, FILENAME, this.name);
+            throw new Error(`No primary certificate file found for '${this.name}'.`);
+        }
+
+        logger.debug(`Using primary certificate file for refresh: ${primaryCertPath}`, null, FILENAME, this.name);
+
+        try {
+            const certDetails = await cryptoServiceService.getCertificateInfo(primaryCertPath);
+
+            if (!certDetails || typeof certDetails !== 'object') {
+                logger.error(`Failed to retrieve valid details from cryptoService service for '${primaryCertPath}'. Received: ${JSON.stringify(certDetails)}`, null, FILENAME, this.name);
+                throw new Error(`Invalid details received from cryptoService service for '${this.name}'.`);
+            }
+
+            logger.fine(`Successfully parsed details for '${this.name}' from '${primaryCertPath}'. Updating properties.`, certDetails, FILENAME, this.name);
+
+            // Update internal properties based on parsed details
+            // It's safer to check for existence of each property in certDetails
+            // before assigning to avoid 'undefined' values if the parser omits some fields.
+
+            this._fingerprint = certDetails.fingerprint || this._fingerprint;
+            this._commonName = certDetails.commonName || this._commonName;
+            // If name was derived from commonName and commonName changed, update name
+            if (this._name === (certDetails.previousCommonNameForComparison || null) || !this._name) { // You might need to pass old CN if logic is complex
+                this._name = certDetails.commonName || this._name;
+            }
+            this._subject = certDetails.subject || this._subject;
+            this._issuer = certDetails.issuer || this._issuer;
+            this._validFrom = certDetails.validFrom || this._validFrom;
+            this._validTo = certDetails.validTo || this._validTo;
+
+            this._keyType = certDetails.keyType || this._keyType;
+            this._keySize = certDetails.keySize || this._keySize;
+            this._signatureAlgorithm = certDetails.signatureAlgorithm || certDetails.signatureAlgorithm || this._signatureAlgorithm; // Allow for different naming
+            this._originalEncoding = certDetails.originalEncoding || this._originalEncoding; // Assuming cryptoServiceService provides this
+
+            this._serialNumber = certDetails.serialNumber || this._serialNumber;
+            this._subjectKeyIdentifier = certDetails.subjectKeyIdentifier || certDetails.subjectKeyIdentifier || this._subjectKeyIdentifier;
+            this._authorityKeyIdentifier = certDetails.authorityKeyIdentifier || certDetails.authorityKeyIdentifier || this._authorityKeyIdentifier;
+
+            this._selfSigned = certDetails.selfSigned !== undefined ? certDetails.selfSigned : this._selfSigned;
+            this._isCA = certDetails.isCA !== undefined ? certDetails.isCA : this._isCA;
+            this._isRootCA = certDetails.isRootCA !== undefined ? certDetails.isRootCA : this._isRootCA; // Assuming cryptoServiceService can determine this
+            this._pathLenConstraint = certDetails.pathLenConstraint !== undefined ? certDetails.pathLenConstraint : this._pathLenConstraint;
+
+
+            if (certDetails.sans && typeof certDetails.sans === 'object') {
+                this._sans.domains = Array.isArray(certDetails.sans.domains) ? certDetails.sans.domains.map(d => d.trim().toLowerCase()) : this._sans.domains;
+                this._sans.ips = Array.isArray(certDetails.sans.ips) ? certDetails.sans.ips.map(ip => ip.trim()) : this._sans.ips;
+                // Note: Idle domains/IPs are usually managed by user input, not directly from cert details,
+                // unless your cryptoServiceService specifically extracts them from an extension or CSR.
+                // If not, they should remain as they are.
+            }
+
+            // Passphrase status might need re-evaluation if the key file changed,
+            // but `needsPassphrase` is often a config, and `hasPassphrase` is about storage.
+            // For now, we assume these are not directly changed by parsing the cert itself.
+            // If `cryptoServiceService.getCertificateInfo` also checks if the key is encrypted, update `_needsPassphrase`.
+            if (certDetails.isKeyEncrypted !== undefined) {
+                this._needsPassphrase = certDetails.isKeyEncrypted;
+            }
+
+
+            // Cert type might be derivable by cryptoServiceService (e.g. based on extensions)
+            // For now, we assume it's mostly set by config or initial creation logic.
+            // If `certDetails.certType` is provided by your service, you can update it:
+            // this._certType = certDetails.certType || this._certType;
+
+            this._modificationTime = Date.now();
+            logger.info(`Properties for certificate '${this.name}' successfully refreshed from file. New fingerprint: ${this._fingerprint}`, null, FILENAME, this.name);
+
+        } catch (error) {
+            logger.error(`Error refreshing properties for certificate '${this.name}' from file '${primaryCertPath}':`, error, FILENAME, this.name);
+            throw error; // Re-throw the error so the calling method can handle it
+        }
+    }
+
+    /**
+     * Deletes a specific snapshot (metadata and archived files).
+     * @param {string} snapshotId - The ID of the snapshot to delete.
+     * @returns {Promise<boolean>} True if deletion was successful, false otherwise.
+     */
+    async deleteSnapshot(snapshotId) {
+        logger.info(`Attempting to delete snapshot ID '${snapshotId}' for certificate '${this.name}'`, null, FILENAME, this.name);
+
+        const snapshotIndex = this._snapshots.findIndex(s => s.id === snapshotId);
+        if (snapshotIndex === -1) {
+            logger.warn(`Snapshot ID '${snapshotId}' not found for certificate '${this.name}'. Cannot delete.`, null, FILENAME, this.name);
+            return false;
+        }
+
+        const snapshotEntry = this._snapshots[snapshotIndex];
+
+        try {
+            // Delete the archive directory from the filesystem
+            if (snapshotEntry.archiveDirectory && fs.existsSync(snapshotEntry.archiveDirectory)) {
+                await fs.promises.rm(snapshotEntry.archiveDirectory, { recursive: true, force: true });
+                logger.debug(`Successfully deleted snapshot archive directory: ${snapshotEntry.archiveDirectory}`, null, FILENAME, this.name);
+            } else {
+                logger.warn(`Snapshot archive directory '${snapshotEntry.archiveDirectory}' not found or not specified for snapshot '${snapshotId}'. Skipping directory deletion.`, null, FILENAME, this.name);
+            }
+
+            // Remove the snapshot entry from the array
+            this._snapshots.splice(snapshotIndex, 1);
+            this._modificationTime = Date.now();
+
+            logger.info(`Successfully deleted snapshot ID '${snapshotId}' (metadata and files) for certificate '${this.name}'`, null, FILENAME, this.name);
+            return true;
+        } catch (error) {
+            logger.error(`Error deleting snapshot ID '${snapshotId}' for certificate '${this.name}':`, error, FILENAME, this.name);
+            return false;
+        }
     }
 
     /**
@@ -870,61 +1201,74 @@ class Certificate {
      */
     findSigningCA(certManager) {
         try {
-            logger.debug(`Finding signing CA for certificate ${this._name} (${this._fingerprint})`, null, FILENAME, this._name);
+            logger.debug(`Finding signing CA for certificate ${this._name} (${this._fingerprint}) with AKI: ${this._authorityKeyIdentifier}, Issuer: ${this._issuer}`, null, FILENAME, this._name);
 
-            if (!this._authorityKeyId) {
-                logger.fine(`No Authority Key ID available for this certificate, can't reliably find signing CA`, null, FILENAME, this._name);
-                return null;
+            if (!this._authorityKeyIdentifier && !this._issuer) { // Adjusted condition slightly
+                logger.fine(`No Authority Key ID or Issuer available for this certificate, can't reliably find signing CA by these methods.`, null, FILENAME, this._name);
+                // Still allow fallback to stored caFingerprint
             }
 
-            // First try to find by Authority Key ID matching CA's Subject Key ID (most reliable)
-            const allCerts = certManager.getAllCertificates();
+            const allCerts = certManager.getAllCertificates(); // This returns an array of JSON objects
+            logger.debug(`Total certificates from certManager: ${allCerts.length}`, null, FILENAME, this._name);
 
-            const caByKeyId = allCerts.find(cert =>
-                cert.isCA &&
-                cert._keyId &&
-                cert._keyId.toUpperCase() === this._authorityKeyId.toUpperCase()
-            );
+            const caByKeyId = allCerts.find(cert => { // cert here is a JSON object
+                const isMatch = cert.isCA &&
+                                cert.subjectKeyIdentifier && // Use public property
+                                cert.subjectKeyIdentifier.toUpperCase() === (this._authorityKeyIdentifier ? this._authorityKeyIdentifier.toUpperCase() : '');
+                if (cert.isCA) { // Log details for all CAs being checked
+                    // Use public properties for logging from the JSON object
+                    logger.debug(`Checking CA by Key ID: Name='${cert.name}', Fingerprint='${cert.fingerprint}', isCA='${cert.isCA}', SKI='${cert.subjectKeyIdentifier}', MatchAttempt=${isMatch}`, null, FILENAME, this._name);
+                }
+                return isMatch;
+            });
 
             if (caByKeyId) {
-                logger.fine(`Found signing CA by Key ID: ${caByKeyId._name} (${caByKeyId._fingerprint})`, null, FILENAME, this._name);
-
-                // Update the certificate's CA reference
-                this._config.caFingerprint = caByKeyId._fingerprint;
-                this._config.caName = caByKeyId._name;
-
-                return caByKeyId;
+                // caByKeyId is a JSON object here. We need its fingerprint and name.
+                logger.fine(`Found signing CA by Key ID: ${caByKeyId.name} (${caByKeyId.fingerprint})`, null, FILENAME, this._name);
+                this._config.caFingerprint = caByKeyId.fingerprint; // Correctly use fingerprint from JSON
+                this._config.caName = caByKeyId.name;         // Correctly use name from JSON
+                // To return a Certificate instance, we'd need to get it from certManager again,
+                // or ensure findSigningCA is robust enough if it only needs fingerprint/name.
+                // For now, let's assume setting fingerprint/name in config is the main goal here
+                // and returning the JSON object might be acceptable if the caller handles it.
+                // If a full Certificate instance is needed, it should be fetched:
+                // return certManager.getCertificate(caByKeyId.fingerprint);
+                return certManager.getCertificate(caByKeyId.fingerprint); // Fetch the actual Certificate instance
             }
 
-            // If we can't find by Key ID, fall back to issuer name matching
             if (this._issuer) {
-                const caByIssuer = allCerts.find(cert =>
-                    cert.isCA &&
-                    cert._subject &&
-                    cert._subject === this._issuer
-                );
+                const caByIssuer = allCerts.find(cert => { // cert here is a JSON object
+                    const isMatch = cert.isCA &&
+                                    cert.subject && // Use public property
+                                    cert.subject === this._issuer;
+                    if (cert.isCA) { // Log details for all CAs being checked
+                        // Use public properties for logging from the JSON object
+                        logger.debug(`Checking CA by Issuer: Name='${cert.name}', Fingerprint='${cert.fingerprint}', isCA='${cert.isCA}', Subject='${cert.subject}', MatchAttempt=${isMatch}`, null, FILENAME, this._name);
+                    }
+                    return isMatch;
+                });
 
                 if (caByIssuer) {
-                    logger.fine(`Found signing CA by issuer subject: ${caByIssuer._name} (${caByIssuer._fingerprint})`, null, FILENAME, this._name);
-
-                    // Update the certificate's CA reference
-                    this._config.caFingerprint = caByIssuer._fingerprint;
-                    this._config.caName = caByIssuer._name;
-
-                    return caByIssuer;
+                    // caByIssuer is a JSON object here.
+                    logger.fine(`Found signing CA by issuer subject: ${caByIssuer.name} (${caByIssuer.fingerprint})`, null, FILENAME, this._name);
+                    this._config.caFingerprint = caByIssuer.fingerprint;
+                    this._config.caName = caByIssuer.name;
+                    // return caByIssuer; // This would return the JSON object
+                    return certManager.getCertificate(caByIssuer.fingerprint); // Fetch the actual Certificate instance
                 }
             }
 
-            // As a last resort, try the stored caFingerprint
             if (this._config?.caFingerprint) {
-                const caByFingerprint = certManager.getCertificate(this._config.caFingerprint);
-                if (caByFingerprint && caByFingerprint.isCA) {
-                    logger.fine(`Found signing CA by stored fingerprint: ${caByFingerprint._name}`, null, FILENAME, this._name);
+                const caByFingerprint = certManager.getCertificate(this._config.caFingerprint); // This returns a Certificate instance
+                if (caByFingerprint && caByFingerprint.isCA) { // Access isCA getter on the instance
+                    logger.fine(`Found signing CA by stored fingerprint: ${caByFingerprint.name} (Fingerprint: ${caByFingerprint.fingerprint})`, null, FILENAME, this._name);
                     return caByFingerprint;
+                } else {
+                    logger.debug(`Stored CA fingerprint ${this._config.caFingerprint} did not resolve to a valid CA.`, null, FILENAME, this._name);
                 }
             }
 
-            logger.debug(`No signing CA found for certificate ${this._name}`, null, FILENAME, this._name);
+            logger.debug(`No signing CA found for certificate ${this._name} after all checks.`, null, FILENAME, this._name);
             return null;
         } catch (error) {
             logger.error(`Error finding signing CA for ${this._name}:`, error, FILENAME, this._name);
@@ -1297,29 +1641,29 @@ class Certificate {
         this._keySize = size;
     }
 
-    get sigAlg() {
-        return this._sigAlg;
+    get signatureAlgorithm() {
+        return this._signatureAlgorithm;
     }
 
-    set sigAlg(value) {
-        logger.finest(`Setting sigAlg from '${this._sigAlg}' to '${value}'`, null, FILENAME, this._name);
-        this._sigAlg = value;
+    set signatureAlgorithm(value) {
+        logger.finest(`Setting signatureAlgorithm from '${this._signatureAlgorithm}' to '${value}'`, null, FILENAME, this._name);
+        this._signatureAlgorithm = value;
     }
 
-    get keyId() {
-        return this._keyId;
+    get subjectKeyIdentifier() {
+        return this._subjectKeyIdentifier;
     }
 
-    set keyId(value) {
-        this._keyId = value;
+    set subjectKeyIdentifier(value) {
+        this._subjectKeyIdentifier = value;
     }
 
-    get authorityKeyId() {
-        return this._authorityKeyId;
+    get authorityKeyIdentifier() {
+        return this._authorityKeyIdentifier;
     }
 
-    set authorityKeyId(value) {
-        this._authorityKeyId = value;
+    set authorityKeyIdentifier(value) {
+        this._authorityKeyIdentifier = value;
     }
 
     get selfSigned() {
@@ -1335,7 +1679,7 @@ class Certificate {
     }
 
     get isRootCA() {
-        return this._isRootCa;
+        return this._isRootCA;
     }
 
     get acmeSettings() {
@@ -1454,34 +1798,6 @@ class Certificate {
         logger.finest(`Setting needsPassphrase from ${this._needsPassphrase} to ${Boolean(value)}`, null, FILENAME, this._name);
         this._needsPassphrase = Boolean(value);
         this._passphraseChecked = true;
-    }
-
-    get config() {
-        return {
-            autoRenew: this._config.autoRenew,
-            renewDaysBeforeExpiry: this._config.renewDaysBeforeExpiry,
-            signWithCA: this._config.signWithCA,
-            caFingerprint: this._config.caFingerprint,
-            deployActions: [...this._config.deployActions]
-        };
-    }
-
-    set config(value) {
-        if (!value || typeof value !== 'object') return;
-
-        logger.finest(`Setting config: ${JSON.stringify(value)}`, null, FILENAME, this._name);
-
-        this._config = {
-            autoRenew: value.autoRenew !== undefined ? value.autoRenew : this._config.autoRenew,
-            renewDaysBeforeExpiry: value.renewDaysBeforeExpiry || this._config.renewDaysBeforeExpiry,
-            signWithCA: value.signWithCA !== undefined ? value.signWithCA : this._config.signWithCA,
-            caFingerprint: value.caFingerprint || this._config.caFingerprint,
-            deployActions: Array.isArray(value.deployActions) ? [...value.deployActions] : this._config.deployActions
-        };
-    }
-
-    get previousVersions() {
-        return { ...this._previousVersions };
     }
 
     get modificationTime() {

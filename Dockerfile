@@ -1,6 +1,6 @@
 FROM node:23-slim
 
-RUN apt-get update && apt-get install -y openssl curl tzdata && apt-get clean
+RUN apt-get update && apt-get install -y curl openssl tzdata && apt-get clean
 
 WORKDIR /app
 

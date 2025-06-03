@@ -192,7 +192,7 @@
                 <div class="form-group">
                   <label for="cert-path">Certificates Path</label>
                   <div class="input-with-button">
-                    <input type="text" id="cert-path" name="certPath" />
+                    <input type="text" id="cert-path" name="certsDir" />
                     <button
                       type="button"
                       class="browse-btn"
@@ -209,11 +209,26 @@
                     <option value="warn">Warning</option>
                     <option value="info">Info</option>
                     <option value="debug">Debug</option>
+                    <option value="fine">Fine</option>
+                    <option value="finest">Finest</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label for="openssl-path">OpenSSL Path</label>
                   <input type="text" id="openssl-path" name="openSSLPath" />
+                </div>
+                <div class="form-group">
+                  <label for="server-port">Server Port</label>
+                  <input type="number" id="server-port" name="port" min="1" max="65535" />
+                </div>
+                <div class="form-group checkbox">
+                  <input type="checkbox" id="sign-standard-certs-with-ca" name="signStandardCertsWithCA" />
+                  <label for="sign-standard-certs-with-ca">Sign Standard Certificates with CA by default</label>
+                  <span class="form-help">Applies when creating new standard certificates.</span>
+                </div>
+                <div class="form-group checkbox">
+                  <input type="checkbox" id="auto-renew-by-default" name="autoRenewByDefault" />
+                  <label for="auto-renew-by-default">Enable Auto-Renewal for new certificates by default</label>
                 </div>
                 <button type="submit" class="button primary">
                   Save Settings
@@ -263,6 +278,23 @@
                       Browse
                     </button>
                   </div>
+                </div>
+                <div class="form-group checkbox">
+                  <input type="checkbox" id="disable-auth" name="security.disableAuth" />
+                  <label for="disable-auth">Disable Authentication (Not Recommended)</label>
+                  <span class="form-help warning-text">Warning: Disabling authentication will make the manager accessible to anyone.</span>
+                </div>
+                <div class="form-group">
+                  <label for="auth-mode">Authentication Mode</label>
+                  <select id="auth-mode" name="security.authMode">
+                    <option value="basic">Basic Authentication</option>
+                    <!-- <option value="oidc">OIDC</option> -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="token-expiration">API Token Expiration</label>
+                  <input type="text" id="token-expiration" name="security.tokenExpiration" placeholder="e.g., 8h, 30d, 1y" />
+                  <span class="form-help">Examples: 8h (hours), 30d (days), 1y (year).</span>
                 </div>
                 <button type="submit" class="button primary">
                   Save Settings
@@ -411,7 +443,7 @@
                     id="enable-auto-renewal"
                     name="enableAutoRenewalJob"
                   />
-                  <label for="enable-auto-renewal">Enable Auto-Renewal</label>
+                  <label for="enable-auto-renewal">Enable Auto-Renewal Job</label>
                 </div>
                 <div class="form-group">
                   <label for="renewal-schedule">Renewal Schedule (cron)</label>
@@ -426,7 +458,7 @@
                   >
                 </div>
                 <div class="form-group">
-                  <label for="renew-days">Days Before Expiry</label>
+                  <label for="renew-days">Renew Days Before Expiry</label>
                   <input
                     type="number"
                     id="renew-days"
@@ -442,7 +474,7 @@
                     name="enableFileWatch"
                   />
                   <label for="enable-file-watch"
-                    >Watch for Certificate Changes</label
+                    >Watch for External Certificate Changes</label
                   >
                 </div>
 
@@ -459,6 +491,19 @@
                     >When enabled, idle domains and IPs will be included in
                     renewed certificates</span
                   >
+                </div>
+                <h4>Default Certificate Validity Periods (days)</h4>
+                <div class="form-group">
+                  <label for="validity-root-ca">Root CA</label>
+                  <input type="number" id="validity-root-ca" name="caValidityPeriod.rootCA" min="1" />
+                </div>
+                <div class="form-group">
+                  <label for="validity-intermediate-ca">Intermediate CA</label>
+                  <input type="number" id="validity-intermediate-ca" name="caValidityPeriod.intermediateCA" min="1" />
+                </div>
+                <div class="form-group">
+                  <label for="validity-standard-cert">Standard Certificate</label>
+                  <input type="number" id="validity-standard-cert" name="caValidityPeriod.standard" min="1" />
                 </div>
                 <button type="submit" class="button primary">
                   Save Settings
@@ -1418,7 +1463,7 @@
     <script src="/js/utils/ui-utils.js"></script>
     <script src="/js/utils/docker-utils.js"></script>
     <script src="/js/modules/logger.js"></script>
-    <script src="/js/logs.js"></script>
+    <script src="/js/logs-viewer.js"></script>
     <script src="/js/settings-ui.js"></script>
     <script src="/js/file-browser.js"></script>
     <script src="/js/deployment-actions-sortable.js"></script>

@@ -756,11 +756,16 @@ function initSettingsRouter(services) {
 
         // Extract renewal-related settings
         const renewalSettings = {
-        enableAutoRenewalJob: settings.enableAutoRenewalJob || false,
+        enableAutoRenewalJob: settings.enableAutoRenewalJob !== undefined ? settings.enableAutoRenewalJob : false,
         renewalSchedule: settings.renewalSchedule || '0 0 * * *',
         renewDaysBeforeExpiry: settings.renewDaysBeforeExpiry || 30,
-        enableFileWatch: settings.enableFileWatch || false,
-        includeIdleDomainsOnRenewal: settings.includeIdleDomainsOnRenewal !== false
+        enableFileWatch: settings.enableFileWatch !== undefined ? settings.enableFileWatch : false,
+        includeIdleDomainsOnRenewal: settings.includeIdleDomainsOnRenewal !== undefined ? settings.includeIdleDomainsOnRenewal : true,
+        caValidityPeriod: settings.caValidityPeriod || { // Added
+            rootCA: 3650,
+            intermediateCA: 1825,
+            standard: 90
+        }
         };
 
         res.json(renewalSettings);
@@ -814,7 +819,12 @@ function initSettingsRouter(services) {
         renewalSchedule: renewalSettings.renewalSchedule || '0 0 * * *',
         renewDaysBeforeExpiry: renewalSettings.renewDaysBeforeExpiry || 30,
         enableFileWatch: renewalSettings.enableFileWatch,
-        includeIdleDomainsOnRenewal: renewalSettings.includeIdleDomainsOnRenewal
+        includeIdleDomainsOnRenewal: renewalSettings.includeIdleDomainsOnRenewal,
+        caValidityPeriod: renewalSettings.caValidityPeriod || currentSettings.caValidityPeriod || { // Added
+            rootCA: 3650,
+            intermediateCA: 1825,
+            standard: 90
+          }
         };
 
         // Save settings
@@ -832,9 +842,9 @@ function initSettingsRouter(services) {
         // Update renewal service settings
         renewalService.options.disableRenewalCron = !updatedSettings.enableAutoRenewalJob;
         renewalService.options.renewalSchedule = updatedSettings.renewalSchedule;
-        renewalService.options.renewDaysBeforeExpiry = updatedSettings.renewDaysBeforeExpiry;
+        renewalService.options.renewDaysBeforeExpiry = updatedSettings.renewDaysBeforeExpiry; // This was missing from original renewalService update
         renewalService.options.enableWatcher = updatedSettings.enableFileWatch;
-        renewalService.options.includeIdleDomainsOnRenewal = updatedSettings.includeIdleDomainsOnRenewal;
+        renewalService.options.includeIdleDomainsOnRenewal = updatedSettings.includeIdleDomainsOnRenewal; // This was missing
 
         // Apply schedule changes
         if (!renewalService.options.disableRenewalCron) {
@@ -858,12 +868,13 @@ function initSettingsRouter(services) {
         res.json({
         success: true,
         message: 'Renewal settings updated successfully',
-        settings: {
+        settings: { // Return the updated subset
             enableAutoRenewalJob: updatedSettings.enableAutoRenewalJob,
             renewalSchedule: updatedSettings.renewalSchedule,
             renewDaysBeforeExpiry: updatedSettings.renewDaysBeforeExpiry,
             enableFileWatch: updatedSettings.enableFileWatch,
-            includeIdleDomainsOnRenewal: updatedSettings.includeIdleDomainsOnRenewal
+            includeIdleDomainsOnRenewal: updatedSettings.includeIdleDomainsOnRenewal,
+            caValidityPeriod: updatedSettings.caValidityPeriod // Added
         }
         });
     } catch (error) {

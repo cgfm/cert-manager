@@ -46,7 +46,7 @@ class ActivityService {
       try {
         await fs.access(this.activitiesFile);
       } catch (err) {
-        logger.info('Activities file not found, creating new file', null, FILENAME);
+        logger.info(`Activities file not found, creating new file ${this.activitiesFile}.`, null, FILENAME);
         await fs.mkdir(path.dirname(this.activitiesFile), { recursive: true });
         await fs.writeFile(this.activitiesFile, JSON.stringify([], null, 2));
         this.activities = [];
@@ -57,9 +57,9 @@ class ActivityService {
       const activitiesData = await fs.readFile(this.activitiesFile, 'utf8');
       this.activities = JSON.parse(activitiesData);
       
-      logger.debug(`Loaded ${this.activities.length} activities from file`, null, FILENAME);
+      logger.debug(`Loaded ${this.activities.length} activities from file ${this.activitiesFile}.`, null, FILENAME);
     } catch (error) {
-      logger.error('Error loading activities from file', { error: error.message }, FILENAME);
+      logger.error(`Error loading activities from file ${this.activitiesFile}.`, { error: error.message }, FILENAME);
       this.activities = [];
       throw error;
     }

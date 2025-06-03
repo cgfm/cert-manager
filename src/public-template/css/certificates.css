@@ -358,65 +358,6 @@ body[data-theme="dark"] .hierarchy-cert-item:hover {
     border-color: var(--primary-color, #0078d4);
 }
 
-/* Certificate version history styles */
-.history-section {
-    padding: 0 0 20px 0;
-}
-
-.history-list {
-    margin-top: 15px;
-}
-
-.history-item {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    margin-bottom: 12px;
-    transition: all 0.2s ease;
-}
-
-.history-item:hover {
-    border-color: var(--primary-color-light);
-}
-
-.history-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 15px;
-    border-bottom: 1px solid var(--border-color);
-    cursor: pointer;
-}
-
-.history-item-title {
-    display: flex;
-    align-items: center;
-    font-weight: 500;
-}
-
-.version-badge {
-    background-color: var(--primary-color);
-    color: white;
-    font-size: 0.8rem;
-    padding: 2px 6px;
-    border-radius: 10px;
-    margin-right: 8px;
-}
-
-.version-fingerprint {
-    color: var(--text-muted);
-    font-family: monospace;
-}
-
-.history-item-details {
-    padding: 12px 15px;
-}
-
-.history-item-detail {
-    display: flex;
-    margin-bottom: 8px;
-}
-
 .detail-label {
     width: 100px;
     color: var(--text-muted);
@@ -435,12 +376,6 @@ body[data-theme="dark"] .hierarchy-cert-item:hover {
     font-size: 0.8rem;
     padding: 2px 6px;
     border-radius: 4px;
-}
-
-.history-item-files {
-    margin-top: 10px;
-    border-top: 1px dashed var(--border-color);
-    padding-top: 10px;
 }
 
 .archived-files-list {
@@ -502,7 +437,129 @@ body[data-theme="dark"] .hierarchy-cert-item:hover {
     justify-content: center;
 }
 
-.empty-history-message {
+/* Snapshots Tab Styles */
+.snapshots-section {
+  padding: 0 0 20px 0;
+}
+
+.snapshots-tree-container {
+  margin-top: 15px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  padding: 10px;
+  background-color: var(--card-bg, #fff);
+}
+
+.snapshot-tree {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.snapshot-version-node,
+.snapshot-backup-node {
+  margin-bottom: 5px;
+  padding-left: 20px; /* Indentation for tree structure */
+  position: relative;
+}
+
+.snapshot-version-node > .snapshot-node-header {
+  cursor: pointer;
+  padding: 8px 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.snapshot-version-node > .snapshot-node-header:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+.snapshot-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.snapshot-toggle-icon {
+  width: 16px;
+  text-align: center;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.snapshot-toggle-icon i.fa-caret-down {
+  transform: rotate(0deg); /* Ensure it points down when expanded */
+}
+
+.snapshot-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.version-icon i {
+  color: var(--primary-color, #007bff);
+}
+
+.backup-icon i {
+  color: var(--secondary-color, #6c757d); /* Or a different color for backups */
+}
+
+.snapshot-label {
+  font-weight: 500;
+}
+
+.snapshot-date,
+.snapshot-description {
+  color: var(--text-muted, #6c757d);
+  font-size: 0.85rem;
+  margin-left: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px; /* Adjust as needed */
+}
+.snapshot-description {
+    flex-grow: 1;
+}
+
+
+.snapshot-actions {
+  margin-left: auto; /* Pushes actions to the right */
+  display: flex;
+  gap: 5px;
+}
+
+.snapshot-backup-list {
+  list-style: none;
+  padding-left: 25px; /* Further indent backups */
+  margin-top: 5px;
+  border-left: 1px dashed var(--border-color-light, #ccc);
+}
+
+.snapshot-backup-list.hidden {
+  display: none;
+}
+
+.snapshot-backup-node .snapshot-node-header {
+  padding: 6px 5px;
+  border-bottom: 1px solid var(--border-color-lighter, #eee);
+}
+.snapshot-backup-node:last-child .snapshot-node-header {
+  border-bottom: none;
+}
+
+
+.snapshot-no-backups-message,
+.snapshot-no-versions {
+  padding: 10px 20px;
+  color: var(--text-muted, #6c757d);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.empty-snapshots-message {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -511,10 +568,42 @@ body[data-theme="dark"] .hierarchy-cert-item:hover {
     color: var(--text-muted);
 }
 
-.empty-history-message i {
+.empty-snapshots-message i {
     font-size: 2rem;
     margin-bottom: 15px;
     color: var(--text-subtle);
+}
+
+/* Dark mode adjustments for snapshots tree */
+body[data-theme="dark"] .snapshots-tree-container {
+  border-color: var(--border-color-dark, #444);
+  background-color: var(--card-bg-dark, #2c2c2c);
+}
+
+body[data-theme="dark"] .snapshot-version-node > .snapshot-node-header:hover {
+  background-color: var(--hover-bg-dark, #383838);
+}
+
+body[data-theme="dark"] .snapshot-toggle-icon {
+  color: var(--text-muted-dark, #aaa);
+}
+
+body[data-theme="dark"] .snapshot-date,
+body[data-theme="dark"] .snapshot-description {
+  color: var(--text-muted-dark, #aaa);
+}
+
+body[data-theme="dark"] .snapshot-backup-list {
+  border-left-color: var(--border-color-light-dark, #555);
+}
+
+body[data-theme="dark"] .snapshot-backup-node .snapshot-node-header {
+  border-bottom-color: var(--border-color-lighter-dark, #3a3a3a);
+}
+
+body[data-theme="dark"] .snapshot-no-backups-message,
+body[data-theme="dark"] .snapshot-no-versions {
+  color: var(--text-muted-dark, #aaa);
 }
 
 /* Passphrase modal styling */

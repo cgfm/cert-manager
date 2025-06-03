@@ -73,7 +73,7 @@ function initSetupRouter(deps) {
       }
       
       // Validate config
-      if (!config || !config.certPath) {
+      if (!config || !config.certsDir) {
         return res.status(400).json({
           success: false,
           message: 'Missing required configuration'
@@ -95,7 +95,7 @@ function initSetupRouter(deps) {
       
       // Create new settings object
       const newSettings = {
-        certPath: config.certPath,
+        certsDir: config.certsDir,
         port: config.port || 3000,
         // Security settings
         security: {
@@ -125,13 +125,13 @@ function initSetupRouter(deps) {
       
       // Create cert directory if it doesn't exist
       try {
-        const certPath = config.certPath;
-        await fs.mkdir(certPath, { recursive: true });
-        logger.info('Created certificates directory', { path: certPath }, FILENAME);
+        const certsDir = config.certsDir;
+        await fs.mkdir(certsDir, { recursive: true });
+        logger.info('Created certificates directory', { path: certsDir }, FILENAME);
       } catch (error) {
         logger.warn('Error creating certificates directory', { 
           error: error.message, 
-          path: config.certPath 
+          path: config.certsDir 
         }, FILENAME);
       }
       
@@ -139,7 +139,7 @@ function initSetupRouter(deps) {
       if (activityService) {
         await activityService.recordSystemActivity('setup-complete', {
           username: admin.username,
-          certPath: config.certPath
+          certsDir: config.certsDir
         });
       }
       

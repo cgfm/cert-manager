@@ -6,10 +6,6 @@
  * @module api/routes/certificates
  * @requires express
  * @requires ../../services/logger
- * @requires ../../models/Certificate
- * @requires ../../services/OpenSSLWrapper
- * @requires ../../services/CertificateManager
- * @requires ../../services/PassphraseManager
  * @version 0.0.3
  * @author Christian Meiners
  * @license MIT
@@ -29,12 +25,12 @@ const FILENAME = 'api/routes/certificates.js';
  * Initialize the certificates router with dependencies
  * @param {Object} deps - Dependencies
  * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {OpenSSLWrapper} deps.openSSL - OpenSSL wrapper instance
+ * @param {cryptoServiceWrapper} deps.cryptoService - cryptoService wrapper instance
  * @returns {express.Router} Express router
  */
 function initCertificatesRouter(deps) {
   const router = express.Router();
-  const { certificateManager, openSSL } = deps;
+  const { certificateManager, cryptoService } = deps;
 
   // Get all certificates
   router.get('/', async (req, res) => {
@@ -184,7 +180,7 @@ function initCertificatesRouter(deps) {
       }
 
       // Update the configuration
-      const updateResult = await certificateManager.updateCertificateConfigAndSync(fingerprint, {
+      const updateResult = await certificateManager.updateCertificateConfig(fingerprint, {
         autoRenew,
         renewDaysBeforeExpiry,
         signWithCA,
@@ -245,7 +241,7 @@ function initCertificatesRouter(deps) {
       if (metadata !== undefined) updateData.metadata = metadata;
 
       // Update the certificate
-      const success = await certificateManager.updateCertificateConfigAndSync(fingerprint, updateData);
+      const success = await certificateManager.updateCertificateConfig(fingerprint, updateData);
 
       if (!success) {
         return res.status(500).json({
@@ -350,15 +346,30 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      // Get backups
-      const backups = await deps.certificateManager.getCertificateBackups(fingerprint);
+      // Get backups using the new method
+      const result = await deps.certificateManager.getCertificateSnapshots(fingerprint, 'backup');
 
-      // Format response
-      const formattedBackups = backups.map(backup => ({
+      if (!result.success) {
+        // Use the error message from the result if available
+        const errorMessage = result.error || 'Failed to retrieve backup snapshots';
+        logger.error(`Error getting backups for certificate ${fingerprint}: ${errorMessage}`, null, FILENAME);
+        return res.status(500).json({
+          message: errorMessage,
+          statusCode: 500
+        });
+      }
+
+      // Format response - result.snapshots is an array of SnapshotEntry objects
+      // Ensure the properties match what BackupSnapshot schema expects (id, date, size, filename, description, etc.)
+      const formattedBackups = result.snapshots.map(backup => ({
         id: backup.id,
-        date: backup.date,
-        size: backup.size,
-        filename: backup.filename
+        date: backup.createdAt, // Assuming SnapshotEntry has createdAt
+        size: backup.size,      // Assuming SnapshotEntry has size
+        filename: backup.filename, // Assuming SnapshotEntry has filename
+        description: backup.description, // Assuming SnapshotEntry has description
+        sourceFingerprint: backup.sourceFingerprint, // Important for linking to versions
+        type: backup.type,
+        versionNumber: backup.versionNumber // If applicable to backups
       }));
 
       res.json(formattedBackups);
@@ -546,6 +557,268 @@ function initCertificatesRouter(deps) {
     }
   });
 
+  // Get certificate previous versions
+  router.get('/:fingerprint/history', async (req, res) => {
+    try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
+      const { fingerprint } = req.params;
+
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
+      }
+
+      // Get version snapshots using the new method
+      const result = await deps.certificateManager.getCertificateSnapshots(fingerprint, 'version');
+
+      if (!result.success) {
+        // Use the error message from the result if available
+        const errorMessage = result.error || 'Failed to retrieve version history';
+        logger.error(`Error getting certificate history for ${fingerprint}: ${errorMessage}`, null, FILENAME);
+        return res.status(500).json({
+          success: false,
+          message: errorMessage,
+          statusCode: 500
+        });
+      }
+
+      // Transform the array of version snapshots into an object keyed by snapshot ID,
+      // as expected by the frontend and OpenAPI spec for /history
+      const previousVersionsObject = {};
+      result.snapshots.forEach(snapshot => {
+        // Ensure the snapshot object matches the VersionSnapshot schema
+        previousVersionsObject[snapshot.id] = {
+          id: snapshot.id,
+          date: snapshot.createdAt, // Assuming SnapshotEntry has createdAt
+          description: snapshot.description,
+          type: snapshot.type,
+          source: snapshot.source,
+          versionNumber: snapshot.versionNumber, // Important for versions
+          sourceFingerprint: snapshot.sourceFingerprint, // Original fingerprint if different
+          // Add any other fields expected by VersionSnapshot schema
+        };
+      });
+
+      res.json({
+        success: true,
+        fingerprint,
+        certificate: certificate.name,
+        previousVersions: previousVersionsObject
+      });
+    } catch (error) {
+      logger.error(`Error getting certificate history for ${req.params.fingerprint}:`, error, FILENAME);
+      res.status(500).json({
+        success: false,
+        message: `Failed to get certificate history: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
+  // Download a previous version file
+  router.get('/:fingerprint/history/:previousFingerprint/files/:fileType', async (req, res) => {
+    try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
+      const { fingerprint, previousFingerprint, fileType } = req.params;
+
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
+      }
+
+      // Get the previous versions
+      const versions = certificate._previousVersions || {};
+      const previousVersion = versions[previousFingerprint];
+
+      if (!previousVersion) {
+        return res.status(404).json({
+          success: false,
+          message: `Previous version with fingerprint ${previousFingerprint} not found`,
+          statusCode: 404
+        });
+      }
+
+      // Find the requested file
+      const archivedFiles = previousVersion.archivedFiles || [];
+      const requestedFile = archivedFiles.find(file => file.type === fileType);
+
+      if (!requestedFile || !requestedFile.path || !fs.existsSync(requestedFile.path)) {
+        return res.status(404).json({
+          success: false,
+          message: `File ${fileType} not found in archived version ${previousVersion.version}`,
+          statusCode: 404
+        });
+      }
+
+      // Generate a safe filename
+      const safeName = certificate.name.replace(/[^\w.-]/g, '_');
+      const versionString = previousVersion.version ? `v${previousVersion.version}` : 'old';
+      const dateString = previousVersion.validFrom ?
+        new Date(previousVersion.validFrom).toISOString().split('T')[0] :
+        'unknown-date';
+
+      const downloadFilename = `${safeName}-${versionString}-${dateString}.${fileType}`;
+
+      // Set content type based on file type
+      const contentTypes = {
+        'crt': 'application/x-x509-ca-cert',
+        'key': 'application/pkcs8',
+        'pem': 'application/x-pem-file',
+        'p12': 'application/x-pkcs12',
+        'pfx': 'application/x-pkcs12',
+        'p7b': 'application/x-pkcs7-certificates',
+        'csr': 'application/pkcs10',
+        'chain': 'application/x-pem-file',
+        'fullchain': 'application/x-pem-file',
+        'default': 'application/octet-stream'
+      };
+
+      // Set response headers
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+      res.setHeader('Content-Type', contentTypes[fileType] || contentTypes.default);
+
+      // Stream the file
+      fs.createReadStream(requestedFile.path).pipe(res);
+    } catch (error) {
+      logger.error(`Error downloading previous version file for certificate ${req.params.fingerprint}:`, error, FILENAME);
+      res.status(500).json({
+        success: false,
+        message: `Failed to download file: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
+  // Download all files from a previous version as zip
+  router.get('/:fingerprint/history/:previousFingerprint/download', async (req, res) => {
+    try {
+      // Check if certificateManager is initialized
+      if (!certificateManager.isInitialized) {
+        return res.json({
+          certificates: [],
+          message: "Certificate manager is still initializing, please wait...",
+          initializing: true
+        });
+      }
+
+      const { fingerprint, previousFingerprint } = req.params;
+      const archiver = require('archiver');
+
+      // Get certificate
+      const certificate = deps.certificateManager.getCertificate(fingerprint);
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: `Certificate with fingerprint ${fingerprint} not found`,
+          statusCode: 404
+        });
+      }
+
+      // Get the previous versions
+      const versions = certificate._previousVersions || {};
+      const previousVersion = versions[previousFingerprint];
+
+      if (!previousVersion) {
+        return res.status(404).json({
+          success: false,
+          message: `Previous version with fingerprint ${previousFingerprint} not found`,
+          statusCode: 404
+        });
+      }
+
+      // Check if there are any archived files
+      const archivedFiles = previousVersion.archivedFiles || [];
+      if (archivedFiles.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `No archived files found for previous version ${previousVersion.version}`,
+          statusCode: 404
+        });
+      }
+
+      // Generate a safe filename
+      const safeName = certificate.name.replace(/[^\w.-]/g, '_');
+      const versionString = previousVersion.version ? `v${previousVersion.version}` : 'old';
+      const dateString = previousVersion.validFrom ?
+        new Date(previousVersion.validFrom).toISOString().split('T')[0] :
+        'unknown-date';
+
+      const downloadFilename = `${safeName}-${versionString}-${dateString}-archived.zip`;
+
+      // Set headers for ZIP download
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+      res.setHeader('Content-Type', 'application/zip');
+
+      // Create a ZIP archive
+      const archive = archiver('zip', {
+        zlib: { level: 9 } // Maximum compression
+      });
+
+      // Pipe the archive to the response
+      archive.pipe(res);
+
+      // Add each file to the archive with normalized names
+      for (const file of archivedFiles) {
+        if (file.path && fs.existsSync(file.path)) {
+          // Create a standardized name for the file in the zip
+          const archiveFileName = `${file.type}.${path.extname(file.path).substring(1)}`;
+          archive.file(file.path, { name: archiveFileName });
+        }
+      }
+
+      // Add metadata JSON
+      const metadata = {
+        name: certificate.name,
+        originalFingerprint: previousFingerprint,
+        subject: previousVersion.subject,
+        issuer: previousVersion.issuer,
+        validFrom: previousVersion.validFrom,
+        validTo: previousVersion.validTo,
+        version: previousVersion.version,
+        archivedAt: previousVersion.archivedAt,
+        exportedAt: new Date().toISOString()
+      };
+
+      archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
+
+      // Finalize the archive
+      archive.finalize();
+    } catch (error) {
+      logger.error(`Error creating ZIP archive for previous version of certificate ${req.params.fingerprint}:`, error, FILENAME);
+      res.status(500).json({
+        success: false,
+        message: `Failed to create ZIP archive: ${error.message}`,
+        statusCode: 500
+      });
+    }
+  });
+
   // Convert certificate to different format
   router.post('/:fingerprint/convert', async (req, res) => {
     try {
@@ -601,26 +874,26 @@ function initCertificatesRouter(deps) {
       // Use new Certificate structure - without Path suffixes
       const paths = certificate._paths || {};
       
-      // Use OpenSSLWrapper to convert certificate
+      // Use cryptoServiceWrapper to convert certificate
       let result;
       
       switch(format) {
         case 'p12':
         case 'pfx':
-          result = await deps.openSSL.convertToP12(certificate, {
+          result = await deps.cryptoService.convertToP12(certificate, {
             passphrase: password,
             outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.${format}`)
           });
           break;
           
         case 'pem':
-          result = await deps.openSSL.convertToPEM(certificate, {
+          result = await deps.cryptoService.convertToPEM(certificate, {
             outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.pem`)
           });
           break;
           
         default:
-          result = await deps.openSSL.convertCertificate(certificate, format, { 
+          result = await deps.cryptoService.convertCertificate(certificate, format, { 
             password,
             outputPath: path.join(path.dirname(paths.crt || ''), `${certificate.name}.${format}`)
           });
@@ -954,240 +1227,6 @@ function initCertificatesRouter(deps) {
     }
   });
 
-  // Get certificate previous versions
-  router.get('/:fingerprint/history', async (req, res) => {
-    try {
-      // Check if certificateManager is initialized
-      if (!certificateManager.isInitialized) {
-        return res.json({
-          certificates: [],
-          message: "Certificate manager is still initializing, please wait...",
-          initializing: true
-        });
-      }
-
-      const { fingerprint } = req.params;
-
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          success: false,
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-
-      // Get the previous versions
-      const previousVersions = certificate.getPreviousVersions();
-
-      res.json({
-        success: true,
-        fingerprint,
-        certificate: certificate.name,
-        previousVersions
-      });
-    } catch (error) {
-      logger.error(`Error getting certificate history for ${req.params.fingerprint}:`, error, FILENAME);
-      res.status(500).json({
-        success: false,
-        message: `Failed to get certificate history: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Download a previous version file
-  router.get('/:fingerprint/history/:previousFingerprint/files/:fileType', async (req, res) => {
-    try {
-      // Check if certificateManager is initialized
-      if (!certificateManager.isInitialized) {
-        return res.json({
-          certificates: [],
-          message: "Certificate manager is still initializing, please wait...",
-          initializing: true
-        });
-      }
-
-      const { fingerprint, previousFingerprint, fileType } = req.params;
-
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          success: false,
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-
-      // Get the previous versions
-      const versions = certificate._previousVersions || {};
-      const previousVersion = versions[previousFingerprint];
-
-      if (!previousVersion) {
-        return res.status(404).json({
-          success: false,
-          message: `Previous version with fingerprint ${previousFingerprint} not found`,
-          statusCode: 404
-        });
-      }
-
-      // Find the requested file
-      const archivedFiles = previousVersion.archivedFiles || [];
-      const requestedFile = archivedFiles.find(file => file.type === fileType);
-
-      if (!requestedFile || !requestedFile.path || !fs.existsSync(requestedFile.path)) {
-        return res.status(404).json({
-          success: false,
-          message: `File ${fileType} not found in archived version ${previousVersion.version}`,
-          statusCode: 404
-        });
-      }
-
-      // Generate a safe filename
-      const safeName = certificate.name.replace(/[^\w.-]/g, '_');
-      const versionString = previousVersion.version ? `v${previousVersion.version}` : 'old';
-      const dateString = previousVersion.validFrom ?
-        new Date(previousVersion.validFrom).toISOString().split('T')[0] :
-        'unknown-date';
-
-      const downloadFilename = `${safeName}-${versionString}-${dateString}.${fileType}`;
-
-      // Set content type based on file type
-      const contentTypes = {
-        'crt': 'application/x-x509-ca-cert',
-        'key': 'application/pkcs8',
-        'pem': 'application/x-pem-file',
-        'p12': 'application/x-pkcs12',
-        'pfx': 'application/x-pkcs12',
-        'p7b': 'application/x-pkcs7-certificates',
-        'csr': 'application/pkcs10',
-        'chain': 'application/x-pem-file',
-        'fullchain': 'application/x-pem-file',
-        'default': 'application/octet-stream'
-      };
-
-      // Set response headers
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
-      res.setHeader('Content-Type', contentTypes[fileType] || contentTypes.default);
-
-      // Stream the file
-      fs.createReadStream(requestedFile.path).pipe(res);
-    } catch (error) {
-      logger.error(`Error downloading previous version file for certificate ${req.params.fingerprint}:`, error, FILENAME);
-      res.status(500).json({
-        success: false,
-        message: `Failed to download file: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
-  // Download all files from a previous version as zip
-  router.get('/:fingerprint/history/:previousFingerprint/download', async (req, res) => {
-    try {
-      // Check if certificateManager is initialized
-      if (!certificateManager.isInitialized) {
-        return res.json({
-          certificates: [],
-          message: "Certificate manager is still initializing, please wait...",
-          initializing: true
-        });
-      }
-
-      const { fingerprint, previousFingerprint } = req.params;
-      const archiver = require('archiver');
-
-      // Get certificate
-      const certificate = deps.certificateManager.getCertificate(fingerprint);
-      if (!certificate) {
-        return res.status(404).json({
-          success: false,
-          message: `Certificate with fingerprint ${fingerprint} not found`,
-          statusCode: 404
-        });
-      }
-
-      // Get the previous versions
-      const versions = certificate._previousVersions || {};
-      const previousVersion = versions[previousFingerprint];
-
-      if (!previousVersion) {
-        return res.status(404).json({
-          success: false,
-          message: `Previous version with fingerprint ${previousFingerprint} not found`,
-          statusCode: 404
-        });
-      }
-
-      // Check if there are any archived files
-      const archivedFiles = previousVersion.archivedFiles || [];
-      if (archivedFiles.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: `No archived files found for previous version ${previousVersion.version}`,
-          statusCode: 404
-        });
-      }
-
-      // Generate a safe filename
-      const safeName = certificate.name.replace(/[^\w.-]/g, '_');
-      const versionString = previousVersion.version ? `v${previousVersion.version}` : 'old';
-      const dateString = previousVersion.validFrom ?
-        new Date(previousVersion.validFrom).toISOString().split('T')[0] :
-        'unknown-date';
-
-      const downloadFilename = `${safeName}-${versionString}-${dateString}-archived.zip`;
-
-      // Set headers for ZIP download
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
-      res.setHeader('Content-Type', 'application/zip');
-
-      // Create a ZIP archive
-      const archive = archiver('zip', {
-        zlib: { level: 9 } // Maximum compression
-      });
-
-      // Pipe the archive to the response
-      archive.pipe(res);
-
-      // Add each file to the archive with normalized names
-      for (const file of archivedFiles) {
-        if (file.path && fs.existsSync(file.path)) {
-          // Create a standardized name for the file in the zip
-          const archiveFileName = `${file.type}.${path.extname(file.path).substring(1)}`;
-          archive.file(file.path, { name: archiveFileName });
-        }
-      }
-
-      // Add metadata JSON
-      const metadata = {
-        name: certificate.name,
-        originalFingerprint: previousFingerprint,
-        subject: previousVersion.subject,
-        issuer: previousVersion.issuer,
-        validFrom: previousVersion.validFrom,
-        validTo: previousVersion.validTo,
-        version: previousVersion.version,
-        archivedAt: previousVersion.archivedAt,
-        exportedAt: new Date().toISOString()
-      };
-
-      archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
-
-      // Finalize the archive
-      archive.finalize();
-    } catch (error) {
-      logger.error(`Error creating ZIP archive for previous version of certificate ${req.params.fingerprint}:`, error, FILENAME);
-      res.status(500).json({
-        success: false,
-        message: `Failed to create ZIP archive: ${error.message}`,
-        statusCode: 500
-      });
-    }
-  });
-
   // Renew certificate
   router.post('/:fingerprint/renew', async (req, res) => {
     try {
@@ -1345,7 +1384,7 @@ function initCertificatesRouter(deps) {
         });
       }
 
-      const matches = await openSSL.verifyCertificateKeyPair(certPath, keyPath);
+      const matches = await cryptoService.validateKeyPair(certPath, keyPath);
 
       res.json({ matches });
     } catch (error) {

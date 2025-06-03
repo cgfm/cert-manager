@@ -564,7 +564,7 @@ function processCertificateTemplate(template, certificate) {
     showCA: certificate.config?.signWithCA,
     keyType: String(keyType),
     keySize: String(keySize),
-    sigAlg: certificate.sigAlg || 'N/A',
+    signatureAlgorithm: certificate.signatureAlgorithm || 'N/A',
     description: description // Add description to template data
   };
 
@@ -709,6 +709,7 @@ function initializePassphraseManagement(certificate) {
     });
   }
 }
+
 /**
  * Show modal to store a certificate passphrase
  * @param {string} fingerprint - Certificate fingerprint
@@ -1117,8 +1118,8 @@ function loadTabContentIfNeeded(tabId, certificate) {
     case "deployment":
       loadCertificateDeploymentActions(certificate);
       break;
-    case "backups":
-      loadCertificateBackups(certificate);
+    case "snapshots":
+      loadSnapshotsTree(certificate.fingerprint);
       break;
     case "settings":
       initializeSettingsForm(certificate);
@@ -1137,8 +1138,7 @@ function loadCertificateTabData(certificate) {
     loadCertificateFiles(certificate);
     loadCertificateDomains(certificate);
     loadCertificateDeploymentActions(certificate);
-    loadCertificateBackups(certificate);
-    loadCertificateHistory(certificate.fingerprint);
+    loadSnapshotsTree(certificate.fingerprint);
     initializeSettingsForm(certificate);
   }, 100);
 }
@@ -1988,7 +1988,7 @@ function loadCertificateTabData(certificate) {
   loadDeploymentActions(certificate.fingerprint);
 
   // Load backups
-  loadCertificateBackups(certificate.fingerprint);
+  loadSnapshotsTree(certificate.fingerprint);
 
   // Initialize settings form
   initializeSettingsForm(certificate);
@@ -2943,162 +2943,430 @@ function renderCertificateDetailsModal(certificate) {
   });
 }
 
-/**
- * Load certificate backups
- * @param {string} fingerprint - Certificate fingerprint
- */
-function loadCertificateBackups(fingerprint) {
-  // Handle case where a full certificate object is passed
-  if (typeof fingerprint === "object" && fingerprint !== null) {
-    fingerprint = fingerprint.fingerprint;
-  }
 
-  // Ensure fingerprint is valid
-  if (!fingerprint) {
-    console.error("Invalid fingerprint provided to loadCertificateBackups");
+/**
+ * Loads and renders the snapshots tree (versions and their backups).
+ * @param {string} certificateFingerprint - The fingerprint of the current certificate.
+ */
+async function loadSnapshotsTree(certificateFingerprint) {
+  const container = document.getElementById("cert-snapshots-tree-container");
+  const emptyMessage = document.getElementById("empty-snapshots-message");
+  const createBackupBtn = document.getElementById("create-snapshot-backup-btn");
+
+  if (!container || !emptyMessage) {
+    Logger.error("Snapshots container or empty message element not found.");
     return;
   }
 
-  const container = document.getElementById("cert-backups-list");
-  if (!container) return;
+  if (createBackupBtn) {
+    // Ensure "Create Backup" button is linked correctly
+    createBackupBtn.onclick = () => createCertificateBackup(certificateFingerprint); // Uses existing createCertificateBackup
+  }
 
-  // Show loading spinner with message
-  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading backups...", "small");
+  UIUtils.showLoadingSpinner(container, "Loading snapshots...", "small");
+  emptyMessage.classList.add("hidden");
 
-  // Fetch backups with proper encoding
-  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+  try {
+    const encodedFingerprint = encodeAPIFingerprint(certificateFingerprint);
 
-  fetch(`/api/certificates/${encodedFingerprint}/backups`)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load backups: ${response.status}`);
+    // Fetch both version history and backups
+    const [historyResponse, backupsResponse] = await Promise.all([
+      fetch(`/api/certificates/${encodedFingerprint}/history`),
+      fetch(`/api/certificates/${encodedFingerprint}/backups`),
+    ]);
+
+    if (!historyResponse.ok) {
+      throw new Error(`Failed to load version history: ${historyResponse.status} ${historyResponse.statusText}`);
+    }
+    if (!backupsResponse.ok) {
+      throw new Error(`Failed to load backups: ${backupsResponse.status} ${backupsResponse.statusText}`);
+    }
+
+    const historyData = await historyResponse.json();
+    const backupsData = await backupsResponse.json(); // This is an array of BackupSnapshot
+
+    // The historyData.previousVersions is an object where keys are snapshot IDs
+    const versionsArray = historyData.success && historyData.previousVersions 
+      ? Object.values(historyData.previousVersions) 
+      : [];
+    
+    // Sort versions by versionNumber descending (newest first)
+    versionsArray.sort((a, b) => (b.versionNumber || 0) - (a.versionNumber || 0));
+
+    if (versionsArray.length === 0 && backupsData.length === 0) {
+      container.innerHTML = ''; // Clear spinner
+      emptyMessage.classList.remove("hidden");
+      return;
+    }
+
+    // Group backups by their sourceFingerprint (which is the version's ID)
+    const backupsByVersionId = {};
+    backupsData.forEach(backup => {
+      const versionId = backup.sourceFingerprint; // or backup.versionNumber if more reliable
+      if (!backupsByVersionId[versionId]) {
+        backupsByVersionId[versionId] = [];
       }
-      return response.json();
-    })
-    .then((backups) => {
-      // Remove the loading spinner
-      UIUtils.removeLoadingSpinner(loadingSpinner);
+      backupsByVersionId[versionId].push(backup);
+      // Sort backups by date descending (newest first)
+      backupsByVersionId[versionId].sort((a, b) => new Date(b.date) - new Date(a.date));
+    });
+    
+    // Also consider backups that might not have a direct version snapshot (e.g., backups of the current, unversioned state)
+    // For now, we'll only show backups linked to a version. This can be expanded.
 
-      if (!backups || backups.length === 0) {
-        container.innerHTML =
-          '<p class="empty-message">No backups available.</p>';
-        return;
-      }
+    let treeHtml = '<ul class="snapshot-tree">';
 
-      // Create HTML for backups list using safeTemplate
-      const backupsHtml = backups
-        .map((backup) => {
-          const date = new Date(backup.date);
-          const formattedDate = DateUtils.formatDateTime(date);
+    if (versionsArray.length === 0 && backupsData.length > 0) {
+        // Handle case where there are only backups (e.g. for the current version before any renewal)
+        // This might require a "Current Version" virtual node or listing them separately.
+        // For simplicity now, we'll note this edge case.
+        // Or, we can create a "Loose Backups" section if backups exist that don't map to a version.
+        // For now, focusing on versions having backups.
+        treeHtml += '<li class="snapshot-no-versions">No historical versions found. Backups for the current version might be listed if API supports it differently.</li>';
+    }
 
-          return UIUtils.safeTemplate(
-            `
-          <div class="backup-item">
-            <div class="backup-info">
-              <div class="backup-date">\${date|noEscape}</div>
-              <div class="backup-size">\${size|noEscape}</div>
-            </div>
-            <div class="backup-actions">
-              <button class="button small restore-backup-btn" data-id="\${id|attr}">Restore</button>
-              <button class="button small download-backup-btn" data-id="\${id|attr}">Download</button>
-              <button class="button small danger delete-backup-btn" data-id="\${id|attr}">Delete</button>
+
+    versionsArray.forEach(version => {
+      const versionDate = DateUtils.formatDateTime(new Date(version.date)); // 'date' is 'createdAt' from SnapshotBase
+      const associatedBackups = backupsByVersionId[version.id] || [];
+
+      treeHtml += `
+        <li class="snapshot-version-node">
+          <div class="snapshot-node-header version-header">
+            <span class="snapshot-toggle-icon"><i class="fas fa-caret-right"></i></span>
+            <span class="snapshot-icon version-icon"><i class="fas fa-code-branch"></i></span>
+            <span class="snapshot-label">Version ${version.versionNumber}</span>
+            <span class="snapshot-date">(Created: ${versionDate})</span>
+            <span class="snapshot-description">${UIUtils.escapeHTML(version.description || '')}</span>
+            <div class="snapshot-actions">
+              <button class="button small download-version-btn" title="Download all files for this version" data-version-id="${version.id}">
+                <i class="fas fa-download"></i> ZIP
+              </button>
+              <!-- Add other version-specific actions if any, e.g., view files -->
             </div>
           </div>
-        `,
-            {
-              date: formattedDate,
-              size: UIUtils.formatFileSize(backup.size),
-              id: backup.id,
-            }
-          );
-        })
-        .join("");
+          <ul class="snapshot-backup-list hidden">
+      `;
 
-      container.innerHTML = backupsHtml;
-
-      // Add event listeners
-      container.querySelectorAll(".restore-backup-btn").forEach((btn) => {
-        btn.addEventListener("click", function () {
-          const backupId = this.getAttribute("data-id");
-          restoreCertificateBackup(fingerprint, backupId);
+      if (associatedBackups.length > 0) {
+        associatedBackups.forEach(backup => {
+          const backupDate = DateUtils.formatDateTime(new Date(backup.date));
+          treeHtml += `
+            <li class="snapshot-backup-node">
+              <div class="snapshot-node-header backup-header">
+                <span class="snapshot-icon backup-icon"><i class="fas fa-archive"></i></span>
+                <span class="snapshot-label">Backup</span>
+                <span class="snapshot-date">(Created: ${backupDate})</span>
+                <span class="snapshot-description">${UIUtils.escapeHTML(backup.description || '')} - ${UIUtils.formatFileSize(backup.size)}</span>
+                <div class="snapshot-actions">
+                  <button class="button small restore-backup-btn" title="Restore this backup" data-backup-id="${backup.id}">
+                    <i class="fas fa-undo"></i> Restore
+                  </button>
+                  <button class="button small download-backup-btn" title="Download this backup" data-backup-id="${backup.id}">
+                    <i class="fas fa-download"></i> ZIP
+                  </button>
+                  <button class="button small danger delete-backup-btn" title="Delete this backup" data-backup-id="${backup.id}">
+                    <i class="fas fa-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
+            </li>
+          `;
         });
-      });
-
-      container.querySelectorAll(".download-backup-btn").forEach((btn) => {
-        btn.addEventListener("click", function () {
-          const backupId = this.getAttribute("data-id");
-          downloadCertificateBackup(fingerprint, backupId);
-        });
-      });
-
-      container.querySelectorAll(".delete-backup-btn").forEach((btn) => {
-        btn.addEventListener("click", function () {
-          const backupId = this.getAttribute("data-id");
-          deleteCertificateBackup(fingerprint, backupId);
-        });
-      });
-    })
-    .catch((error) => {
-      // Remove the loading spinner
-      UIUtils.removeLoadingSpinner(loadingSpinner);
-
-      console.error("Error loading backups:", error);
-      container.innerHTML = UIUtils.safeTemplate(
-        `
-        <p class="error-message">Failed to load backups: \${errorMessage}</p>
-      `,
-        {
-          errorMessage: UIUtils.sanitizeErrorMessage(error),
-        }
-      );
+      } else {
+        treeHtml += '<li class="snapshot-no-backups-message">No backups for this version.</li>';
+      }
+      treeHtml += `</ul></li>`; // Close snapshot-backup-list and snapshot-version-node
     });
+
+    treeHtml += '</ul>'; // Close snapshot-tree
+    container.innerHTML = treeHtml;
+
+    // Add event listeners
+    container.querySelectorAll('.snapshot-toggle-icon').forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const backupList = this.closest('.snapshot-version-node').querySelector('.snapshot-backup-list');
+        const icon = this.querySelector('i');
+        if (backupList) {
+          backupList.classList.toggle('hidden');
+          icon.classList.toggle('fa-caret-right');
+          icon.classList.toggle('fa-caret-down');
+        }
+      });
+    });
+
+    container.querySelectorAll('.download-version-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const versionId = this.getAttribute('data-version-id');
+        // Use the existing function for downloading version history ZIP
+        // The endpoint is /api/certificates/{fingerprint}/history/{snapshotId}/download
+        downloadCertificateVersion(certificateFingerprint, versionId); 
+      });
+    });
+
+    container.querySelectorAll('.restore-backup-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const backupId = this.getAttribute('data-backup-id');
+        restoreCertificateSnapshot(certificateFingerprint, backupId); // Existing function
+      });
+    });
+
+    container.querySelectorAll('.download-backup-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const backupId = this.getAttribute('data-backup-id');
+        downloadCertificateSnapshot(certificateFingerprint, backupId); // Existing function
+      });
+    });
+
+    container.querySelectorAll('.delete-backup-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const backupId = this.getAttribute('data-backup-id');
+        deleteCertificateSnapshot(certificateFingerprint, backupId); // Existing function
+      });
+    });
+
+  } catch (error) {
+    Logger.error("Error loading snapshots tree:", error);
+    container.innerHTML = UIUtils.safeTemplate(
+      `<p class="error-message">Failed to load snapshots: \${errorMessage}</p>`,
+      { errorMessage: UIUtils.sanitizeErrorMessage(error) }
+    );
+  }
 }
 
+
 /**
- * Create a certificate backup
+ * Create a certificate backup (now called from snapshot tab)
  * @param {string} fingerprint - Certificate fingerprint
+ * @param {string} [description] - Optional description for the backup
  */
-function createCertificateBackup(fingerprint) {
+function createCertificateBackup(fingerprint, description = null) { // Added description parameter
   if (!fingerprint) {
     const modal = document.getElementById("cert-details-modal");
     fingerprint = modal?.getAttribute("data-cert-id");
   }
 
   if (!fingerprint) {
-    UIUtils.showToast("Certificate ID is missing", "error");
+    UIUtils.showToast("Certificate ID is missing for backup creation.", "error");
     return;
   }
 
-  try {
-    UIUtils.showToast("Creating backup...", "info");
+  // Optionally, prompt for a description if not provided
+  // For now, we'll use the description if passed, or null.
+  // A more advanced version could open a small input modal for the description.
 
-    // Encode fingerprint for API use
-    const encodedFingerprint = encodeAPIFingerprint(fingerprint);
+  UIUtils.showToast("Creating backup...", "info");
+  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
 
-    fetch(`/api/certificates/${encodedFingerprint}/backups`, {
-      method: "POST",
-    })
-      .then(response => {
-        if (!response.ok) {
-          return response.text().then(text => {
-            throw new Error(`Failed to create backup: ${text}`);
-          });
-        }
-        return response.json();
-      })
-      .then(data => {
-        // Reload backups list
-        loadCertificateBackups(fingerprint);
-        UIUtils.showToast("Backup created successfully", "success");
-      })
-      .catch(error => {
-        UIUtils.showToast(`Error: ${error.message}`, "error");
-        Logger.error("Failed to create backup:", error);
-      });
-  } catch (error) {
-    UIUtils.showError(`Failed to create backup: ${error.message}`);
-    Logger.error("Error creating backup:", error);
+  const requestBody = {};
+  if (description !== null && description.trim() !== '') {
+    requestBody.description = description;
   }
+
+  fetch(`/api/certificates/${encodedFingerprint}/backups`, {
+    method: "POST",
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody) // Send description in body
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => { // Try to parse error JSON
+        throw new Error(err.message || `Failed to create backup: ${response.status}`);
+      }).catch(() => { // Fallback if error is not JSON
+        throw new Error(`Failed to create backup: ${response.status}`);
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    UIUtils.showToast(data.message || "Backup created successfully.", "success");
+    loadSnapshotsTree(fingerprint); // Reload the new snapshots tree
+  })
+  .catch(error => {
+    UIUtils.showToast(`Error creating backup: ${error.message}`, "error");
+    Logger.error("Failed to create backup:", error);
+  });
+}
+/**
+ * Restore a certificate from a specific backup snapshot.
+ * @param {string} certificateFingerprint - The fingerprint of the certificate.
+ * @param {string} backupId - The ID of the backup snapshot to restore.
+ */
+async function restoreCertificateSnapshot(certificateFingerprint, backupId) {
+  if (!certificateFingerprint || !backupId) {
+    UIUtils.showToast("Missing certificate or backup ID for restore.", "error");
+    Logger.error("restoreCertificateSnapshot: Missing fingerprint or backupId.");
+    return;
+  }
+
+  UIUtils.confirmDialog(
+    "Confirm Restore",
+    "Are you sure you want to restore this certificate from this backup? The current active certificate files will be overwritten.",
+    async () => {
+      UIUtils.showToast("Restoring backup...", "info");
+      const encodedFingerprint = encodeAPIFingerprint(certificateFingerprint);
+      const encodedBackupId = encodeURIComponent(backupId); // backupId might also need encoding if it can contain special chars
+
+      try {
+        const response = await fetch(`/api/certificates/${encodedFingerprint}/backups/${encodedBackupId}/restore`, {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json' // Though no body is sent, it's good practice
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+          throw new Error(errorData.message || `Failed to restore backup: ${response.status}`);
+        }
+
+        const result = await response.json();
+        UIUtils.showToast(result.message || "Certificate restored successfully from backup.", "success");
+        Logger.info(`Backup ${backupId} for certificate ${certificateFingerprint} restored.`);
+        
+        // Reload the main certificate list and the snapshots tree
+        // Also, if the details modal is open for this cert, refresh it.
+        if (typeof loadCertificates === 'function') {
+            await loadCertificates(true); // Force refresh of main list
+        }
+        loadSnapshotsTree(certificateFingerprint); // Refresh the snapshots tree
+        
+        // If current modal is for this cert, refresh its details (especially files tab)
+        const modal = document.getElementById("cert-details-modal");
+        const modalCertId = modal?.getAttribute("data-cert-id");
+        if (modalCertId === certificateFingerprint) {
+            showCertificateDetails(certificateFingerprint, 'files'); // Re-open to files tab or details
+        }
+
+      } catch (error) {
+        UIUtils.showToast(`Error restoring backup: ${error.message}`, "error");
+        Logger.error(`Failed to restore backup ${backupId} for cert ${certificateFingerprint}:`, error);
+      }
+    }
+  );
+}
+
+/**
+ * Download a specific backup snapshot as a ZIP archive.
+ * @param {string} certificateFingerprint - The fingerprint of the certificate.
+ * @param {string} backupId - The ID of the backup snapshot to download.
+ */
+function downloadCertificateSnapshot(certificateFingerprint, backupId) {
+  if (!certificateFingerprint || !backupId) {
+    UIUtils.showToast("Missing certificate or backup ID for download.", "error");
+    Logger.error("downloadCertificateSnapshot: Missing fingerprint or backupId.");
+    return;
+  }
+
+  UIUtils.showToast("Preparing backup download...", "info");
+  const encodedFingerprint = encodeAPIFingerprint(certificateFingerprint);
+  const encodedBackupId = encodeURIComponent(backupId);
+
+  const downloadUrl = `/api/certificates/${encodedFingerprint}/backups/${encodedBackupId}/download`;
+
+  // Create a temporary link to trigger the download
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  // The browser will attempt to get the filename from Content-Disposition header
+  link.download = ''; // Let server suggest filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  Logger.info(`Download initiated for backup ${backupId} of certificate ${certificateFingerprint}.`);
+  // No need for success toast here as the browser handles the download dialog
+}
+
+/**
+ * Delete a specific backup snapshot.
+ * @param {string} certificateFingerprint - The fingerprint of the certificate.
+ * @param {string} backupId - The ID of the backup snapshot to delete.
+ */
+async function deleteCertificateSnapshot(certificateFingerprint, backupId) {
+  if (!certificateFingerprint || !backupId) {
+    UIUtils.showToast("Missing certificate or backup ID for deletion.", "error");
+    Logger.error("deleteCertificateSnapshot: Missing fingerprint or backupId.");
+    return;
+  }
+
+  UIUtils.confirmDialog(
+    "Confirm Delete Backup",
+    "Are you sure you want to permanently delete this backup? This action cannot be undone.",
+    async () => {
+      UIUtils.showToast("Deleting backup...", "info");
+      const encodedFingerprint = encodeAPIFingerprint(certificateFingerprint);
+      const encodedBackupId = encodeURIComponent(backupId);
+
+      try {
+        const response = await fetch(`/api/certificates/${encodedFingerprint}/backups/${encodedBackupId}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+          throw new Error(errorData.message || `Failed to delete backup: ${response.status}`);
+        }
+
+        const result = await response.json();
+        UIUtils.showToast(result.message || "Backup deleted successfully.", "success");
+        Logger.info(`Backup ${backupId} for certificate ${certificateFingerprint} deleted.`);
+        
+        // Reload the snapshots tree to reflect the deletion
+        loadSnapshotsTree(certificateFingerprint);
+
+      } catch (error) {
+        UIUtils.showToast(`Error deleting backup: ${error.message}`, "error");
+        Logger.error(`Failed to delete backup ${backupId} for cert ${certificateFingerprint}:`, error);
+      }
+    }
+  );
+}
+
+/**
+ * Download a specific version file
+ * @param {string} certFingerprint - Certificate fingerprint
+ * @param {string} versionFingerprint - Version fingerprint
+ * @param {string} fileType - File type to download
+ */
+function downloadVersionFile(certFingerprint, versionFingerprint, fileType) {
+  // Encode fingerprints for API use
+  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
+  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
+
+  // Create URL for file download
+  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/files/${fileType}`;
+
+  // Create and trigger download link
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = ''; // Browser will use the server's suggested filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Download a complete version archive
+ * @param {string} certFingerprint - Certificate fingerprint
+ * @param {string} versionFingerprint - Version fingerprint
+ */
+function downloadCertificateVersion(certFingerprint, versionFingerprint) {
+  // Encode fingerprints for API use
+  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
+  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
+
+  // Create URL for archive download
+  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/download`;
+
+  // Create and trigger download link
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = ''; // Browser will use the server's suggested filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 /**
@@ -4804,304 +5072,6 @@ async function deleteCAcertificate(fingerprint) {
     Logger.error(`Error deleting CA certificate: ${error.message}`, error);
     UIUtils.showError(error.message);
   }
-}
-
-/**
- * Load certificate version history
- * @param {string} fingerprint - Certificate fingerprint
- */
-function loadCertificateHistory(fingerprint) {
-  // Handle case where a full certificate object is passed
-  if (typeof fingerprint === "object" && fingerprint !== null) {
-    fingerprint = fingerprint.fingerprint;
-  }
-
-  // Ensure fingerprint is valid
-  if (!fingerprint) {
-    Logger.error("Cannot load certificate history: missing fingerprint");
-    return;
-  }
-
-  const container = document.getElementById("cert-history-list");
-  const emptyMessage = document.getElementById("empty-history-message");
-
-  if (!container) {
-    return;
-  }
-
-  // Show loading spinner with message
-  const loadingSpinner = UIUtils.showLoadingSpinner(container, "Loading version history...", "small");
-
-  // Fetch history with proper encoding
-  const encodedFingerprint = encodeAPIFingerprint(fingerprint);
-
-  fetch(`/api/certificates/${encodedFingerprint}/history`)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load certificate history: ${response.status} ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      // Remove loading spinner
-      UIUtils.removeLoadingSpinner(loadingSpinner);
-
-      // Handle empty history
-      if (!data.previousVersions || data.previousVersions.length === 0) {
-        if (emptyMessage) {
-          emptyMessage.classList.remove('hidden');
-        }
-        container.innerHTML = '';
-        return;
-      }
-
-      // Hide empty message if we have versions
-      if (emptyMessage) {
-        emptyMessage.classList.add('hidden');
-      }
-
-      // Sort versions by version number (newest first)
-      const versions = data.previousVersions.sort((a, b) => (b.version || 0) - (a.version || 0));
-
-      // Create HTML for each version
-      let html = '<div class="history-list-content">';
-      versions.forEach((version) => {
-        // Format dates
-        const archivedDate = version.archivedAt ? new Date(version.archivedAt).toLocaleString() : 'Unknown';
-        const validFrom = version.validFrom ? new Date(version.validFrom).toLocaleString() : 'Unknown';
-        const validTo = version.validTo ? new Date(version.validTo).toLocaleString() : 'Unknown';
-
-        // Group archived files by type
-        const fileTypes = {};
-        if (version.archivedFiles && Array.isArray(version.archivedFiles)) {
-          version.archivedFiles.forEach(file => {
-            if (file.type) {
-              fileTypes[file.type] = true;
-            }
-          });
-        }
-
-        // Create file type badges
-        const fileTypeBadges = Object.keys(fileTypes).map(type =>
-          `<span class="file-type-badge" data-type="${type}">${type}</span>`
-        ).join('');
-
-        html += `
-          <div class="history-item" data-fingerprint="${version.fingerprint}">
-            <div class="history-item-header">
-              <div class="history-item-title">
-                <span class="version-badge">v${version.version || '?'}</span>
-                <span class="version-fingerprint" title="${version.fingerprint}">${version.fingerprint ? version.fingerprint.substring(0, 8) + '...' : 'Unknown'}</span>
-              </div>
-              <div class="history-item-actions">
-                <button class="button small download-version-btn" data-fingerprint="${version.fingerprint}">
-                  <i class="fas fa-download"></i> Download
-                </button>
-              </div>
-            </div>
-            <div class="history-item-details">
-              <div class="history-item-detail">
-                <span class="detail-label">Archived:</span>
-                <span class="detail-value">${archivedDate}</span>
-              </div>
-              <div class="history-item-detail">
-                <span class="detail-label">Valid period:</span>
-                <span class="detail-value">${validFrom} to ${validTo}</span>
-              </div>
-              <div class="history-item-detail">
-                <span class="detail-label">Files:</span>
-                <span class="detail-value file-types-list">${fileTypeBadges || 'None'}</span>
-              </div>
-              <div class="history-item-files hidden">
-                <div class="file-list-loader">
-                  <div class="loading-spinner mini"></div>
-                  <span>Loading files...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      });
-      html += '</div>';
-
-      // Update the container
-      container.innerHTML = html;
-
-      // Add event listeners to download buttons
-      document.querySelectorAll('.download-version-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const versionFingerprint = btn.getAttribute('data-fingerprint');
-          downloadCertificateVersion(fingerprint, versionFingerprint);
-        });
-      });
-
-      // Add event listeners to expand/collapse version details
-      document.querySelectorAll('.history-item-header').forEach((header) => {
-        header.addEventListener('click', (event) => {
-          // Skip if clicking on the download button
-          if (event.target.closest('.download-version-btn')) {
-            return;
-          }
-
-          const historyItem = header.closest('.history-item');
-          const filesSection = historyItem.querySelector('.history-item-files');
-
-          // Toggle files section
-          if (filesSection.classList.contains('hidden')) {
-            // Load file details if needed
-            if (filesSection.querySelector('.file-list-loader')) {
-              // Get the version fingerprint
-              const versionFingerprint = historyItem.getAttribute('data-fingerprint');
-
-              // Show available files
-              loadVersionFiles(fingerprint, versionFingerprint, filesSection);
-            }
-
-            filesSection.classList.remove('hidden');
-          } else {
-            filesSection.classList.add('hidden');
-          }
-        });
-      });
-    })
-    .catch((error) => {
-      Logger.error('Error loading certificate history:', error);
-      UIUtils.removeLoadingSpinner(loadingSpinner);
-      container.innerHTML = `
-        <div class="error-state">
-          <p>Failed to load certificate history: ${error.message}</p>
-          <button class="button small retry-btn">Retry</button>
-        </div>
-      `;
-
-      // Add retry button handler
-      container.querySelector('.retry-btn')?.addEventListener('click', () => {
-        loadCertificateHistory(fingerprint);
-      });
-    });
-}
-
-/**
- * Load files for a specific version
- * @param {string} certFingerprint - Certificate fingerprint
- * @param {string} versionFingerprint - Version fingerprint
- * @param {HTMLElement} container - Container to render files in
- */
-function loadVersionFiles(certFingerprint, versionFingerprint, container) {
-  // Handle case where a certificate object is passed
-  if (typeof certFingerprint === "object" && certFingerprint !== null) {
-    certFingerprint = certFingerprint.fingerprint;
-  }
-
-  // Skip if no container or fingerprints
-  if (!container || !certFingerprint || !versionFingerprint) {
-    return;
-  }
-
-  // Show available files based on version data (from the history API)
-  const historyItem = container.closest('.history-item');
-  if (!historyItem) return;
-
-  const fileTypes = Array.from(historyItem.querySelectorAll('.file-type-badge'))
-    .map(badge => badge.getAttribute('data-type'))
-    .filter(Boolean);
-
-  // Create file list HTML
-  let filesHtml = '<div class="archived-files-list">';
-
-  if (fileTypes.length === 0) {
-    filesHtml += '<div class="no-files-message">No archived files available</div>';
-  } else {
-    filesHtml += '<div class="file-grid">';
-    fileTypes.forEach(fileType => {
-      filesHtml += `
-        <div class="file-item">
-          <div class="file-icon"><i class="fas fa-file-certificate"></i></div>
-          <div class="file-info">
-            <div class="file-name">${fileType}</div>
-          </div>
-          <button class="file-action-btn" data-file-type="${fileType}">
-            <i class="fas fa-download"></i>
-          </button>
-        </div>
-      `;
-    });
-    filesHtml += '</div>';
-
-    // Add download all button
-    filesHtml += `
-      <div class="download-all-section">
-        <button class="button small download-all-btn">
-          <i class="fas fa-download"></i> Download All Files
-        </button>
-      </div>
-    `;
-  }
-
-  filesHtml += '</div>';
-
-  // Update container
-  container.innerHTML = filesHtml;
-
-  // Add event listeners to file download buttons
-  container.querySelectorAll('.file-action-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const fileType = btn.getAttribute('data-file-type');
-      if (fileType) {
-        downloadVersionFile(certFingerprint, versionFingerprint, fileType);
-      }
-    });
-  });
-
-  // Add event listener to download all button
-  container.querySelector('.download-all-btn')?.addEventListener('click', () => {
-    downloadCertificateVersion(certFingerprint, versionFingerprint);
-  });
-}
-
-/**
- * Download a specific version file
- * @param {string} certFingerprint - Certificate fingerprint
- * @param {string} versionFingerprint - Version fingerprint
- * @param {string} fileType - File type to download
- */
-function downloadVersionFile(certFingerprint, versionFingerprint, fileType) {
-  // Encode fingerprints for API use
-  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
-  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
-
-  // Create URL for file download
-  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/files/${fileType}`;
-
-  // Create and trigger download link
-  const link = document.createElement('a');
-  link.href = downloadUrl;
-  link.download = ''; // Browser will use the server's suggested filename
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Download a complete version archive
- * @param {string} certFingerprint - Certificate fingerprint
- * @param {string} versionFingerprint - Version fingerprint
- */
-function downloadCertificateVersion(certFingerprint, versionFingerprint) {
-  // Encode fingerprints for API use
-  const encodedCertFingerprint = encodeAPIFingerprint(certFingerprint);
-  const encodedVersionFingerprint = encodeAPIFingerprint(versionFingerprint);
-
-  // Create URL for archive download
-  const downloadUrl = `/api/certificates/${encodedCertFingerprint}/history/${encodedVersionFingerprint}/download`;
-
-  // Create and trigger download link
-  const link = document.createElement('a');
-  link.href = downloadUrl;
-  link.download = ''; // Browser will use the server's suggested filename
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
 
 // Export functions for global scope

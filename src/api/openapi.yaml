@@ -500,9 +500,9 @@ paths:
                 config:
                   type: object
                   required:
-                    - certPath
+                    - certsDir
                   properties:
-                    certPath:
+                    certsDir:
                       type: string
                       description: Path to store certificates
                     port:
@@ -853,6 +853,7 @@ paths:
   /certificates/{fingerprint}/backups:
     get:
       summary: Get all backups for a certificate
+      description: Retrieves a list of all 'backup' type snapshots for the specified certificate.
       operationId: getCertificateBackups
       tags:
         - certificates
@@ -861,25 +862,33 @@ paths:
         - name: fingerprint
           in: path
           required: true
+          description: Fingerprint of the certificate.
           schema:
             type: string
       responses:
         "200":
-          description: List of backups
+          description: List of backup snapshots.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Backup"
+                  $ref: "#/components/schemas/BackupSnapshot" # Updated schema
         "404":
-          description: Certificate not found
+          description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
     post:
       summary: Create a backup of a certificate
+      description: Creates a new 'backup' type snapshot for the specified certificate.
       operationId: createCertificateBackup
       tags:
         - certificates
@@ -888,11 +897,23 @@ paths:
         - name: fingerprint
           in: path
           required: true
+          description: Fingerprint of the certificate.
           schema:
             type: string
+      requestBody:
+        description: Optional description for the backup.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                  nullable: true
+                  description: A description for the backup.
       responses:
         "201":
-          description: Backup created
+          description: Backup snapshot created successfully.
           content:
             application/json:
               schema:
@@ -901,9 +922,15 @@ paths:
                   message:
                     type: string
                   backup:
-                    $ref: "#/components/schemas/Backup"
+                    $ref: "#/components/schemas/BackupSnapshot" # Updated schema
         "404":
-          description: Certificate not found
+          description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
           content:
             application/json:
               schema:
@@ -912,6 +939,7 @@ paths:
   /certificates/{fingerprint}/backups/{backupId}:
     delete:
       summary: Delete a backup
+      description: Deletes a specific 'backup' type snapshot by its ID.
       operationId: deleteCertificateBackup
       tags:
         - certificates
@@ -920,16 +948,18 @@ paths:
         - name: fingerprint
           in: path
           required: true
+          description: Fingerprint of the certificate.
           schema:
             type: string
-        - name: backupId
+        - name: backupId # This is the snapshotId
           in: path
           required: true
+          description: ID of the backup snapshot to delete.
           schema:
             type: string
       responses:
         "200":
-          description: Backup deleted
+          description: Backup snapshot deleted successfully.
           content:
             application/json:
               schema:
@@ -938,7 +968,13 @@ paths:
                   message:
                     type: string
         "404":
-          description: Certificate or backup not found
+          description: Certificate or backup snapshot not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
           content:
             application/json:
               schema:
@@ -947,6 +983,7 @@ paths:
   /certificates/{fingerprint}/backups/{backupId}/download:
     get:
       summary: Download a backup
+      description: Downloads the files of a specific 'backup' type snapshot as a ZIP archive.
       operationId: downloadCertificateBackup
       tags:
         - certificates
@@ -955,23 +992,31 @@ paths:
         - name: fingerprint
           in: path
           required: true
+          description: Fingerprint of the certificate.
           schema:
             type: string
-        - name: backupId
+        - name: backupId # This is the snapshotId
           in: path
           required: true
+          description: ID of the backup snapshot to download.
           schema:
             type: string
       responses:
         "200":
-          description: Backup file
+          description: Backup snapshot ZIP file.
           content:
             application/zip:
               schema:
                 type: string
                 format: binary
         "404":
-          description: Certificate or backup not found
+          description: Certificate or backup snapshot not found, or files are missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
           content:
             application/json:
               schema:
@@ -980,6 +1025,7 @@ paths:
   /certificates/{fingerprint}/backups/{backupId}/restore:
     post:
       summary: Restore a backup
+      description: Restores a certificate from a specific 'backup' type snapshot.
       operationId: restoreCertificateBackup
       tags:
         - certificates
@@ -988,16 +1034,18 @@ paths:
         - name: fingerprint
           in: path
           required: true
+          description: Fingerprint of the certificate.
           schema:
             type: string
-        - name: backupId
+        - name: backupId # This is the snapshotId
           in: path
           required: true
+          description: ID of the backup snapshot to restore from.
           schema:
             type: string
       responses:
         "200":
-          description: Backup restored
+          description: Backup snapshot restored successfully.
           content:
             application/json:
               schema:
@@ -1006,7 +1054,153 @@ paths:
                   message:
                     type: string
         "404":
-          description: Certificate or backup not found
+          description: Certificate or backup snapshot not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history:
+    get:
+      summary: Get certificate version history
+      description: Retrieves a list of all 'version' type snapshots for the specified certificate.
+      operationId: getCertificateHistory
+      tags:
+        - certificates
+        - history
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          description: Fingerprint of the certificate.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Certificate version history retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  fingerprint:
+                    type: string
+                    description: Current fingerprint of the certificate.
+                  certificate:
+                    type: string
+                    description: Current name of the certificate.
+                  previousVersions: # Renamed from historyItems for clarity
+                    type: object
+                    description: An object where keys are snapshot IDs and values are version snapshot details.
+                    additionalProperties:
+                      $ref: "#/components/schemas/VersionSnapshot" # Updated schema
+        "404":
+          description: Certificate not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history/{snapshotId}/files/{fileType}: # Renamed previousFingerprint to snapshotId
+    get:
+      summary: Download a file from a previous certificate version
+      description: Downloads a specific file from a 'version' type snapshot.
+      operationId: downloadPreviousVersionFile
+      tags:
+        - certificates
+        - history
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          description: Fingerprint of the certificate.
+          schema:
+            type: string
+        - name: snapshotId # Renamed from previousFingerprint
+          in: path
+          required: true
+          description: ID of the version snapshot.
+          schema:
+            type: string
+        - name: fileType
+          in: path
+          required: true
+          description: The type of file to download (e.g., crt, key, pem).
+          schema:
+            type: string
+            enum: [crt, key, pem, chain, fullchain, csr, p12, pfx, der, cer, ext] # Reflects common file types
+      responses:
+        "200":
+          description: File from the specified version snapshot.
+          content:
+            application/octet-stream: # Generic binary for various file types
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Certificate, version snapshot, or file not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /certificates/{fingerprint}/history/{snapshotId}/download: # Renamed previousFingerprint to snapshotId
+    get:
+      summary: Download all files from a previous certificate version as ZIP
+      description: Downloads all files of a specific 'version' type snapshot as a ZIP archive.
+      operationId: downloadPreviousVersionZip
+      tags:
+        - certificates
+        - history
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          description: Fingerprint of the certificate.
+          schema:
+            type: string
+        - name: snapshotId # Renamed from previousFingerprint
+          in: path
+          required: true
+          description: ID of the version snapshot to download.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ZIP archive containing all files from the specified version snapshot.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Certificate or version snapshot not found, or files are missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error.
           content:
             application/json:
               schema:
@@ -1622,92 +1816,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  /certificates/{fingerprint}/history:
-    get:
-      summary: Get certificate previous versions
-      operationId: getCertificateHistory
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Certificate history retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  fingerprint:
-                    type: string
-                  certificate:
-                    type: string
-                  previousVersions:
-                    type: object
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/files/{fileType}:
-    get:
-      summary: Download a file from a previous certificate version
-      operationId: downloadPreviousVersionFile
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: fileType
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: File from previous version
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-
-  /certificates/{fingerprint}/history/{previousFingerprint}/download:
-    get:
-      summary: Download all files from a previous certificate version as ZIP
-      operationId: downloadPreviousVersionZip
-      tags:
-        - certificates
-      parameters:
-        - name: fingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: previousFingerprint
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ZIP archive containing all files from previous version
-          content:
-            application/zip:
-              schema:
-                type: string
-                format: binary
 
   /certificates/{fingerprint}/passphrase:
     get:
@@ -3984,7 +4092,7 @@ components:
           type: integer
           description: Size of key in bits
           example: 2048
-        sigAlg:
+        signatureAlgorithm:
           type: string
           description: Signature algorithm
           example: "sha256WithRSAEncryption"
@@ -4043,6 +4151,76 @@ components:
           type: string
         statusCode:
           type: integer
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    SnapshotBase:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique ID of the snapshot.
+          example: "a1b2c3d4e5f67890abcdeffedcba0987"
+        date: # maps to SnapshotEntry.createdAt
+          type: string
+          format: date-time
+          description: Date and time the snapshot was created.
+        description:
+          type: string
+          nullable: true
+          description: Description of the snapshot.
+        trigger:
+          type: string
+          description: Trigger for the snapshot creation (e.g., manual, pre-renewal, initial-creation).
+          example: "manual"
+        versionNumber:
+          type: integer
+          description: The version number of the certificate this snapshot is associated with.
+        sourceFingerprint:
+          type: string
+          description: Fingerprint of the certificate at the time of the snapshot.
+          example: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+      required:
+        - id
+        - date
+        - versionNumber
+        - sourceFingerprint
+
+    BackupSnapshot: # Replaces the old Backup schema
+      description: Represents a backup snapshot of a certificate.
+      allOf:
+        - $ref: "#/components/schemas/SnapshotBase"
+        - type: object
+          properties:
+            size:
+              type: integer
+              format: int64
+              description: Approximate size of the backup in bytes.
+            filename:
+              type: string
+              description: Suggested filename for the downloadable backup archive.
+              example: "backup-mycert-a1b2c3d4e5f67890.zip"
+          required:
+            - size
+            - filename
+
+    VersionSnapshot:
+      description: Represents a version snapshot of a certificate for history.
+      allOf:
+        - $ref: "#/components/schemas/SnapshotBase"
+        - type: object
+          properties:
+            sourceCommonName:
+              type: string
+              nullable: true
+              description: Common Name of the certificate at the time of this version snapshot.
+            sourceValidTo:
+              type: string
+              format: date-time
+              nullable: true
+              description: Valid-to date of the certificate at the time of this version snapshot.
 
     RenewCertificateRequest:
       type: object
@@ -4476,7 +4654,7 @@ components:
     Settings:
       type: object
       properties:
-        certPath:
+        certsDir:
           type: string
         enableHttps:
           type: boolean
@@ -4488,7 +4666,7 @@ components:
         httpsKeyPath:
           type: string
           nullable: true
-        openSSLPath:
+        cryptoServicePath:
           type: string
         caValidityPeriod:
           type: object
@@ -4526,7 +4704,7 @@ components:
     SettingsUpdate:
       type: object
       properties:
-        certPath:
+        certsDir:
           type: string
         enableHttps:
           type: boolean
@@ -4536,7 +4714,7 @@ components:
           type: string
         httpsKeyPath:
           type: string
-        openSSLPath:
+        cryptoServicePath:
           type: string
         caValidityPeriod:
           type: object
@@ -4889,7 +5067,7 @@ components:
         keySize:
           type: integer
           description: Key size in bits
-        sigAlg:
+        signatureAlgorithm:
           type: string
           description: Signature algorithm
         archivedAt:

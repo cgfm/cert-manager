@@ -103,7 +103,7 @@
           <div class="form-group">
             <label for="cert-path">Certificate Directory</label>
             <div class="input-with-button">
-              <input type="text" id="cert-path" name="certPath" required>
+              <input type="text" id="cert-path" name="certsDir" required>
               <button type="button" class="browse-btn" data-target="cert-path">
                 <i class="fas fa-folder-open"></i>
               </button>
@@ -354,19 +354,19 @@
       configForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        const certPath = document.getElementById('cert-path').value.trim();
+        const certsDir = document.getElementById('cert-path').value.trim();
         const port = document.getElementById('port').value;
         const enableHttps = document.getElementById('enable-https').checked;
         
         // Validate form
-        if (!certPath || !port) {
+        if (!certsDir || !port) {
           showMessage('Please fill in all required fields', 'error');
           return;
         }
         
         // Store config data
         setupData.config = {
-          certPath,
+          certsDir,
           port: parseInt(port, 10),
           enableHttps
         };
@@ -385,7 +385,7 @@
         
         // Update summary
         document.getElementById('summary-username').textContent = setupData.admin.username;
-        document.getElementById('summary-cert-path').textContent = setupData.config.certPath;
+        document.getElementById('summary-cert-path').textContent = setupData.config.certsDir;
         document.getElementById('summary-port').textContent = setupData.config.port;
         
         // Move to next step

@@ -38,37 +38,60 @@ class ConfigService {
             logger.error(`Error creating config directory ${this.configDir}:`, error, FILENAME);
             // Fall back to a directory we know should be writable
             this.configDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-            logger.info(`Using fallback config directory: ${this.configDir}`, null, FILENAME);
+            logger.warn(`Using fallback config directory: ${this.configDir}`, null, FILENAME);
         }
 
         this.settingsPath = path.join(this.configDir, 'settings.json');
 
-        this.certPath = options.certPath ||
+        this.certsDir = options.certsDir ||
             process.env.CERT_PATH ||
             process.env.CERT_MANAGER_CERT_PATH ||
             '/certs';
 
         // Ensure certificate directory exists
         try {
-            if (!fs.existsSync(this.certPath)) {
-                fs.mkdirSync(this.certPath, { recursive: true });
-                logger.info(`Created certificates directory: ${this.certPath}`, null, FILENAME);
+            if (!fs.existsSync(this.certsDir)) {
+                fs.mkdirSync(this.certsDir, { recursive: true });
+                logger.info(`Created certificates directory: ${this.certsDir}`, null, FILENAME);
             }
         } catch (error) {
-            logger.error(`Error creating certificates directory ${this.certPath}:`, error, FILENAME);
+            logger.error(`Error creating certificates directory ${this.certsDir}:`, error, FILENAME);
             // Fall back to a directory we know should be writable
-            this.certPath = process.env.HOME || process.env.USERPROFILE || '/tmp';
-            logger.info(`Using fallback config directory: ${this.certPath}`, null, FILENAME);
+            this.certsDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+            logger.warn(`Using fallback config directory: ${this.certsDir}`, null, FILENAME);
         }
+
+        
+        this.archiveBaseDir = options.archiveBaseDir ||
+            process.env.ARCHIVE_BASEDIR ||
+            process.env.CERT_MANAGER_ARCHIVE_BASEDIR ||
+            path.join(this.configDir, 'archive');
+
+        // Ensure config directory exists
+        try {
+            if (!fs.existsSync(this.archiveBaseDir)) {
+                fs.mkdirSync(this.archiveBaseDir, { recursive: true });
+                logger.info(`Created archive base-directory: ${this.archiveBaseDir}`, null, FILENAME);
+            }
+        } catch (error) {
+            logger.error(`Error creating archive base-directory ${this.archiveBaseDir}:`, error, FILENAME);
+            // Fall back to a directory we know should be writable
+            this.archiveBaseDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+            logger.warn(`Using fallback archive base-directory: ${this.archiveBaseDir}`, null, FILENAME);
+        }
+
+        
         // Define default settings
         this.defaultSettings = {
             configDir: this.configDir,
-            certPath: this.certPath,
+            certsDir: this.certsDir,
+            archiveBaseDir: this.archiveBaseDir,
             enableHttps: false,
             httpsPort: 4443,
             httpsCertPath: null,
             httpsKeyPath: null,
-            openSSLPath: "openssl",
+            cryptoServicePath: "cryptoService",
+            cryptoBackend: 'node-forge', // NEW: 'node-forge', 'openssl', 'node-forge-fallback'
             caValidityPeriod: {
                 rootCA: 3650, // 10 years
                 intermediateCA: 1825, // 5 years
@@ -146,9 +169,10 @@ class ConfigService {
         this.effectiveSettings = { ...this.fileSettings };
 
         // Environment variable mapping - define mappings for special/complex cases
+        //TODO: this should be more dynamic, maybe use a config file or similar.At least it should be more complete.
         const envMappings = {
             'PORT': 'port',
-            'CERTS_DIR': 'certPath',
+            'CERTS_DIR': 'certsDir',
             'ENABLE_AUTO_RENEWAL': 'enableAutoRenewalJob',
             'ENABLE_FILE_WATCHER': 'enableFileWatch',
             'RENEWAL_SCHEDULE': 'renewalSchedule'

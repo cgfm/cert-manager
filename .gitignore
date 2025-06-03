@@ -13,7 +13,7 @@ build/
 .env
 .VS*/
 config/
-# Ignore everything in certs/
+notes/
 certs/
 dummyParent/
 nginxpm/

@@ -208,53 +208,91 @@ class LogsService {
             this.logger.warn('Empty or invalid content passed to parseLogContent', null, FILENAME);
             return [];
         }
-        
-        const lines = content.split('\n').filter(line => line.trim());
+
+        const lines = content.split('\n'); // Don't filter empty lines initially
         const logs = [];
         let currentEntry = null;
-        
-        // Enhanced regex that handles instance in parentheses
-        // Format: YYYY-MM-DD HH:mm:ss LEVEL [filename (instance)] message
-        // or the original format: YYYY-MM-DD HH:mm:ss LEVEL [filename] message
+        let metaLinesBuffer = [];
+        let parsingMetaForCurrentEntry = false;
+
         const logRegex = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+([A-Z]+)\s+\[([^\]()]+)(?:\s+\(([^)]+)\))?\]\s+(.+)$/i;
-        
+        const metaStartRegex = /^META:\s*(.*)$/; // Starts with META:, captures rest of line
+
+        const processMetaBuffer = () => {
+            if (currentEntry && parsingMetaForCurrentEntry && metaLinesBuffer.length > 0) {
+                const metaString = metaLinesBuffer.join('\n').trim();
+                if (metaString) {
+                    try {
+                        currentEntry.meta = JSON.parse(metaString);
+                    } catch (e) {
+                        // If parsing as JSON fails, store the raw string wrapped in an object
+                        // to conform to OpenAPI 'meta: type: object'.
+                        currentEntry.meta = { data: metaString };
+                        this.logger.fine(`META block for log (instance: ${currentEntry.instance || 'N/A'}) was not JSON, stored as {data: metaString}`, null, FILENAME);
+                    }
+                }
+            }
+            metaLinesBuffer = [];
+            parsingMetaForCurrentEntry = false;
+        };
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const match = logRegex.exec(line);
-            
-            if (match) {
-                // This is a new log entry
-                // Group 1: timestamp, 2: level, 3: filename, 4: instance (or undefined), 5: message
-                const [, timestamp, level, filename, instance, message] = match;
-                
+            const trimmedLine = line.trim();
+
+            // Skip genuinely empty lines if not in a meta block
+            if (!trimmedLine && !parsingMetaForCurrentEntry) {
+                continue;
+            }
+
+            const logMatch = logRegex.exec(trimmedLine);
+            // Try meta match only if not a log line. Use raw line for META: check to preserve leading spaces in JSON.
+            const metaMatch = !logMatch ? metaStartRegex.exec(line) : null; 
+
+            if (logMatch) { // This line is a new log entry
+                processMetaBuffer(); // Process any accumulated meta for the *previous* entry
+
+                const [, timestamp, level, filename, instance, message] = logMatch;
                 currentEntry = {
                     timestamp,
                     level: level.toLowerCase(),
-                    filename,
-                    instance: instance || null, // Add instance to the log structure
-                    message
+                    filename: filename.trim(),
+                    instance: instance ? instance.trim() : null,
+                    message: message.trim(), // Initial part of the message
+                    meta: null // Initialize meta, will be populated by processMetaBuffer
                 };
-                
                 logs.push(currentEntry);
-            } else if (currentEntry) {
-                // Continuation of previous log entry
-                currentEntry.message += '\n' + line;
-            } else if (i === 0) {
-                // First line doesn't match, possibly invalid log format
-                this.logger.warn(`First log line doesn't match expected format: ${line}`, null, FILENAME);
-                
-                logs.push({
-                    timestamp: new Date().toISOString(),
-                    level: 'warn',
-                    filename: 'logger',
-                    instance: null,
-                    message: `Unparseable log entry: ${line}`
-                });
+            } else if (currentEntry) { // This line is a continuation or meta for the currentEntry
+                if (metaMatch) { // This line starts a META block for currentEntry
+                    // If we were already parsing meta, it implies a new META block starts
+                    // before the old one was "terminated" by a new log line. Process the old one.
+                    if (parsingMetaForCurrentEntry) {
+                        processMetaBuffer();
+                    }
+                    parsingMetaForCurrentEntry = true;
+                    const metaContentOnFirstLine = metaMatch[1]; // Content after "META:"
+                    // If "META:" was on a line by itself, metaContentOnFirstLine will be empty.
+                    // If "META: {..." then metaContentOnFirstLine will be "{...".
+                    if (metaContentOnFirstLine.trim()) {
+                        metaLinesBuffer.push(metaContentOnFirstLine);
+                    }
+                } else if (parsingMetaForCurrentEntry) {
+                    // This line is part of an ongoing META block
+                    metaLinesBuffer.push(line); // Add the raw line to preserve formatting for JSON
+                } else {
+                    // This line is a continuation of the currentEntry's message
+                    // Append the raw line to preserve any intentional formatting
+                    currentEntry.message += '\n' + line;
+                }
+            } else if (trimmedLine) {
+                // This line is not a log entry and there's no currentEntry (e.g. file starts with META or garbage)
+                this.logger.warn(`Orphan log line (no current log context): "${trimmedLine}"`, null, FILENAME);
             }
         }
-        
-        // Return logs with newest first
-        return logs.reverse();
+
+        processMetaBuffer(); // Process meta for the very last log entry in the file
+
+        return logs.reverse(); // Newest first
     }
 }
 

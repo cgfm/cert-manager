@@ -491,15 +491,17 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
   logger.info(`Certificate signed by CA and saved to temp location: ${tempPaths.certPath}`, null, FILENAME, certName);
 }
 
+
+
   /**
    * Extract certificate information
    * @param {string} certPath - Path to certificate file
    * @param {string} [certName] - Certificate name for logging
-   * @returns {Promise<Object>} Certificate information
+   * @returns {Promise<Object>} Certificate information aligned with ForgeCryptoService
    */
   async getCertificateInfo(certPath, certName = null) {
     const instance = certName || path.basename(certPath, path.extname(certPath));
-    logger.debug(`Getting certificate info from: ${certPath}`, null, FILENAME, instance);
+    logger.debug(`Getting certificate info from: ${certPath} using OpenSSL`, null, FILENAME, instance);
 
     try {
       if (!fs.existsSync(certPath)) {
@@ -509,167 +511,189 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
 
       // Get text representation of certificate
       logger.finest(`Executing openssl x509 to read certificate: ${certPath}`, null, FILENAME, instance);
+      // Use -nameopt RFC2253 for a more standard DN output, though _formatDN in forge is different
+      // We will use the default OpenSSL output and rely on its typical structure.
       const certText = await this.execute(`openssl x509 -in "${certPath}" -text -noout`, instance);
 
-      // Extract subject
+      // --- Subject and Issuer ---
       const subjectMatch = certText.match(/Subject:\s*([^\n]+)/);
-      const subject = subjectMatch ? subjectMatch[1].trim() : null;
-      logger.fine(`Certificate subject: ${subject}`, null, FILENAME, instance);
+      const subjectString = subjectMatch ? subjectMatch[1].trim() : null;
+      logger.fine(`Certificate subject: ${subjectString}`, null, FILENAME, instance);
 
-      // Extract issuer
       const issuerMatch = certText.match(/Issuer:\s*([^\n]+)/);
-      const issuer = issuerMatch ? issuerMatch[1].trim() : null;
-      logger.fine(`Certificate issuer: ${issuer}`, null, FILENAME, instance);
+      const issuerString = issuerMatch ? issuerMatch[1].trim() : null;
+      logger.fine(`Certificate issuer: ${issuerString}`, null, FILENAME, instance);
 
-      // Determine if self-signed by comparing subject and issuer
-      const isSelfSigned = this._isSelfSigned(subject, issuer);
-      logger.fine(`Self-signed certificate: ${isSelfSigned}`, null, FILENAME, instance);
-
-      // Extract validity period
-      const validityMatch = certText.match(/Not Before:\s*([^\n]+)\s*Not After\s*:\s*([^\n]+)/);
-      let validFrom = null;
-      let validTo = null;
-
-      if (validityMatch) {
-        validFrom = new Date(validityMatch[1].trim());
-        validTo = new Date(validityMatch[2].trim());
-
-        logger.fine(`Certificate validity: ${validFrom.toISOString()} to ${validTo.toISOString()}`, null, FILENAME, instance);
-      }
-
-      // Extract CN from subject
-      const cnMatch = subject && subject.match(/CN\s*=\s*([^,]+)/i);
+      // --- Common Name (from Subject) ---
+      const cnMatch = subjectString && subjectString.match(/CN\s*=\s*([^,]+)/i);
       const commonName = cnMatch ? cnMatch[1].trim() : null;
       logger.fine(`Certificate CN: ${commonName}`, null, FILENAME, instance);
 
-      // Extract serial number
-      const serialMatch = certText.match(/Serial Number:\s*(?:.*\n\s*)?([0-9a-fA-F:]+)/);
-      const serialNumber = serialMatch ? serialMatch[1].replace(/:/g, '') : null;
+      // --- Issuer Common Name ---
+      const issuerCNMatch = issuerString && issuerString.match(/CN\s*=\s*([^,]+)/i);
+      const issuerCN = issuerCNMatch ? issuerCNMatch[1].trim() : null;
+      logger.fine(`Certificate Issuer CN: ${issuerCN}`, null, FILENAME, instance);
+      
+      // --- Self-Signed ---
+      // _isSelfSigned already normalizes and compares subject and issuer strings
+      const isSelfSigned = this._isSelfSigned(subjectString, issuerString);
+      logger.fine(`Self-signed certificate: ${isSelfSigned}`, null, FILENAME, instance);
+
+      // --- Validity Period ---
+      const validityMatch = certText.match(/Not Before:\s*([^\n]+)\s*Not After\s*:\s*([^\n]+)/);
+      let validFrom = null;
+      let validTo = null;
+      if (validityMatch) {
+        validFrom = new Date(validityMatch[1].trim());
+        validTo = new Date(validityMatch[2].trim());
+        logger.fine(`Certificate validity: ${validFrom.toISOString()} to ${validTo.toISOString()}`, null, FILENAME, instance);
+      }
+
+      // --- Serial Number ---
+      const serialMatch = certText.match(/Serial Number:\s*(?:.*\n\s*)?([0-9a-fA-F:]+)/i);
+      // OpenSSL might output "00:01:02..." or just "102...". Ensure it's a clean hex string.
+      let serialNumber = null;
+      if (serialMatch && serialMatch[1]) {
+        serialNumber = serialMatch[1].replace(/^00:/, '').replace(/:/g, '').toUpperCase();
+      }
       logger.fine(`Certificate serial number: ${serialNumber}`, null, FILENAME, instance);
 
-      // Extract key identifier (Subject Key Identifier)
-      const keyIdMatch = certText.match(/X509v3 Subject Key Identifier:\s*\n\s*([0-9A-F:]+)/i);
-      const keyId = keyIdMatch ? keyIdMatch[1].replace(/:/g, '') : null;
-      logger.fine(`Certificate key ID: ${keyId}`, null, FILENAME, instance);
+      // --- Key Identifier (Subject Key Identifier) ---
+      const subjectKeyIdentifierMatch = certText.match(/X509v3 Subject Key Identifier:\s*\n\s*([0-9A-F:]+)/i);
+      const subjectKeyIdentifier = subjectKeyIdentifierMatch ? subjectKeyIdentifierMatch[1].replace(/:/g, '').toUpperCase() : null;
+      logger.fine(`Certificate SKI: ${subjectKeyIdentifier}`, null, FILENAME, instance);
 
-      // Extract authority key identifier
+      // --- Authority Key Identifier (keyid part) ---
       const authKeyIdMatch = certText.match(/X509v3 Authority Key Identifier:\s*\n\s*([0-9A-F:]+)/i);
-      const authorityKeyId = authKeyIdMatch ? authKeyIdMatch[1].replace(/:/g, '').trim() : null;
-      logger.fine(`Certificate authority key ID: ${authorityKeyId}`, null, FILENAME, instance);
+      const authorityKeyIdentifier = authKeyIdMatch ? authKeyIdMatch[1].replace(/:/g, '').toUpperCase().trim() : null;
+      logger.fine(`Certificate AKI (keyid): ${authorityKeyIdentifier}`, null, FILENAME, instance);
 
-      // Extract signature algorithm
-      const sigAlgMatch = certText.match(/Signature Algorithm:\s*([^\n]+)/);
-      const sigAlg = sigAlgMatch ? sigAlgMatch[1].trim() : null;
-      logger.fine(`Certificate signature algorithm: ${sigAlg}`, null, FILENAME, instance);
+      // --- Signature Algorithm ---
+      const signatureAlgorithmMatch = certText.match(/Signature Algorithm:\s*([^\n]+)/);
+      const signatureAlgorithm = signatureAlgorithmMatch ? signatureAlgorithmMatch[1].trim() : null;
+      logger.fine(`Certificate signature algorithm: ${signatureAlgorithm}`, null, FILENAME, instance);
 
-      // Extract public key type and size
+      // --- Public Key Type and Size ---
       const keyTypeMatch = certText.match(/Public Key Algorithm:\s*([^\n]+)/);
-      const keyType = keyTypeMatch ? keyTypeMatch[1].trim() : null;
-      
+      let keyType = null; // RSA, EC, DSA
       let keySize = null;
+
+      if (keyTypeMatch) {
+        const pkAlgorithm = keyTypeMatch[1].trim().toLowerCase();
+        if (pkAlgorithm.includes('rsa')) keyType = 'RSA';
+        else if (pkAlgorithm.includes('ec') || pkAlgorithm.includes('elliptic curve')) keyType = 'EC';
+        else if (pkAlgorithm.includes('dsa')) keyType = 'DSA';
+      }
       
-      // RSA key size
       const rsaKeySizeMatch = certText.match(/Public-Key:\s*\((\d+)\s*bit\)/);
       if (rsaKeySizeMatch) {
         keySize = parseInt(rsaKeySizeMatch[1], 10);
-      } 
-      // EC key size
-      else {
-        const ecKeySizeMatch = certText.match(/ASN1 OID:\s*([^\n]+)/);
-        if (ecKeySizeMatch && ecKeySizeMatch[1].includes('secp')) {
-          const ecCurve = ecKeySizeMatch[1].trim();
-          // Extract bit size from common EC curves
-          if (ecCurve.includes('secp256')) {
-            keySize = 256;
-          } else if (ecCurve.includes('secp384')) {
-            keySize = 384;
-          } else if (ecCurve.includes('secp521')) {
-            keySize = 521;
-          }
+      } else {
+        // For EC, try to infer from curve name if present
+        const ecCurveMatch = certText.match(/(?:ASN1 OID:|NIST CURVE:)\s*([^\s\n]+)/i);
+        if (ecCurveMatch && ecCurveMatch[1]) {
+            const curve = ecCurveMatch[1].toLowerCase();
+            if (curve.includes('p-256') || curve.includes('secp256r1') || curve.includes('prime256v1')) keySize = 256;
+            else if (curve.includes('p-384') || curve.includes('secp384r1')) keySize = 384;
+            else if (curve.includes('p-521') || curve.includes('secp521r1')) keySize = 521;
         }
       }
-      
       logger.fine(`Certificate key type: ${keyType}, size: ${keySize}`, null, FILENAME, instance);
 
-      // Extract alternative names
-      const domains = [];
-      const ips = [];
-      
-      if(commonName) {
-        domains.push(commonName);
-      }
-
-      const sanMatch = certText.match(/X509v3 Subject Alternative Name:[^]*?(DNS:[^]*?)(?:\n\s*[A-Za-z]|\n\n)/);
-      if (sanMatch) {
-        const sanText = sanMatch[1].trim();
-        logger.finest(`Extracting SANs from certificate`, {sanText}, FILENAME, instance);
-
-        // Extract all DNS names
-        const dnsMatches = sanText.matchAll(/DNS:([^,\s]+)/g);
+      // --- Subject Alternative Names (SANs) ---
+      const sans = { domains: [], ips: [] };
+      // Regex to capture the whole SAN block more reliably
+      const sanBlockMatch = certText.match(/X509v3 Subject Alternative Name:\s*\n\s*([^\n]+(?:\n\s+[^\n]+)*)/i);
+      if (sanBlockMatch) {
+        const sanText = sanBlockMatch[1].replace(/\n\s*/g, ' '); // Normalize multi-line SANs
+        logger.finest(`Extracting SANs from SAN block: "${sanText}"`, null, FILENAME, instance);
+        
+        const dnsMatches = sanText.matchAll(/DNS:([^,]+)/g);
         for (const match of dnsMatches) {
-          domains.push(match[1].trim());
+          sans.domains.push(match[1].trim().toLowerCase());
         }
-        domains.sort();
-
-        // Extract all IP addresses
-        const ipMatches = sanText.matchAll(/IP Address:([^,\s]+)/g);
+        
+        const ipMatches = sanText.matchAll(/IP Address:([^,]+)/g);
         for (const match of ipMatches) {
-          ips.push(match[1].trim());
+          sans.ips.push(match[1].trim());
         }
-        ips.sort();
-
-        logger.fine(`Certificate SANs: ${domains.length} domains, ${ips.length} IPs`, null, FILENAME, instance);
-        logger.finest(`Certificate SANs: domains: ${domains.join(', ')}, IPs: ${ips.join(', ')}`, null, FILENAME, instance);
       }
-
-      // Extract CA information
-      const caMatch = certText.match(/X509v3 Basic Constraints:[^]*?CA:(TRUE|FALSE)/i);
+      // Add CN to domains if not already present (case-insensitive check)
+      if (commonName && !sans.domains.some(d => d === commonName.toLowerCase())) {
+        sans.domains.unshift(commonName.toLowerCase());
+      }
+      sans.domains = [...new Set(sans.domains)].sort(); // Unique, sorted
+      sans.ips.sort(); // Sorted
+      logger.fine(`Certificate SANs: ${sans.domains.length} domains, ${sans.ips.length} IPs`, null, FILENAME, instance);
+      logger.finest(`Domains: ${sans.domains.join(', ')}, IPs: ${sans.ips.join(', ')}`, null, FILENAME, instance);
+      
+      // --- CA Information ---
+      const caMatch = certText.match(/X509v3 Basic Constraints:(?:critical)?\s*\n\s*CA:(TRUE|FALSE)/i);
       const isCA = caMatch ? caMatch[1].toUpperCase() === 'TRUE' : false;
       logger.fine(`Certificate is CA: ${isCA}`, null, FILENAME, instance);
 
-      // Extract path length constraint if CA
-      let pathLengthConstraint = undefined;
+      let pathLenConstraint; // undefined if not present
       if (isCA) {
-        const pathLengthMatch = caMatch && certText.match(/pathlen:(\d+)/i);
+        const pathLengthMatch = certText.match(/pathlen:(\d+)/i);
         if (pathLengthMatch) {
-          pathLengthConstraint = parseInt(pathLengthMatch[1], 10);
-          logger.fine(`CA path length constraint: ${pathLengthConstraint}`, null, FILENAME, instance);
+          pathLenConstraint = parseInt(pathLengthMatch[1], 10);
+          logger.fine(`CA path length constraint: ${pathLenConstraint}`, null, FILENAME, instance);
         }
       }
+      const isRootCA = isCA && isSelfSigned; // A root CA is a self-signed CA
 
-      const isRootCA = isCA && !pathLengthConstraint;
-
-      // Get fingerprint (SHA-256)
-      const fingerprint = await this._getCertificateFingerprint(certPath, instance);
+      // --- Fingerprint (SHA-256) ---
+      const fingerprintSha256 = await this._getCertificateFingerprint(certPath, instance); // Already uppercase, no colons
       
-      // Build complete result object with all certificate information
-      let result = {
-        subject,
-        issuer,
-        commonName,
-        validFrom,
-        validTo,
-        isSelfSigned,
-        fingerprint,
-        isCA,
-        isRootCA,
-        pathLengthConstraint,
-        serialNumber,
-        keyId,
-        authorityKeyId,
-        keyType,
-        keySize,
-        sigAlg,
-        sans:{
-          domains: [...domains],
-          ips: [...ips]
+      // --- Original Encoding (Best Effort) ---
+      // OpenSSL's `x509 -in ... -text` handles both PEM and DER.
+      // We can't be certain of the original without trying to parse specifically.
+      // For now, we'll leave it null or assume PEM if it parsed.
+      // A more robust check would involve trying to read as PEM, then as DER.
+      let originalEncoding = null;
+      try {
+        const rawContent = await fsPromises.readFile(certPath, 'utf8');
+        if (rawContent.includes('-----BEGIN CERTIFICATE-----')) {
+            originalEncoding = 'PEM';
+        } else {
+            // Could be DER or corrupted PEM. If OpenSSL parsed it, it's valid.
+            // We could try a DER parse here with OpenSSL if needed, but for now, this is a basic check.
+            const stats = await fsPromises.stat(certPath);
+            if (stats.size > 0) { // Basic check if it's not empty
+                 // Assume DER if not clearly PEM and OpenSSL parsed it. This is a heuristic.
+                originalEncoding = 'DER'; // Could be wrong if it's PEM without headers/footers that OpenSSL still read.
+            }
         }
+      } catch (e) { /* ignore, originalEncoding remains null */ }
+      logger.fine(`Guessed original encoding: ${originalEncoding}`, null, FILENAME, instance);
+
+
+      const result = {
+        fingerprint: fingerprintSha256,
+        commonName: commonName,
+        subject: subjectString,
+        issuer: issuerString,
+        issuerCN: issuerCN,
+        validFrom: validFrom,
+        validTo: validTo,
+        serialNumber: serialNumber,
+        keyType: keyType,
+        keySize: keySize,
+        originalEncoding: originalEncoding,
+        signatureAlgorithm: signatureAlgorithm,
+        subjectKeyIdentifier: subjectKeyIdentifier,
+        authorityKeyIdentifier: authorityKeyIdentifier,
+        isCA: isCA,
+        pathLenConstraint: pathLenConstraint,
+        isSelfSigned: isSelfSigned,
+        isRootCA: isRootCA,
+        sans: sans
       };
-      logger.fine(`Got certificate info from ${certPath}`, result, FILENAME, instance);
+      logger.fine(`Got certificate info from ${certPath} using OpenSSL`, result, FILENAME, instance);
       return result;
     } catch (error) {
-      logger.error(`Failed to get certificate info from ${certPath}: ${error.message}`, error, FILENAME, instance);
-      throw new Error(`Failed to get certificate info: ${error.message}`);
+      logger.error(`Failed to get certificate info from ${certPath} using OpenSSL: ${error.message}`, error, FILENAME, instance);
+      throw new Error(`Failed to get certificate info with OpenSSL: ${error.message}`);
     }
   }
 
@@ -708,35 +732,37 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
    * @private
    */
   _isSelfSigned(subject, issuer) {
+    // Handle null or undefined inputs gracefully
+    if (subject === null || subject === undefined || issuer === null || issuer === undefined) {
+        logger.fine(`isSelfSigned check - Subject or Issuer is null/undefined. self-signed: false`, null, FILENAME);
+        return false;
+    }
     logger.fine(`isSelfSigned check - Comparing:`, null, FILENAME);
     logger.finest(`Subject: "${subject}"`, null, FILENAME);
     logger.finest(`Issuer:  "${issuer}"`, null, FILENAME);
 
-    // Direct string comparison first as most efficient check
     if (subject === issuer) {
       logger.fine(`Direct string comparison matched - self-signed: true`, null, FILENAME);
       return true;
     }
 
-    // We need to normalize the strings to handle cases where order or spacing might differ
     const normalizeString = (str) => {
       logger.finest(`Normalizing string: "${str}"`, null, FILENAME);
-      // Extract components
       const components = [];
-      const regex = /(C|ST|L|O|OU|CN)\s*=\s*([^,/]+)/gi;
+      // Regex to capture TYPE=Value pairs, attempting to handle quoted values that might contain commas.
+      // This is still a simplification and might not cover all edge cases of RFC 2253/4514 DNs.
+      const regex = /([a-zA-Z0-9.]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^,]+))(?:,|$)/g;
       let match;
 
-      while (match = regex.exec(str)) {
-        components.push({ key: match[1].toUpperCase(), value: match[2].trim() });
-        logger.finest(`  Found component: ${match[1].toUpperCase()}=${match[2].trim()}`, null, FILENAME);
+      while ((match = regex.exec(str)) !== null) {
+        // match[2] is the quoted value, match[3] is the unquoted value
+        const value = match[2] ? match[2].replace(/\\"/g, '"').replace(/\\,/g, ',') : match[3].trim();
+        components.push({ key: match[1].toUpperCase(), value: value });
+        logger.finest(`  Found component: ${match[1].toUpperCase()}=${value}`, null, FILENAME);
       }
 
       logger.finest(`  Extracted ${components.length} components`, null, FILENAME);
-
-      // Sort by key
       components.sort((a, b) => a.key.localeCompare(b.key));
-
-      // Reconstruct normalized string
       const normalized = components.map(c => `${c.key}=${c.value}`).join(', ');
       logger.finest(`  Normalized result: "${normalized}"`, null, FILENAME);
       return normalized;
@@ -1143,21 +1169,21 @@ async _signWithCA(tempPaths, config, configPath, instance = null) {
     if (cert.authorityKeyId) {
       logger.fine(`Looking for parent by authorityKeyId: ${cert.authorityKeyId}`, null, FILENAME);
 
-      // Log all available keyIds for debugging
+      // Log all available subjectKeyIdentifiers for debugging
       const availableKeyIds = allCerts
-        .filter(c => c.isCA && c.keyId)
-        .map(c => ({ name: c.name, keyId: c.keyId, fingerprint: c.fingerprint }));
+        .filter(c => c.isCA && c.subjectKeyIdentifier)
+        .map(c => ({ name: c.name, subjectKeyIdentifier: c.subjectKeyIdentifier, fingerprint: c.fingerprint }));
 
-      logger.finest(`Available CA keyIds: ${JSON.stringify(availableKeyIds)}`, null, FILENAME);
+      logger.finest(`Available CA subjectKeyIdentifiers: ${JSON.stringify(availableKeyIds)}`, null, FILENAME);
 
       const parentByKeyId = allCerts.find(c =>
         c.fingerprint !== cert.fingerprint && // Not the same cert
         c.isCA && // Must be a CA
-        c.keyId === cert.authorityKeyId // Match by Authority Key ID
+        c.subjectKeyIdentifier === cert.authorityKeyId // Match by Authority Key ID
       );
 
       if (parentByKeyId) {
-        logger.debug(`Found parent by keyId: ${parentByKeyId.name} (${parentByKeyId.fingerprint})`, null, FILENAME);
+        logger.debug(`Found parent by subjectKeyIdentifier: ${parentByKeyId.name} (${parentByKeyId.fingerprint})`, null, FILENAME);
         return parentByKeyId;
       } else {
         logger.fine(`No parent found by authorityKeyId`, null, FILENAME);

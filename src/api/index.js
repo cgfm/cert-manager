@@ -140,7 +140,7 @@ try {
  * Register all API routes
  * @param {Object} deps - Dependencies
  * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {OpenSSLWrapper} deps.openSSL - OpenSSL wrapper instance
+ * @param {cryptoServiceWrapper} deps.cryptoService - cryptoService wrapper instance
  * @returns {express.Router} Express router
  */
 function setupApi(deps) {
