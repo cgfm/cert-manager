@@ -1,0 +1,11 @@
+{
+  "source": {
+    "include": ["./src/"],
+    "includePattern": "\\.(js)$",
+    "exclude": ["node_modules/"]
+  },
+  "opts": {
+    "destination": "./docs/api/"
+  },
+  "plugins": ["plugins/markdown"]
+}

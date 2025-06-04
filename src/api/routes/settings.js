@@ -23,9 +23,9 @@ const axios = require('axios');
 // Filename for better logging
 const FILENAME = 'api/routes/settings.js';
 
-function initSettingsRouter(services) {
+function initSettingsRouter(deps) {
     const router = express.Router();
-    const { configService, renewalService, npmIntegrationService } = services;
+    const { configService, renewalService, npmIntegrationService, activityService } = deps;
 
     // Get all settings
     router.get('/', async (req, res) => {
@@ -78,6 +78,22 @@ function initSettingsRouter(services) {
                     message: 'Failed to update settings',
                     statusCode: 500
                 });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated application settings',
+                        type: 'update',
+                        target: 'settings',
+                        metadata: {
+                            fields: Object.keys(newSettings)
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log settings update activity:', activityError, FILENAME);
             }
 
             // Apply renewal settings if they were changed
@@ -171,6 +187,22 @@ function initSettingsRouter(services) {
                     message: 'Failed to update certificate settings',
                     statusCode: 500
                 });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated certificate settings',
+                        type: 'update',
+                        target: 'certificate-settings',
+                        metadata: {
+                            fields: Object.keys(settingsToUpdate)
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log certificate settings update activity:', activityError, FILENAME);
             }
 
             res.json({
@@ -292,6 +324,22 @@ function initSettingsRouter(services) {
                 });
             }
 
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated deployment settings',
+                        type: 'update',
+                        target: 'deployment-settings',
+                        metadata: {
+                            categories: Object.keys(deployment)
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log deployment settings update activity:', activityError, FILENAME);
+            }
+
             // Get updated settings
             const newSettings = configService.get();
 
@@ -362,6 +410,24 @@ function initSettingsRouter(services) {
                     message: 'Failed to update email settings',
                     statusCode: 500
                 });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated email/SMTP settings',
+                        type: 'update',
+                        target: 'email-settings',
+                        metadata: {
+                            host: smtp.host,
+                            port: smtp.port,
+                            secure: smtp.secure
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log email settings update activity:', activityError, FILENAME);
             }
 
             // Get updated settings
@@ -586,6 +652,24 @@ function initSettingsRouter(services) {
                 });
             }
 
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated Nginx Proxy Manager settings',
+                        type: 'update',
+                        target: 'npm-settings',
+                        metadata: {
+                            host: npmSettings.host,
+                            port: npmSettings.port,
+                            useHttps: npmSettings.useHttps
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log NPM settings update activity:', activityError, FILENAME);
+            }
+
             // Get updated settings
             const newSettings = configService.get();
 
@@ -747,7 +831,64 @@ function initSettingsRouter(services) {
     };
 
     // Docker settings routes
-    router.put('/deployment/docker', handleDeploymentCategory('dockerDefaults'));
+    router.put('/deployment/docker', async (req, res) => {
+        try {
+            const categorySettings = req.body;
+
+            // Get current settings
+            const currentSettings = configService.get();
+
+            // Create updated settings
+            const updatedSettings = {
+                ...currentSettings,
+                deployment: {
+                    ...currentSettings.deployment,
+                    dockerDefaults: categorySettings
+                }
+            };
+
+            // Save settings
+            const result = configService.updateSettings(updatedSettings);
+
+            if (!result) {
+                return res.status(500).json({
+                    message: 'Failed to update docker settings',
+                    statusCode: 500
+                });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: 'Updated Docker settings',
+                        type: 'update',
+                        target: 'docker-settings',
+                        metadata: {
+                            socketPath: categorySettings.socketPath,
+                            host: categorySettings.host,
+                            port: categorySettings.port
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log Docker settings update activity:', activityError, FILENAME);
+            }
+
+            res.json({
+                success: true,
+                message: 'docker settings updated successfully',
+                dockerDefaults: categorySettings
+            });
+        } catch (error) {
+            logger.error('Error updating docker settings:', error, FILENAME);
+            res.status(500).json({
+                message: 'Failed to update docker settings',
+                error: error.message,
+                statusCode: 500
+            });
+        }
+    });
 
     // Renewal settings routes
     router.get('/renewal', async (req, res) => {
@@ -837,32 +978,52 @@ function initSettingsRouter(services) {
         });
         }
 
+        // Log activity
+        try {
+            if (activityService && typeof activityService.addActivity === 'function') {
+                await activityService.addActivity({
+                    action: 'Updated auto-renewal settings',
+                    type: 'update',
+                    target: 'renewal-settings',
+                    metadata: {
+                        enableAutoRenewalJob: updatedSettings.enableAutoRenewalJob,
+                        renewalSchedule: updatedSettings.renewalSchedule,
+                        renewDaysBeforeExpiry: updatedSettings.renewDaysBeforeExpiry,
+                        enableFileWatch: updatedSettings.enableFileWatch,
+                        includeIdleDomainsOnRenewal: updatedSettings.includeIdleDomainsOnRenewal
+                    }
+                });
+            }
+        } catch (activityError) {
+            logger.warn('Failed to log renewal settings update activity:', activityError, FILENAME);
+        }
+
         // Apply changes to renewal service
         if (renewalService) {
-        // Update renewal service settings
-        renewalService.options.disableRenewalCron = !updatedSettings.enableAutoRenewalJob;
-        renewalService.options.renewalSchedule = updatedSettings.renewalSchedule;
-        renewalService.options.renewDaysBeforeExpiry = updatedSettings.renewDaysBeforeExpiry; // This was missing from original renewalService update
-        renewalService.options.enableWatcher = updatedSettings.enableFileWatch;
-        renewalService.options.includeIdleDomainsOnRenewal = updatedSettings.includeIdleDomainsOnRenewal; // This was missing
+            // Update renewal service settings
+            renewalService.options.disableRenewalCron = !updatedSettings.enableAutoRenewalJob;
+            renewalService.options.renewalSchedule = updatedSettings.renewalSchedule;
+            renewalService.options.renewDaysBeforeExpiry = updatedSettings.renewDaysBeforeExpiry;
+            renewalService.options.enableWatcher = updatedSettings.enableFileWatch;
+            renewalService.options.includeIdleDomainsOnRenewal = updatedSettings.includeIdleDomainsOnRenewal;
 
-        // Apply schedule changes
-        if (!renewalService.options.disableRenewalCron) {
-            renewalService.scheduleCronJob();
-        } else if (renewalService.cronJob) {
-            renewalService.cronJob.stop();
-            renewalService.cronJob = null;
-            logger.info('Renewal cron job stopped', null, FILENAME);
-        }
+            // Apply schedule changes
+            if (!renewalService.options.disableRenewalCron) {
+                renewalService.scheduleCronJob();
+            } else if (renewalService.cronJob) {
+                renewalService.cronJob.stop();
+                renewalService.cronJob = null;
+                logger.info('Renewal cron job stopped', null, FILENAME);
+            }
 
-        // Apply file watcher changes
-        if (renewalService.options.enableWatcher && !renewalService.watcher) {
-            await renewalService.startFileWatcher();
-        } else if (!renewalService.options.enableWatcher && renewalService.watcher) {
-            await renewalService.watcher.close();
-            renewalService.watcher = null;
-            logger.info('File watcher stopped', null, FILENAME);
-        }
+            // Apply file watcher changes
+            if (renewalService.options.enableWatcher && !renewalService.watcher) {
+                await renewalService.startFileWatcher();
+            } else if (!renewalService.options.enableWatcher && renewalService.watcher) {
+                await renewalService.watcher.close();
+                renewalService.watcher = null;
+                logger.info('File watcher stopped', null, FILENAME);
+            }
         }
 
         res.json({
@@ -934,6 +1095,7 @@ function initSettingsRouter(services) {
 
             // Get current settings
             const settings = configService.get();
+            const oldLevel = settings.logLevel;
 
             // Update log level in settings
             settings.logLevel = level;
@@ -946,6 +1108,23 @@ function initSettingsRouter(services) {
                     message: 'Failed to update default log level',
                     statusCode: 500
                 });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: `Changed default log level from ${oldLevel || 'info'} to ${level}`,
+                        type: 'update',
+                        target: 'logging-settings',
+                        metadata: {
+                            oldLevel: oldLevel || 'info',
+                            newLevel: level
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log default log level change activity:', activityError, FILENAME);
             }
 
             // Apply the new log level immediately
@@ -996,6 +1175,8 @@ function initSettingsRouter(services) {
                 settings.fileLogLevels = {};
             }
 
+            const oldLevel = settings.fileLogLevels[filename];
+
             // Update file log level
             settings.fileLogLevels[filename] = level;
 
@@ -1007,6 +1188,24 @@ function initSettingsRouter(services) {
                     message: `Failed to update log level for ${filename}`,
                     statusCode: 500
                 });
+            }
+
+            // Log activity
+            try {
+                if (activityService && typeof activityService.addActivity === 'function') {
+                    await activityService.addActivity({
+                        action: `Changed log level for ${filename} from ${oldLevel || 'default'} to ${level}`,
+                        type: 'update',
+                        target: 'logging-settings',
+                        metadata: {
+                            filename,
+                            oldLevel: oldLevel || 'default',
+                            newLevel: level
+                        }
+                    });
+                }
+            } catch (activityError) {
+                logger.warn('Failed to log file log level change activity:', activityError, FILENAME);
             }
 
             // Apply the new log level immediately

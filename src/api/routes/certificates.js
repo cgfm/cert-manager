@@ -30,7 +30,7 @@ const FILENAME = 'api/routes/certificates.js';
  */
 function initCertificatesRouter(deps) {
   const router = express.Router();
-  const { certificateManager, cryptoService } = deps;
+  const { certificateManager, cryptoService, activityService } = deps;
 
   // Get all certificates
   router.get('/', async (req, res) => {
@@ -253,19 +253,8 @@ function initCertificatesRouter(deps) {
       // Get the updated certificate
       const updatedCert = certificateManager.getCertificate(fingerprint);
 
-      // Add entry to activity log
+      // Add entry to activity log using the passed instance
       try {
-        // Check if activity service exists and has the required function
-        const activityServicePath = '../../services/activity-service';
-        let activityService;
-
-        try {
-          activityService = require(activityServicePath);
-        } catch (moduleError) {
-          logger.debug(`Activity service module not found: ${moduleError.message}`, null, FILENAME);
-          activityService = null;
-        }
-
         if (activityService && typeof activityService.addActivity === 'function') {
           await activityService.addActivity({
             action: `Updated metadata for certificate '${updatedCert.name}'`,
@@ -406,7 +395,7 @@ function initCertificatesRouter(deps) {
       }
 
       // Create backup
-      const backup = await deps.certificateManager.createCertificateBackup(fingerprint);
+      const backup = await deps.certificateManager.createManualBackup(fingerprint);
 
       res.status(201).json({
         message: 'Backup created successfully',
@@ -931,6 +920,7 @@ function initCertificatesRouter(deps) {
   // Import the deployment actions router
   const deploymentRouter = initDeploymentActionsRouter({
     certificateManager: deps.certificateManager,
+    activityService: deps.activityService,
     deployService: require('../../services/deploy-service')
   });
 
@@ -1639,18 +1629,8 @@ function initCertificatesRouter(deps) {
       // Save certificate changes
       await deps.certificateManager.saveCertificateConfigs();
 
-      // Log activity
+      // Log activity using the passed instance
       try {
-        const activityServicePath = '../../services/activity-service';
-        let activityService;
-
-        try {
-          activityService = require(activityServicePath);
-        } catch (moduleError) {
-          logger.debug(`Activity service module not found: ${moduleError.message}`, null, FILENAME);
-          activityService = null;
-        }
-
         if (activityService && typeof activityService.addActivity === 'function') {
           await activityService.addActivity({
             action: `Added ${idle ? 'idle ' : ''}${subjectType} "${value}" to certificate`,
@@ -1734,18 +1714,8 @@ function initCertificatesRouter(deps) {
       // Save certificate changes
       await deps.certificateManager.saveCertificateConfigs();
 
-      // Log activity
+      // Log activity using the passed instance
       try {
-        const activityServicePath = '../../services/activity-service';
-        let activityService;
-
-        try {
-          activityService = require(activityServicePath);
-        } catch (moduleError) {
-          logger.debug(`Activity service module not found: ${moduleError.message}`, null, FILENAME);
-          activityService = null;
-        }
-
         if (activityService && typeof activityService.addActivity === 'function') {
           await activityService.addActivity({
             action: `Removed ${fromIdle ? 'idle ' : ''}${type} "${value}" from certificate`,
@@ -1829,18 +1799,8 @@ function initCertificatesRouter(deps) {
         await deps.certificateManager.saveCertificateConfigs();
       }
 
-      // Log activity
+      // Log activity using the passed instance
       try {
-        const activityServicePath = '../../services/activity-service';
-        let activityService;
-
-        try {
-          activityService = require(activityServicePath);
-        } catch (moduleError) {
-          logger.debug(`Activity service module not found: ${moduleError.message}`, null, FILENAME);
-          activityService = null;
-        }
-
         if (activityService && typeof activityService.addActivity === 'function') {
           await activityService.addActivity({
             action: `Applied idle domains/IPs and renewed certificate`,

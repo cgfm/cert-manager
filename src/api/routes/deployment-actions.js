@@ -12,11 +12,12 @@ const FILENAME = 'api/routes/deployment-actions.js';
  * @param {Object} deps - Dependencies
  * @param {CertificateManager} deps.certificateManager - Certificate manager instance
  * @param {Object} deps.deployService - Deploy service instance
+ * @param {ActivityService} deps.activityService - Activity service instance
  * @returns {express.Router} Express router
  */
 function initDeploymentActionsRouter(deps) {
   const router = express.Router({ mergeParams: true });
-  const { certificateManager, deployService } = deps;
+  const { certificateManager, deployService, activityService } = deps;
 
   // Get all deployment actions for a certificate
   router.get('/', async (req, res) => {
@@ -75,6 +76,25 @@ function initDeploymentActionsRouter(deps) {
       // Save the updated certificate
       await certificateManager.saveCertificateConfigs();
 
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Added ${action.type} deployment action "${action.name || action.type}" to certificate`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              actionType: action.type,
+              actionName: action.name,
+              actionId: action.id
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment action creation activity:', activityError, FILENAME);
+      }
+
       // Return success property along with the action
       res.json({
         success: true,
@@ -94,7 +114,7 @@ function initDeploymentActionsRouter(deps) {
   // Update a deployment action
   router.put('/:actionIndex', async (req, res) => {
     try {
-      const { fingerprint, actionIndex } = req.params; // Changed from actionId to actionIndex
+      const { fingerprint, actionIndex } = req.params;
       const updatedAction = req.body;
 
       if (!updatedAction || !updatedAction.type) {
@@ -111,13 +131,15 @@ function initDeploymentActionsRouter(deps) {
       if (!Array.isArray(cert._config.deployActions)) cert._config.deployActions = [];
 
       // Find the action by ID (which is stored in actionIndex parameter)
-      const actionId = actionIndex; // This is the UUID coming from the client
+      const actionId = actionIndex;
       const actionArrayIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
 
       if (actionArrayIndex === -1) {
         logger.warn(`Deployment action with ID ${actionId} not found for certificate ${fingerprint}`, null, FILENAME);
         return res.status(404).json({ success: false, error: 'Deployment action not found' });
       }
+
+      const oldAction = { ...cert._config.deployActions[actionArrayIndex] };
 
       // Update the action with the new properties
       cert._config.deployActions[actionArrayIndex] = {
@@ -130,6 +152,27 @@ function initDeploymentActionsRouter(deps) {
 
       // Save the updated certificate
       await certificateManager.saveCertificateConfigs();
+
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Updated ${updatedAction.type} deployment action "${updatedAction.name || updatedAction.type}" for certificate`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              actionType: updatedAction.type,
+              actionName: updatedAction.name,
+              actionId: actionId,
+              oldName: oldAction.name,
+              changes: Object.keys(updatedAction).filter(key => key !== 'id')
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment action update activity:', activityError, FILENAME);
+      }
 
       // Return success property along with the updated action
       res.json({
@@ -150,7 +193,7 @@ function initDeploymentActionsRouter(deps) {
   // Delete a deployment action
   router.delete('/:actionIndex', async (req, res) => {
     try {
-      const { fingerprint, actionIndex } = req.params; // Changed from actionId to actionIndex
+      const { fingerprint, actionIndex } = req.params;
 
       const cert = certificateManager.getCertificate(fingerprint);
       if (!cert) {
@@ -163,7 +206,7 @@ function initDeploymentActionsRouter(deps) {
       }
 
       // Find the action by ID (which is stored in actionIndex parameter)
-      const actionId = actionIndex; // This is the UUID coming from the client
+      const actionId = actionIndex;
       const actionArrayIndex = cert._config.deployActions.findIndex(action => action.id === actionId);
 
       if (actionArrayIndex === -1) {
@@ -171,11 +214,33 @@ function initDeploymentActionsRouter(deps) {
         return res.status(404).json({ error: 'Deployment action not found' });
       }
 
+      const deletedAction = { ...cert._config.deployActions[actionArrayIndex] };
+
       // Remove the action
       cert._config.deployActions.splice(actionArrayIndex, 1);
 
       // Save the updated certificate
       await certificateManager.saveCertificateConfigs();
+
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Deleted ${deletedAction.type} deployment action "${deletedAction.name || deletedAction.type}" from certificate`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              actionType: deletedAction.type,
+              actionName: deletedAction.name,
+              actionId: actionId,
+              remainingActions: cert._config.deployActions.length
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment action deletion activity:', activityError, FILENAME);
+      }
 
       res.json({ 
         success: true, 
@@ -276,6 +341,26 @@ function initDeploymentActionsRouter(deps) {
             message: `Unknown action type: ${action.type}`,
             statusCode: 400
           });
+      }
+
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Tested ${action.type} deployment action "${action.name || action.type}" for certificate`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              actionType: action.type,
+              actionName: action.name,
+              testSuccess: result?.success || false,
+              testMessage: result?.message
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment action test activity:', activityError, FILENAME);
       }
 
       res.json({
@@ -407,6 +492,27 @@ function initDeploymentActionsRouter(deps) {
         }
       }
 
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `Executed ${executedCount} deployment actions for certificate (${successCount} succeeded)`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              totalActions: deployActions.length,
+              executedCount,
+              successCount,
+              failedCount: executedCount - successCount,
+              results: results.map(r => ({ name: r.name, type: r.type, success: r.success }))
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment actions execution activity:', activityError, FILENAME);
+      }
+
       // Return the results
       res.json({
         success: true,
@@ -507,6 +613,25 @@ function initDeploymentActionsRouter(deps) {
         deployActions: newActions
       });
 
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: 'Reordered deployment actions for certificate',
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              oldOrder: deployActions.map(a => a.name || a.type),
+              newOrder: newActions.map(a => a.name || a.type),
+              actionCount: newActions.length
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment actions reorder activity:', activityError, FILENAME);
+      }
+
       logger.info(`Reordered deployment actions for certificate: ${fingerprint}`, null, FILENAME);
 
       return res.json({
@@ -587,6 +712,8 @@ function initDeploymentActionsRouter(deps) {
         });
       }
 
+      const oldEnabled = actions[index].enabled;
+      
       // Update action
       actions[index].enabled = enabled;
 
@@ -594,6 +721,27 @@ function initDeploymentActionsRouter(deps) {
       await certificateManager.updateCertificateConfig(fingerprint, {
         deployActions: actions
       });
+
+      // Log activity
+      try {
+        if (activityService && typeof activityService.addActivity === 'function') {
+          await activityService.addActivity({
+            action: `${enabled ? 'Enabled' : 'Disabled'} deployment action "${actions[index].name || actions[index].type}" for certificate`,
+            type: 'deployment',
+            target: cert.name,
+            metadata: {
+              fingerprint: cert.fingerprint,
+              actionType: actions[index].type,
+              actionName: actions[index].name,
+              actionIndex: index,
+              oldEnabled: oldEnabled !== undefined ? oldEnabled : true,
+              newEnabled: enabled
+            }
+          });
+        }
+      } catch (activityError) {
+        logger.warn('Failed to log deployment action toggle activity:', activityError, FILENAME);
+      }
 
       logger.info(`Toggled deployment action ${index} to ${enabled ? 'enabled' : 'disabled'} for certificate: ${fingerprint}`,
         null, FILENAME);
@@ -613,7 +761,6 @@ function initDeploymentActionsRouter(deps) {
       });
     }
   });
-
 
   return router;
 }

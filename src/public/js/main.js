@@ -606,7 +606,6 @@ function updateExpiringCerts() {
     return UIUtils.safeTemplate(`
       <div class="expiring-cert-item">
         <div class="expiring-cert-name">\${name}</div>
-        <div class="expiring-cert-domain">\${domain}</div>
         <div class="expiring-days warning">Expires in \${days} days</div>
         <button class="button small renew-btn" data-cert-id="\${fingerprint|attr}">Renew</button>
       </div>
@@ -1800,7 +1799,6 @@ function updateExpiringCerts() {
     return UIUtils.safeTemplate(`
       <div class="expiring-cert-item">
         <div class="expiring-cert-name">\${name}</div>
-        <div class="expiring-cert-domain">\${domain}</div>
         <div class="expiring-days warning">Expires in \${days} days</div>
         <button class="button small renew-btn" data-cert-id="\${fingerprint|attr}">Renew</button>
       </div>

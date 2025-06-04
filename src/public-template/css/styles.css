@@ -697,11 +697,6 @@ main::before {
     flex: 1;
 }
 
-.expiring-cert-domain {
-    color: var(--text-muted);
-    flex: 1;
-}
-
 .expiring-days {
     margin-right: 1rem;
 }
@@ -810,7 +805,6 @@ main::before {
     }
 
     .expiring-cert-name,
-    .expiring-cert-domain,
     .expiring-days {
         margin-bottom: 0.5rem;
     }
