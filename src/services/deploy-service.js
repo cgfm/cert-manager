@@ -1,11 +1,13 @@
 /**
- * @module DeployService
+ * @fileoverview Deploy Service - Provides certificate deployment methods for various targets
+ * @module services/deploy-service
  * @requires fs
  * @requires path
- * @requires util
+ * @requires os
  * @requires child_process
- * @requires logger
- * @requires dockerService
+ * @requires util
+ * @requires ./logger
+ * @requires ./docker-service
  * @requires ssh2-sftp-client
  * @requires smb2
  * @requires basic-ftp
@@ -16,7 +18,6 @@
  * @version 0.0.2
  * @license MIT
  * @author Christian Meiners
- * @description This module exports a singleton instance of DeployService that provides methods to execute deployment actions for certificates.
  */
 
 const fs = require('fs');
@@ -77,29 +78,32 @@ try {
 const execAsync = promisify(exec);
 
 /**
- * Service to handle certificate deployment actions
+ * Deploy Service for handling certificate deployment to various targets.
+ * Supports multiple deployment methods including file copy, Docker, SSH, SMB, FTP, API, and email notifications.
  */
 class DeployService {
     /**
-     * Creates an instance of DeployService.
-     * @param {Object} services - Optional services to inject
-     * @param {Object} services.certificateManager - Certificate manager service
-     * @param {Object} services.dockerService - Docker service
-     * @param {Object} services.npmIntegrationService - Nginx Proxy Manager integration service
-     * @constructor
-     */      
+     * Create a new DeployService instance
+     * @param {Object} [services=null] - Optional services to inject for dependency management
+     * @param {Object} [services.certificateManager] - Certificate manager service for certificate operations
+     * @param {Object} [services.dockerService] - Docker service for container management
+     * @param {Object} [services.npmIntegrationService] - Nginx Proxy Manager integration service
+     */
     constructor(services = null) {
         const { certificateManager, dockerService, npmIntegrationService } = services || {};
         this.dockerService = dockerService;
         this.certificateManager = certificateManager;
         this.npmIntegrationService = npmIntegrationService;
-    }
-
-    /**
-     * Execute deployment actions for a certificate
-     * @param {Certificate} certificate - Certificate object
-     * @param {Array} actions - Deployment actions to execute
-     * @returns {Promise<Object>} Result of deployment operations
+    }    /**
+     * Execute deployment actions for a certificate across multiple deployment targets.
+     * Processes deployment actions sequentially and returns comprehensive results.
+     * @async
+     * @param {Object} certificate - Certificate object containing certificate data and deployment configuration
+     * @param {Array} [actions=null] - Optional array of deployment actions to execute (defaults to certificate.deployActions)
+     * @returns {Promise<Object>} Result object containing success status, executed actions, and any errors
+     * @returns {boolean} returns.success - Overall success status of all deployment actions
+     * @returns {Array} returns.results - Array of individual deployment action results
+     * @returns {Array} returns.errors - Array of any errors encountered during deployment
      */
     async executeDeployActions(certificate, actions = null) {
         // Use certificate's own actions if none provided

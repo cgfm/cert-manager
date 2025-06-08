@@ -1,3 +1,20 @@
+/**
+ * @fileoverview Certificate Manager Application Entry Point
+ * @module app
+ * @requires express - Express.js web framework
+ * @requires path - Node.js path utilities
+ * @requires fs - Node.js file system module
+ * @requires cookie-parser - Express middleware for parsing cookies
+ * @requires ejs - Embedded JavaScript templating engine
+ * @version 1.0.0
+ * @license MIT
+ * @author Christian Meiners
+ * @description Main application file for the Certificate Manager. Initializes all services,
+ * sets up middleware, configures routes, and starts the Express server.
+ * Supports multiple crypto backends (OpenSSL, node-forge, hybrid) and includes
+ * comprehensive certificate management, renewal, and deployment capabilities.
+ */
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -20,6 +37,12 @@ const cookieParser = require('cookie-parser');
 const DeployService = require('./services/deploy-service');
 
 const FILENAME = 'app.js';
+/**
+ /**
+ * Global flag to track system initialization status
+ * @type {boolean}
+ * @global
+ */
 global.systemReady = false;
 
 const pkg = require('../package.json');
@@ -42,6 +65,19 @@ app.set('views', path.join(__dirname, 'public-template'));
 app.set('view engine', 'html');
 app.engine('html', ejs.renderFile);
 
+/**
+ * Initializes and starts the Certificate Manager application
+ * @async
+ * @function startApp
+ * @returns {Promise<void>} Resolves when application is fully initialized and running
+ * @throws {Error} Throws error if critical services fail to initialize
+ * @description Performs complete application initialization including:
+ * - Configuration loading and validation
+ * - Service initialization (crypto, database, logging, etc.)
+ * - Middleware setup
+ * - Route configuration
+ * - Server startup
+ */
 async function startApp() {
   try {
     // Set a maximum timeout for system initialization

@@ -1,15 +1,12 @@
 /**
- * DockerService class to manage Docker integration.
- * It initializes the Docker client and provides methods to interact with Docker containers.
+ * @fileoverview Docker Service - Manages Docker integration and container operations
  * @module services/docker-service
- * @requires dockerode - Docker client for Node.js
- * @requires fs - File system module for file operations
- * @requires services/logger - Logger service for logging messages
+ * @requires dockerode
+ * @requires fs
+ * @requires ./logger
  * @version 0.0.2
  * @license MIT
  * @author Christian Meiners
- * @description This module exports a singleton instance of DockerService for managing Docker containers.
- * It handles initialization of the Docker client, checking for availability, and provides methods to list and restart containers.
  */
 
 const Docker = require('dockerode');
@@ -18,13 +15,27 @@ const logger = require('./logger');
 
 const FILENAME = 'services/docker-service.js';
 
+/**
+ * Docker Service for managing Docker integration and container operations.
+ * Provides methods to interact with Docker containers, list volumes, and restart services.
+ * Handles cross-platform Docker socket initialization.
+ */
 class DockerService {
+    /**
+     * Create a new DockerService instance.
+     * Automatically initializes Docker client connection.
+     */
     constructor() {
         this.docker = null;
         this.isAvailable = false;
         this.initDocker();
     }
 
+    /**
+     * Initialize Docker client connection with cross-platform support.
+     * Attempts to connect via Windows named pipe, Unix socket, or environment variables.
+     * @private
+     */
     initDocker() {
         try {
             if (process.platform === 'win32') {

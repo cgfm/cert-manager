@@ -1,6 +1,26 @@
 /**
- * UI Utilities
- * Common UI helper functions
+ * @fileoverview UI Utilities - Common UI helper functions and components
+ * 
+ * This module provides a comprehensive collection of UI utility functions for:
+ * - Modal and dialog management (show/hide with backdrop)
+ * - Loading state management with spinners and overlays
+ * - Scrollbar width calculation and body scroll prevention
+ * - Toast notification system with multiple severity levels
+ * - Form validation and error display utilities
+ * - DOM manipulation helpers and event management
+ * - Cross-browser compatibility utilities
+ * 
+ * Features include:
+ * - Responsive modal system with backdrop click handling
+ * - Animated loading states with customizable messages
+ * - Toast notifications with auto-dismiss functionality
+ * - Form field validation with real-time feedback
+ * - Scrollbar compensation for modal display
+ * - Memory leak prevention through proper event cleanup
+ * 
+ * @module public/js/utils/ui-utils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 const UIUtils = {
   // Store the original overflow state
@@ -8,7 +28,13 @@ const UIUtils = {
   originalPaddingRight: null,
   scrollbarWidth: null,
 
-  // Calculate scrollbar width once
+  /**
+   * Calculates the width of the browser's scrollbar
+   * Uses a temporary element to measure the difference between
+   * outer and inner widths when overflow is set to scroll
+   * 
+   * @returns {number} The scrollbar width in pixels
+   */
   getScrollbarWidth() {
     if (this.scrollbarWidth === null) {
       // Create a temporary div to measure scrollbar width
@@ -32,17 +58,21 @@ const UIUtils = {
 
   /**
    * Show a modal with content and options
+   * Creates modal if it doesn't exist, updates content, and displays it
+   * 
    * @param {string} modalId - ID of the modal to show
-   * @param {Object} options - Modal options
-   * @param {string} options.title - Modal title
-   * @param {string} options.content - Modal HTML content
-   * @param {Object[]} options.buttons - Button definitions
-   * @param {string} options.buttons[].text - Button text
-   * @param {string} options.buttons[].id - Button ID
-   * @param {string} options.buttons[].action - Button action (close, custom)
-   * @param {string} [options.buttons[].class] - Additional button classes
-   * @param {Object} [options.data] - Additional data to store with modal
-   * @param {Function} [options.onShow] - Callback to run when modal is shown
+   * @param {Object} [options={}] - Modal configuration options
+   * @param {string} [options.title] - Modal title text
+   * @param {string} [options.content] - Modal HTML content
+   * @param {string} [options.extendedHeader] - Additional header content
+   * @param {Object[]} [options.buttons] - Button definitions array
+   * @param {string} options.buttons[].text - Button display text
+   * @param {string} [options.buttons[].id] - Button DOM ID
+   * @param {string} [options.buttons[].type] - Button type for styling
+   * @param {string} [options.buttons[].class] - Additional CSS classes
+   * @param {Object} [options.data] - Data attributes to set on modal
+   * @param {Function} [options.onShow] - Callback executed after modal is shown
+   * @returns {void}
    */
   showModal: function (modalId, options = {}) {
     let modal = document.getElementById(modalId);
@@ -80,8 +110,11 @@ const UIUtils = {
   },
 
   /**
-   * Open a modal by ID
+   * Opens a modal by removing hidden class and preventing body scroll
+   * Handles scrollbar compensation to prevent content shift
+   * 
    * @param {string} modalId - ID of the modal to open
+   * @returns {void}
    */
   openModal: function (modalId) {
     const modal = document.getElementById(modalId);
@@ -120,9 +153,12 @@ const UIUtils = {
   },
 
   /**
-   * Update modal content
+   * Updates the content and configuration of an existing modal
+   * Rebuilds the modal HTML with new options and sets up event handlers
+   * 
    * @param {string} modalId - ID of the modal to update
-   * @param {Object} options - Modal options (same as showModal)
+   * @param {Object} [options={}] - Modal configuration options (same as showModal)
+   * @returns {void}
    */
   updateModal: function (modalId, options = {}) {
     const modal = document.getElementById(modalId);

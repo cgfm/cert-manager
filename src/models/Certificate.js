@@ -70,12 +70,11 @@ class Certificate {
         this._fingerprint = null;
         this._subject = null;
         this._issuer = null;
-        this._validFrom = null;
-        this._validTo = null;
+        this._validFrom = null;        this._validTo = null;
         this._description = null;
 
         // Certificate type and attributes
-        this._certType = 'standard'; // standard, rootCA, intermediateCA, acme
+        this._certType = 'standard'; // standard, rootCA, intermediateCA
         this._keyType = 'RSA';
         this._keySize = 2048;
         this._signatureAlgorithm = null;
@@ -95,18 +94,13 @@ class Certificate {
         this._passphraseChecked = false;
 
         // File paths - using "paths" not "pathes"
-        this._paths = {};
-
-        // Subject Alternative Names
+        this._paths = {};        // Subject Alternative Names
         this._sans = {
             domains: [],      // Active domains
             ips: [],          // Active IPs
             idleDomains: [],  // Pending domains
             idleIps: []       // Pending IPs
         };
-
-        // ACME settings
-        this._acmeSettings = null;
 
         // Configuration
         this._config = {
@@ -175,12 +169,7 @@ class Certificate {
             // Passphrase information
             this._hasPassphrase = data.hasPassphrase || false;
             this._needsPassphrase = data.needsPassphrase || false;
-            this._passphraseChecked = data.needsPassphrase !== undefined;
-
-            // ACME settings
-            this._acmeSettings = data.acmeSettings || null;
-
-            // Initialize paths
+            this._passphraseChecked = data.needsPassphrase !== undefined;            // Initialize paths
             this._paths = {};
             if (data.paths && typeof data.paths === 'object') {
                 Object.entries(data.paths).forEach(([key, value]) => {
@@ -411,13 +400,7 @@ class Certificate {
             if (Array.isArray(data.deployActions)) {
                 this._config.deployActions = [...data.deployActions];
                 logger.fine(`Updated deployActions from top-level property (${data.deployActions.length} actions)`, null, FILENAME, this._name);
-            }
-        }
-
-        // Update ACME settings if provided
-        if (data.acmeSettings) {
-            this._acmeSettings = data.acmeSettings;
-        }
+            }        }
 
         // Update previous versions if provided
         if (data.previousVersions && typeof data.previousVersions === 'object') {
@@ -562,12 +545,8 @@ class Certificate {
                 sans: {
                     domains: [...this._sans.domains],
                     ips: [...this._sans.ips],
-                    idleDomains: [...this._sans.idleDomains],
-                    idleIps: [...this._sans.idleIps]
+                    idleDomains: [...this._sans.idleDomains],                    idleIps: [...this._sans.idleIps]
                 },
-
-                // ACME settings
-                acmeSettings: this._acmeSettings,
 
                 // Configuration - always consistent
                 config: {
@@ -887,19 +866,17 @@ class Certificate {
             return false;
         }
     }
-
-
     /**
      * Refreshes the certificate's internal properties by parsing its live files.
      * This method should be called after certificate files are created, renewed, or restored.
-     * @param {object} cryptoServiceService - An instance of the cryptoService service capable of parsing certificate files.
-     * @returns {Promise<void>}
-     * @throws {Error} if parsing or updating fails, or if essential services/files are missing.
+     * @param {Object} cryptoService - An instance of the cryptoService capable of parsing certificate files
+     * @returns {Promise<void>} Promise that resolves when properties are refreshed
+     * @throws {Error} If parsing or updating fails, or if essential services/files are missing
      */
-    async refreshPropertiesFromFiles(cryptoServiceService) {
+    async refreshPropertiesFromFiles(cryptoService) {
         logger.info(`Refreshing properties from files for certificate '${this.name}'...`, null, FILENAME, this.name);
 
-        if (!cryptoServiceService || typeof cryptoServiceService.getCertificateInfo !== 'function') {
+        if (!cryptoService || typeof cryptoService.getCertificateInfo !== 'function') {
             logger.error(`cryptoService service is not available or 'getCertificateInfo' method is missing. Cannot refresh properties for '${this.name}'.`, null, FILENAME, this.name);
             throw new Error('cryptoService service unavailable for refreshing certificate properties.');
         }
@@ -926,7 +903,7 @@ class Certificate {
         logger.debug(`Using primary certificate file for refresh: ${primaryCertPath}`, null, FILENAME, this.name);
 
         try {
-            const certDetails = await cryptoServiceService.getCertificateInfo(primaryCertPath);
+            const certDetails = await cryptoService.getCertificateInfo(primaryCertPath);
 
             if (!certDetails || typeof certDetails !== 'object') {
                 logger.error(`Failed to retrieve valid details from cryptoService service for '${primaryCertPath}'. Received: ${JSON.stringify(certDetails)}`, null, FILENAME, this.name);
@@ -953,7 +930,7 @@ class Certificate {
             this._keyType = certDetails.keyType || this._keyType;
             this._keySize = certDetails.keySize || this._keySize;
             this._signatureAlgorithm = certDetails.signatureAlgorithm || certDetails.signatureAlgorithm || this._signatureAlgorithm; // Allow for different naming
-            this._originalEncoding = certDetails.originalEncoding || this._originalEncoding; // Assuming cryptoServiceService provides this
+            this._originalEncoding = certDetails.originalEncoding || this._originalEncoding; // Assuming cryptoService provides this
 
             this._serialNumber = certDetails.serialNumber || this._serialNumber;
             this._subjectKeyIdentifier = certDetails.subjectKeyIdentifier || certDetails.subjectKeyIdentifier || this._subjectKeyIdentifier;
@@ -961,7 +938,7 @@ class Certificate {
 
             this._selfSigned = certDetails.selfSigned !== undefined ? certDetails.selfSigned : this._selfSigned;
             this._isCA = certDetails.isCA !== undefined ? certDetails.isCA : this._isCA;
-            this._isRootCA = certDetails.isRootCA !== undefined ? certDetails.isRootCA : this._isRootCA; // Assuming cryptoServiceService can determine this
+            this._isRootCA = certDetails.isRootCA !== undefined ? certDetails.isRootCA : this._isRootCA; // Assuming cryptoService can determine this
             this._pathLenConstraint = certDetails.pathLenConstraint !== undefined ? certDetails.pathLenConstraint : this._pathLenConstraint;
 
 
@@ -969,20 +946,20 @@ class Certificate {
                 this._sans.domains = Array.isArray(certDetails.sans.domains) ? certDetails.sans.domains.map(d => d.trim().toLowerCase()) : this._sans.domains;
                 this._sans.ips = Array.isArray(certDetails.sans.ips) ? certDetails.sans.ips.map(ip => ip.trim()) : this._sans.ips;
                 // Note: Idle domains/IPs are usually managed by user input, not directly from cert details,
-                // unless your cryptoServiceService specifically extracts them from an extension or CSR.
+                // unless your cryptoService specifically extracts them from an extension or CSR.
                 // If not, they should remain as they are.
             }
 
             // Passphrase status might need re-evaluation if the key file changed,
             // but `needsPassphrase` is often a config, and `hasPassphrase` is about storage.
             // For now, we assume these are not directly changed by parsing the cert itself.
-            // If `cryptoServiceService.getCertificateInfo` also checks if the key is encrypted, update `_needsPassphrase`.
+            // If `cryptoService.getCertificateInfo` also checks if the key is encrypted, update `_needsPassphrase`.
             if (certDetails.isKeyEncrypted !== undefined) {
                 this._needsPassphrase = certDetails.isKeyEncrypted;
             }
 
 
-            // Cert type might be derivable by cryptoServiceService (e.g. based on extensions)
+            // Cert type might be derivable by cryptoService (e.g. based on extensions)
             // For now, we assume it's mostly set by config or initial creation logic.
             // If `certDetails.certType` is provided by your service, you can update it:
             // this._certType = certDetails.certType || this._certType;
@@ -1610,11 +1587,9 @@ class Certificate {
 
     get certType() {
         return this._certType;
-    }
-
-    set certType(value) {
+    }    set certType(value) {
         logger.finest(`Setting certType from '${this._certType}' to '${value}'`, null, FILENAME, this._name);
-        if (['standard', 'rootCA', 'intermediateCA', 'acme'].includes(value)) {
+        if (['standard', 'rootCA', 'intermediateCA'].includes(value)) {
             this._certType = value;
         } else {
             logger.warn(`Invalid certificate type: ${value}`, null, FILENAME, this._name);
@@ -1676,19 +1651,8 @@ class Certificate {
 
     get isCA() {
         return this._isCA;
-    }
-
-    get isRootCA() {
+    }    get isRootCA() {
         return this._isRootCA;
-    }
-
-    get acmeSettings() {
-        return this._acmeSettings;
-    }
-
-    set acmeSettings(value) {
-        logger.finest(`Setting acmeSettings to: ${JSON.stringify(value)}`, null, FILENAME, this._name);
-        this._acmeSettings = value;
     }
 
     get paths() {

@@ -1,6 +1,9 @@
 /**
- * Docker API Routes
+ * @fileoverview Docker API Routes - Provides Docker container and volume management endpoints
  * @module api/routes/docker
+ * @requires express
+ * @requires ../../services/logger
+ * @author Certificate Manager
  */
 
 const express = require('express');
@@ -10,10 +13,11 @@ const logger = require('../../services/logger');
 const FILENAME = 'api/routes/docker.js';
 
 /**
- * Docker router factory
- * @param {Object} deps - Dependencies
- * @param {Object} deps.dockerService - Docker service instance
- * @returns {express.Router} Express router
+ * Initialize Docker router with required dependencies.
+ * Provides endpoints for Docker container and volume management operations.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.dockerService - Docker service instance for container operations
+ * @returns {express.Router} Configured Express router with Docker management endpoints
  */
 function dockerRouter(deps) {
   const { dockerService } = deps;

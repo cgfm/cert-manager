@@ -1,9 +1,61 @@
 /**
- * User Management Module
- * Handles user and API token management functionality
+ * @fileoverview User Management Module - Comprehensive user and API token administration
+ * 
+ * This module provides complete user management functionality for the Certificate Manager,
+ * including user account administration, role management, API token generation, and
+ * access control. It supports both individual user operations and bulk administrative tasks.
+ * 
+ * Key Features:
+ * - User account creation, modification, and deletion
+ * - Role-based access control (Admin, User, Read-only)
+ * - API token generation and management
+ * - Password policy enforcement and validation
+ * - Account security features (2FA, session management)
+ * - User activity logging and audit trails
+ * - Bulk user operations and CSV import/export
+ * - Real-time user status monitoring
+ * 
+ * User Roles and Permissions:
+ * - Admin: Full system access and user management
+ * - User: Certificate management and personal settings
+ * - Read-only: View-only access to certificates and logs
+ * - API-only: Programmatic access via API tokens
+ * 
+ * Security Features:
+ * - Strong password requirements and validation
+ * - Account lockout after failed login attempts
+ * - Session timeout and management
+ * - API token expiration and rotation
+ * - Comprehensive audit logging
+ * - Role-based UI element visibility
+ * 
+ * API Token Management:
+ * - Token generation with custom permissions
+ * - Token expiration and automatic renewal
+ * - Usage tracking and rate limiting
+ * - Secure token storage and transmission
+ * 
+ * Dependencies:
+ * - Logger (global logging service)
+ * - Authentication API endpoints
+ * - Form validation utilities
+ * - Security utilities for password handling
+ * 
+ * @module public/user-management
+ * @version 1.0.0
+ * @author Certificate Manager Team
  */
 
-// State for user management
+/**
+ * Global state object for user management operations.
+ * Maintains current user information, loaded users list, API tokens, and access permissions.
+ * 
+ * @type {Object}
+ * @property {Array} users - Array of all loaded user objects
+ * @property {Array} tokens - Array of all API tokens for the current user
+ * @property {Object|null} currentUser - Current authenticated user object
+ * @property {boolean} isAdmin - Whether the current user has admin privileges
+ */
 const userManagement = {
   users: [],
   tokens: [],
@@ -12,7 +64,18 @@ const userManagement = {
 };
 
 /**
- * Initialize user management functionality
+ * Initialize the user management functionality.
+ * Sets up forms, loads current user information, and prepares the UI based on user permissions.
+ * This function should be called when the user management page loads.
+ * 
+ * @async
+ * @function initUserManagement
+ * @returns {Promise<void>} Promise that resolves when initialization is complete
+ * @throws {Error} If user information cannot be loaded or forms cannot be initialized
+ * 
+ * @example
+ * // Initialize user management on page load
+ * document.addEventListener('DOMContentLoaded', initUserManagement);
  */
 async function initUserManagement() {
   Logger.debug('Initializing user management module');

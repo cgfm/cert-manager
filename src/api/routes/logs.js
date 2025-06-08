@@ -1,7 +1,18 @@
 /**
- * Logs API Routes
- * @module logsRoutes
+ * @fileoverview Logs API Routes - Provides endpoints for log file management and retrieval
+ * 
+ * This module handles all log-related operations including:
+ * - Retrieving log entries with filtering and search capabilities
+ * - Managing multiple log files 
+ * - Clearing log files
+ * - Debug information for troubleshooting
+ * 
+ * Supports filtering by log level, filename, and text search across entries.
+ * 
+ * @module api/routes/logs
  * @requires express
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 const express = require('express');
@@ -9,15 +20,31 @@ const express = require('express');
 const FILENAME = 'api/routes/logs.js';
 
 /**
- * Logs routes
- * @param {Object} deps - Dependencies
- * @returns {express.Router} Router
+ * Creates and configures the logs routes
+ * 
+ * @param {Object} deps - Required dependencies for logs operations
+ * @param {Object} deps.logsService - Service for log file operations and parsing
+ * @param {Object} deps.logger - Logger instance for request logging
+ * @returns {express.Router} Configured Express router with logs endpoints
  */
 function logsRoutes(deps) {
   const router = express.Router();
   const { logsService, logger } = deps;
-  
-  // Get current logs (default log file)
+    /**
+   * GET /api/logs
+   * Retrieves log entries from the default log file with optional filtering
+   * 
+   * Query Parameters:
+   * - limit: Maximum number of entries to return (default: 1000)
+   * - level: Filter by log level (debug, info, warn, error)
+   * - file: Filter by source filename
+   * - search: Text search within log entries
+   * 
+   * @async
+   * @param {express.Request} req - Express request object
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} JSON array of log entries or error response
+   */
   router.get('/', async (req, res) => {
     try {
       const limit = parseInt(req.query.limit) || 1000;
@@ -53,8 +80,15 @@ function logsRoutes(deps) {
       });
     }
   });
-  
-  // Get available log files
+    /**
+   * GET /api/logs/files
+   * Retrieves a list of available log files
+   * 
+   * @async
+   * @param {express.Request} req - Express request object
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} JSON array of available log files or error response
+   */
   router.get('/files', async (req, res) => {
     try {
       const files = await logsService.getLogFiles();
@@ -67,8 +101,24 @@ function logsRoutes(deps) {
       });
     }
   });
-
-  // Get content of a specific log file
+  /**
+   * GET /api/logs/file/:filename
+   * Retrieves content from a specific log file with optional filtering
+   * 
+   * Path Parameters:
+   * - filename: Name of the log file to retrieve
+   * 
+   * Query Parameters:
+   * - limit: Maximum number of entries to return (default: 1000)
+   * - level: Filter by log level (debug, info, warn, error)
+   * - file: Filter by source filename
+   * - search: Text search within log entries
+   * 
+   * @async
+   * @param {express.Request} req - Express request object with filename parameter
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} JSON array of filtered log entries or error response
+   */
   router.get('/file/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
@@ -93,8 +143,18 @@ function logsRoutes(deps) {
       });
     }
   });
-
-  // Clear a log file
+  /**
+   * DELETE /api/logs/file/:filename
+   * Clears the contents of a specific log file
+   * 
+   * Path Parameters:
+   * - filename: Name of the log file to clear
+   * 
+   * @async
+   * @param {express.Request} req - Express request object with filename parameter
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} Success confirmation or error response
+   */
   router.delete('/file/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
@@ -119,8 +179,20 @@ function logsRoutes(deps) {
       });
     }
   });
-
-  // Add a new debug route
+  /**
+   * GET /api/logs/debug
+   * Provides debug information about the logging system
+   * 
+   * Returns information about:
+   * - Logs directory path and contents
+   * - Sample log entries from main log file
+   * - Log parsing test results
+   * 
+   * @async
+   * @param {express.Request} req - Express request object
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} Debug information object or error response
+   */
   router.get('/debug', async (req, res) => {
     try {
       // Check logs directory

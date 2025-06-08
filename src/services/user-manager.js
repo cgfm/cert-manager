@@ -1,7 +1,14 @@
 /**
- * User Manager Service
- * Handles user management, authentication and permission checks
+ * @fileoverview User Manager Service - Handles user management, authentication and permission checks
+ * @module services/user-manager
+ * @requires fs
+ * @requires path
+ * @requires crypto
+ * @requires bcryptjs
+ * @requires ./logger
+ * @author Certificate Manager
  */
+
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
@@ -10,11 +17,17 @@ const logger = require('./logger');
 
 const FILENAME = 'services/user-manager.js';
 
+/**
+ * User Manager Service for handling user authentication, authorization, and user account management.
+ * Provides functionality for creating, updating, deleting users, managing passwords, roles, and permissions.
+ * Handles user sessions and activity logging integration.
+ */
 class UserManager {
   /**
-   * Create a new UserManager
-   * @param {Object} config - Application configuration
-   * @param {Object} activityService - Activity service for recording user activities
+   * Create a new UserManager instance
+   * @param {Object} config - Application configuration object containing system settings
+   * @param {string} config.configDir - Directory path where user data files are stored
+   * @param {Object} [activityService=null] - Activity service instance for recording user activities and audit trails
    */
   constructor(config, activityService = null) {
     this.config = config;
@@ -29,9 +42,12 @@ class UserManager {
       usersFile: this.usersFile 
     }, FILENAME);
   }
-  
-  /**
-   * Initialize the UserManager and load users
+    /**
+   * Initialize the UserManager service by loading existing users and setting up default admin if needed.
+   * Creates default admin user if setup is completed but no users exist (migration scenario).
+   * @async
+   * @returns {Promise<void>} Promise that resolves when initialization is complete
+   * @throws {Error} Throws error if initialization fails (file access, user creation, etc.)
    */
   async init() {
     try {
@@ -77,9 +93,13 @@ class UserManager {
       throw error;
     }
   }
-  
-  /**
-   * Load users from file
+    /**
+   * Load users from the users JSON file into memory.
+   * Creates the users file if it doesn't exist. Populates the internal users Map.
+   * @async
+   * @private
+   * @returns {Promise<void>} Promise that resolves when users are loaded
+   * @throws {Error} Throws error if file operations fail or JSON parsing fails
    */
   async loadUsers() {
     try {
@@ -117,9 +137,13 @@ class UserManager {
       throw error;
     }
   }
-  
-  /**
-   * Save users to file
+    /**
+   * Save all users from memory to the users JSON file.
+   * Serializes the users Map to JSON format and writes to file.
+   * @async
+   * @private
+   * @returns {Promise<void>} Promise that resolves when users are saved
+   * @throws {Error} Throws error if file write operation fails
    */
   async saveUsers() {
     try {
@@ -138,11 +162,15 @@ class UserManager {
       throw error;
     }
   }
-  
-  /**
-   * Get a user by username
-   * @param {string} username - Username to look up
-   * @returns {Object|null} User object or null if not found
+    /**
+   * Retrieve a user by username from the users collection.
+   * @param {string} username - The username to search for
+   * @returns {Object|null} User object containing user details or null if user not found
+   * @returns {string} returns.username - User's username
+   * @returns {string} returns.name - User's display name
+   * @returns {string} returns.role - User's role (admin, user, etc.)
+   * @returns {boolean} returns.disabled - Whether the user account is disabled
+   * @returns {string} returns.password - Hashed password
    */
   getUser(username) {
     logger.finest('Getting user', { username }, FILENAME);

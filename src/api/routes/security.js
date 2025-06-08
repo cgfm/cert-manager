@@ -1,12 +1,19 @@
 /**
- * Security router for handling encryption key rotation
+ * @fileoverview Security API Routes - Encryption and security management endpoints
+ * 
+ * This module provides endpoints for managing security-related operations:
+ * - Encryption key rotation for stored passphrases
+ * - Security event logging and audit trails
+ * - Certificate security management
+ * 
+ * All operations are logged for security audit purposes and require
+ * appropriate authentication and authorization.
+ * 
  * @module api/routes/security
  * @requires express
  * @requires services/logger
- * @version 0.0.2
- * @license MIT
- * @author Christian Meiners
- * @description This module exports a function that initializes an Express router for handling security-related requests.
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 const express = require('express');
 const logger = require('../../services/logger');
@@ -14,16 +21,32 @@ const logger = require('../../services/logger');
 const FILENAME = 'api/routes/security.js';
 
 /**
- * Initialize the security router with dependencies
- * @param {Object} deps - Dependencies
- * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {ActivityService} deps.activityService - Activity service instance
- * @returns {express.Router} Express router
+ * Initializes the security router with endpoints for security operations
+ * 
+ * @param {Object} deps - Required dependencies for security operations
+ * @param {Object} deps.certificateManager - Certificate manager for key operations
+ * @param {Object} deps.activityService - Activity service for audit logging
+ * @returns {express.Router} Configured Express router with security endpoints
  */
 function initSecurityRouter(deps) {
   const router = express.Router();
   const { certificateManager, activityService } = deps;
 
+  /**
+   * POST /api/security/rotate-encryption-key
+   * Rotates the encryption key used for storing certificate passphrases
+   * 
+   * This security-critical operation:
+   * - Generates a new encryption key
+   * - Re-encrypts all stored passphrases with the new key
+   * - Logs the operation for audit trails
+   * - Maintains data integrity throughout the process
+   * 
+   * @async
+   * @param {express.Request} req - Express request object
+   * @param {express.Response} res - Express response object
+   * @returns {Promise<void>} JSON response confirming key rotation success or failure
+   */
   // Rotate encryption key for passphrases
   router.post('/rotate-encryption-key', async (req, res) => {
     try {

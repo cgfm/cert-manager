@@ -32,13 +32,12 @@ Before getting started, ensure you have:
 - Administrative privileges for certificate operations
 
 ### Network Access
-- Internet connectivity for ACME challenges (if using Let's Encrypt)
 - Access to target servers for deployment
-- Firewall rules allowing necessary ports (80, 443, custom ports)
+- Firewall rules allowing necessary ports for deployment (if applicable)
 
 ### Domain Control
-- DNS control for domain validation
-- Access to web servers for HTTP validation
+- Domain ownership for creating valid certificates
+- Access to web servers for certificate deployment
 - Administrative access to target deployment systems
 
 ## Initial Setup
@@ -101,24 +100,19 @@ Fill in the basic certificate information:
 }
 ```
 
-### Step 3: Domain Validation
+### Step 3: Certificate Generation
 
-Choose your validation method:
+The Certificate Manager will create your certificate using OpenSSL:
 
-#### HTTP Validation
-- Requires access to web server
-- Places validation file in `.well-known/acme-challenge/`
-- Best for standard web hosting
+#### Self-Signed Certificates
+- Generated locally using OpenSSL
+- No external validation required
+- Suitable for internal/development use
 
-#### DNS Validation
-- Requires DNS control
-- Creates TXT records for validation
-- Works with any server configuration
-
-#### Manual Validation
-- For complex setups
-- Manual verification process
-- Full control over validation
+#### CA-Signed Certificates
+- Signed by your own Certificate Authority
+- Maintains trust chain
+- Best for internal infrastructure
 
 ### Step 4: Generate Certificate
 

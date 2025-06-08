@@ -1,12 +1,23 @@
+/**
+ * @fileoverview Integrations API Routes - Manages third-party service integrations
+ * @module api/routes/integrations
+ * @requires express
+ * @requires ../../services/logger
+ * @author Certificate Manager
+ */
+
 const express = require('express');
 const logger = require('../../services/logger');
 
 const FILENAME = 'api/routes/integrations.js';
 
 /**
- * Initialize the integrations router
- * @param {Object} deps - Dependencies
- * @returns {Object} Express router
+ * Initialize the integrations router with required dependencies.
+ * Provides endpoints for managing third-party integrations like Nginx Proxy Manager.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.npmIntegrationService - NPM integration service for Nginx Proxy Manager operations
+ * @param {Object} deps.configService - Configuration service for managing integration settings
+ * @returns {express.Router} Configured Express router with integration endpoints
  */
 function initIntegrationsRouter(deps) {
     const router = express.Router();

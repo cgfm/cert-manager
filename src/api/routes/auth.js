@@ -1,20 +1,27 @@
 /**
- * Authentication API Routes
+ * @fileoverview Authentication API Routes - Handles user authentication, login, logout, and session management
+ * @module api/routes/auth
+ * @requires express
+ * @requires jsonwebtoken
+ * @requires ../../services/logger
+ * @author Certificate Manager
  */
+
 const express = require('express');
 const router = express.Router();
 const logger = require('../../services/logger');
-const jwt = require('jsonwebtoken'); // Add this import
+const jwt = require('jsonwebtoken');
 
 const FILENAME = 'api/routes/auth.js';
 
 /**
- * Initialize authentication router
- * @param {Object} deps - Dependencies
- * @param {AuthMiddleware} deps.authMiddleware - Authentication middleware
- * @param {UserManager} deps.userManager - User manager service
- * @param {ActivityService} deps.activityService - Activity service
- * @returns {express.Router} Express router
+ * Initialize authentication router with required dependencies.
+ * Sets up routes for login, logout, session validation, and user management.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.authMiddleware - Authentication middleware for JWT handling and session management
+ * @param {Object} deps.userManager - User manager service for user authentication and management
+ * @param {Object} deps.activityService - Activity service for logging authentication events
+ * @returns {express.Router} Configured Express router with authentication endpoints
  */
 function initAuthRouter(deps) {
     const { authMiddleware, userManager, activityService } = deps;

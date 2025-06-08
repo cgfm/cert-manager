@@ -17,3 +17,5 @@ notes/
 certs/
 dummyParent/
 nginxpm/
+coverage/
+test-results/

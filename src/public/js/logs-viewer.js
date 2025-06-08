@@ -1,6 +1,27 @@
 /**
- * Certificate Manager - Logs System
- * Combines log viewing and log level management functionality
+ * @fileoverview Certificate Manager - Logs System and Viewer
+ * 
+ * This module provides comprehensive log viewing and management capabilities for the
+ * Certificate Manager application. It combines real-time log monitoring with advanced
+ * filtering, search, and export functionality.
+ * 
+ * Features include:
+ * - Real-time log streaming and auto-refresh
+ * - Multi-level filtering (level, file, search text)
+ * - Log export functionality (JSON/CSV formats)
+ * - Log level management and dynamic configuration
+ * - Pagination for large log datasets
+ * - Color-coded log levels for better readability
+ * - Cross-platform log file access
+ * 
+ * The logs system integrates with the backend logging service to provide
+ * administrators with comprehensive system monitoring capabilities.
+ * 
+ * @module public/js/logs-viewer
+ * @requires Logger
+ * @requires UIUtils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 // Logs state

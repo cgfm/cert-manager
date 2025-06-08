@@ -1,17 +1,20 @@
 /**
- * Renewal API Routes
- * This module defines the routes for managing certificate renewals.
- * It provides endpoints to check renewal status, trigger manual checks,
- * restart the file watcher, and reschedule the renewal cron job.
+ * @fileoverview Renewal API Routes - Certificate renewal management endpoints
+ * 
+ * This module provides endpoints for managing automated certificate renewals:
+ * - Status monitoring of renewal service
+ * - Manual renewal checks and triggers
+ * - File watcher management for certificate changes
+ * - Cron job scheduling for automated renewals
+ * 
+ * Supports both automatic scheduled renewals and manual intervention
+ * when certificates need immediate attention.
+ * 
  * @module api/routes/renewal
  * @requires express
  * @requires services/logger
- * @version 0.0.2
- * @license MIT
- * @author Christian Meiners
- * @description This module exports a function that initializes an Express router for handling renewal-related requests.
- * The router provides endpoints to check the renewal service status, trigger manual renewal checks,
- * restart the file watcher, and reschedule the renewal cron job.
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 const express = require('express');
@@ -19,10 +22,26 @@ const logger = require('../../services/logger');
 
 const FILENAME = 'api/routes/renewal.js';
 
+/**
+ * Initializes the renewal routes with certificate renewal management endpoints
+ * 
+ * @param {Object} services - Required services for renewal operations
+ * @param {Object} services.renewalService - Service for managing certificate renewals
+ * @returns {express.Router} Configured Express router with renewal endpoints
+ */
 function initRenewalRouter(services) {
     const router = express.Router();
     const { renewalService } = services;
 
+    /**
+     * GET /api/renewal/status
+     * Retrieves the current status of the renewal service
+     * 
+     * @async
+     * @param {express.Request} req - Express request object
+     * @param {express.Response} res - Express response object
+     * @returns {Promise<void>} JSON response with renewal service status
+     */
     // Get renewal service status
     router.get('/status', async (req, res) => {
         try {
@@ -38,6 +57,18 @@ function initRenewalRouter(services) {
         }
     });
 
+    /**
+     * POST /api/renewal/check
+     * Triggers a manual renewal check for certificates
+     * 
+     * Request Body:
+     * - forceAll: boolean - Force check all certificates regardless of expiry
+     * 
+     * @async
+     * @param {express.Request} req - Express request object with renewal options
+     * @param {express.Response} res - Express response object
+     * @returns {Promise<void>} JSON response with renewal check results
+     */
     // Trigger a manual renewal check
     router.post('/check', async (req, res) => {
         try {
@@ -57,6 +88,15 @@ function initRenewalRouter(services) {
         }
     });
 
+    /**
+     * POST /api/renewal/watcher/restart
+     * Restarts the file watcher for certificate changes
+     * 
+     * @async
+     * @param {express.Request} req - Express request object
+     * @param {express.Response} res - Express response object
+     * @returns {Promise<void>} JSON response confirming watcher restart
+     */
     // Restart the file watcher
     router.post('/watcher/restart', async (req, res) => {
         try {
@@ -75,6 +115,18 @@ function initRenewalRouter(services) {
         }
     });
 
+    /**
+     * POST /api/renewal/schedule
+     * Updates the cron schedule for automatic renewals
+     * 
+     * Request Body:
+     * - schedule: string - Cron expression for renewal schedule (optional)
+     * 
+     * @async
+     * @param {express.Request} req - Express request object with schedule options
+     * @param {express.Response} res - Express response object
+     * @returns {Promise<void>} JSON response with updated schedule information
+     */
     // Reschedule the cron job
     router.post('/schedule', async (req, res) => {
         try {

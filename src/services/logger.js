@@ -9,7 +9,19 @@ try {
 const path = require('path');
 const fs = require('fs');
 
+/**
+ * Logger service for the Certificate Manager application
+ * Provides centralized logging with support for different log levels, file logging, and Winston integration
+ * @class Logger
+ */
 class Logger {
+    /**
+     * Create a Logger instance
+     * @param {Object} [config=null] - Optional configuration object for logger settings
+     * @param {string} [config.logLevel] - Default log level (error, warn, info, debug, fine, finest)
+     * @param {string} [config.logDir] - Directory for log files
+     * @param {Object} [config.fileLogLevels] - File-specific log level overrides
+     */
     constructor(config = null) {
         // Default log level
         this.logLevel = process.env.LOG_LEVEL || 'info';
@@ -46,10 +58,11 @@ class Logger {
         }
 
         console.log(`Logger initialized with default level: ${this.logLevel}`);
-    }
-
-    /**
+    }    /**
      * Create Winston logger with file-specific log level filtering
+     * Initializes Winston transports for console and file output with custom formatting
+     * @private
+     * @returns {void}
      */
     initializeWinstonLogger() {
         // Creating a format that only colorizes the level

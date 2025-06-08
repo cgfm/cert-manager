@@ -1,0 +1,114 @@
+services:
+  # Mock NPM (Nginx Proxy Manager) for testing deployments
+  mock-npm:
+    image: nginx:alpine
+    ports:
+      - "3001:80"
+    volumes:
+      - ./tests/fixtures/mock-npm:/usr/share/nginx/html
+      - ./tests/fixtures/nginx.conf:/etc/nginx/nginx.conf
+    environment:
+      - NGINX_PORT=80
+
+  # Mock SMTP server for email testing
+  mock-smtp:
+    image: maildev/maildev
+    ports:
+      - "1080:1080"  # Web interface
+      - "1025:1025"  # SMTP port
+    environment:
+      - MAILDEV_WEB_PORT=1080
+      - MAILDEV_SMTP_PORT=1025
+
+  # Mock FTP server for file transfer testing
+  mock-ftp:
+    image: stilliard/pure-ftpd
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    environment:
+      - PUBLICHOST=localhost
+      - FTP_USER_NAME=testuser
+      - FTP_USER_PASS=testpass
+      - FTP_USER_HOME=/home/testuser
+    volumes:
+      - ./tests/fixtures/ftp-data:/home/testuser
+
+  # Mock SFTP server for secure file transfer testing
+  mock-sftp:
+    image: atmoz/sftp
+    ports:
+      - "2222:22"
+    command: testuser:testpass:1001:100:upload
+    volumes:
+      - ./tests/fixtures/sftp-data:/home/testuser/upload
+
+  # Mock Docker API for container testing
+  mock-docker:
+    image: docker:dind
+    privileged: true
+    ports:
+      - "2376:2376"
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - ./tests/fixtures/docker-certs:/certs
+
+  # Test database for data persistence testing
+  test-db:
+    image: alpine
+    command: sleep infinity
+    volumes:
+      - test-db-data:/data
+
+  # Simple HTTP server for webhook testing
+  webhook-server:
+    image: node:18-alpine
+    ports:
+      - "3002:3000"
+    working_dir: /app
+    command: |
+      sh -c "
+        echo 'const express = require(\"express\"); 
+        const app = express();
+        app.use(express.json());
+        app.post(\"/webhook\", (req, res) => {
+          console.log(\"Webhook received:\", req.body);
+          res.json({success: true, received: req.body});
+        });
+        app.get(\"/health\", (req, res) => res.json({status: \"ok\"}));
+        app.listen(3000, () => console.log(\"Webhook server ready on port 3000\"));
+        ' > server.js && npm init -y && npm install express && node server.js
+      "
+
+  # Test runner service
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      - mock-npm
+      - mock-smtp
+      - mock-ftp
+      - mock-sftp
+      - mock-docker
+      - webhook-server
+    environment:
+      - NODE_ENV=test
+      - CERT_MANAGER_URL=http://host.docker.internal:3000
+    volumes:
+      - ./tests:/app/tests
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    networks:
+      - default
+    profiles:
+      - test
+
+volumes:
+  test-db-data:
+    driver: local
+
+networks:
+  default:
+    name: cert-manager-test

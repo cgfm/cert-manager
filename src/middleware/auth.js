@@ -1,21 +1,33 @@
 /**
- * Authentication Middleware
- * Handles user authentication and session management
+ * @fileoverview Authentication Middleware - Handles user authentication and session management
+ * @module middleware/auth
+ * @requires crypto
+ * @requires jsonwebtoken
+ * @requires ../services/logger
+ * @author Certificate Manager
  */
+
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const logger = require('../services/logger');
 
 const FILENAME = 'middleware/auth.js';
 
+/**
+ * Authentication Middleware for handling user authentication, JWT tokens, and session management.
+ * Supports setup mode, auth disable mode, and comprehensive session validation.
+ */
 class AuthMiddleware {
     /**
-     * Create a new AuthMiddleware
-     * @param {Object} config - Application configuration
-     * @param {Object} userManager - User manager service
-     * @param {Object} activityService - Activity service
-     * @param {Object} options - Additional options
-     * @param {boolean} options.setupMode - Whether the app is in setup mode
+     * Create a new AuthMiddleware instance
+     * @param {Object} config - Application configuration object
+     * @param {Object} config.security - Security configuration settings
+     * @param {string} [config.security.jwtSecret] - JWT secret key for token signing
+     * @param {boolean} [config.security.disableAuth] - Whether to disable authentication
+     * @param {Object} userManager - User manager service for user validation
+     * @param {Object} [activityService=null] - Activity service for logging auth events
+     * @param {Object} [options={}] - Additional configuration options
+     * @param {boolean} [options.setupMode=false] - Whether the application is in setup mode
      */
     constructor(config, userManager, activityService = null, options = {}) {
         this.config = config;
@@ -42,11 +54,9 @@ class AuthMiddleware {
             authDisabledByEnv: process.env.DISABLE_AUTH === 'true',
             authDisabledByConfig: this.config.security?.disableAuth === true
         }, FILENAME);
-    }
-
-    /**
-     * Set setup mode status
-     * @param {boolean} isSetupMode - Whether the app is in setup mode
+    }    /**
+     * Set setup mode status and update authentication behavior accordingly.
+     * @param {boolean} isSetupMode - Whether the application is in setup mode
      */
     setSetupMode(isSetupMode) {
         // Don't enable setup mode if auth is disabled

@@ -1,6 +1,26 @@
 /**
- * Logger Module
- * Client-side logging functionality
+ * @fileoverview Client-side Logger Module - Comprehensive logging functionality
+ * 
+ * This module provides a complete client-side logging system with:
+ * - Multiple log levels (DEBUG, INFO, WARN, ERROR, FINE, FINEST)
+ * - Persistent log level configuration via localStorage
+ * - Server-side log level synchronization
+ * - Console output formatting with timestamps and context
+ * - Remote logging capabilities for error reporting
+ * - Performance monitoring and timing utilities
+ * - Memory usage tracking and cleanup
+ * 
+ * Features include:
+ * - Hierarchical log level filtering
+ * - Automatic server log level synchronization
+ * - Browser console integration with proper formatting
+ * - Local storage persistence for user preferences
+ * - Remote error reporting and aggregation
+ * - Performance benchmarking utilities
+ * 
+ * @module public/js/modules/logger
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 const Logger = {
   // Log levels
@@ -17,8 +37,14 @@ const Logger = {
   currentLevel: 3, // INFO by default
 
   /**
-   * Set the logging level
-   * @param {string} level - Log level name: 'debug', 'info', 'warn', 'error'
+   * Sets the current logging level for filtering log output
+   * Accepts both string names and numeric values with localStorage persistence
+   * 
+   * @param {string|number} level - Log level ('debug', 'info', 'warn', 'error') or numeric value (0-5)
+   * @example
+   * Logger.setLevel('debug'); // Enable debug and higher level logs
+   * Logger.setLevel(2); // Set to DEBUG level numerically
+   * Logger.setLevel('warn'); // Only show warnings and errors
    */
   setLevel: function (level) {
     // Handle both string and numeric level inputs

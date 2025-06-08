@@ -1,14 +1,15 @@
 /**
- * @module RenewalService
+ * @fileoverview Certificate Renewal Service - Provides automatic certificate renewal and file watching
+ * @module services/renewal-service
  * @requires node-cron
  * @requires chokidar
  * @requires path
  * @requires fs
- * @requires logger
+ * @requires ./logger
+ * @requires ./deploy-service
  * @version 0.1.0
  * @license MIT
  * @author Christian Meiners
- * @description This module provides a service to automatically renew certificates and watch for new certificates.
  */
 
 const cron = require('node-cron');
@@ -20,11 +21,22 @@ const deployService = require('./deploy-service');
 
 const FILENAME = 'services/renewal-service.js';
 
+/**
+ * Certificate Renewal Service for automatically managing certificate renewals and monitoring.
+ * Provides scheduled renewal checks, file system watching for new certificates, and deployment integration.
+ */
 class RenewalService {
     /**
-     * Create a new RenewalService
-     * @param {CertificateManager} certificateManager - Certificate manager instance
-     * @param {Object} options - Configuration options
+     * Create a new RenewalService instance
+     * @param {Object} certificateManager - Certificate manager instance for handling certificate operations
+     * @param {Object} deployService - Deploy service instance for handling certificate deployment
+     * @param {Object} [options={}] - Configuration options for the renewal service
+     * @param {string} [options.renewalSchedule='0 0 * * *'] - Cron schedule for renewal checks (default: daily at midnight)
+     * @param {number} [options.renewalCheckInterval=24] - Hours between renewal checks
+     * @param {boolean} [options.enableWatcher=true] - Whether to enable file system watcher for new certificates
+     * @param {number} [options.watcherStabilityThreshold=2000] - Milliseconds to wait before processing new files
+     * @param {boolean} [options.disableRenewalCron=false] - Whether to disable scheduled renewal cron job
+     * @param {boolean} [options.checkOnStart=false] - Whether to run renewal check on service startup
      */
     constructor(certificateManager, deployService, options = {}) {
         this.certificateManager = certificateManager;

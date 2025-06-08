@@ -18,10 +18,18 @@ RUN npm install
 # Copy application files
 COPY src ./src
 
+# Copy health check script
+COPY healthcheck.js ./
+
 # Create necessary directories with correct permissions
 RUN mkdir -p /logs /config /certs /app/public && \
     chmod 777 /logs /config /certs && \
-    cp -r /app/src/public-template/* /app/public/
+    cp -r /app/src/public-template/* /app/public/ && \
+    chmod +x /app/healthcheck.js
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=20s --start-period=120s --retries=3 \
+    CMD node /app/healthcheck.js
 
 # Set command to run
 CMD ["node", "src/app.js"]

@@ -1,13 +1,25 @@
 /**
- * Domain Validator - Server-side utility for validating domain names and IP addresses
+ * @fileoverview Domain Validator - Server-side utility for validating domain names and IP addresses
+ * @module utils/DomainValidator
+ * @author Certificate Manager
  */
+
 const FILENAME = 'utils/DomainValidator.js';
 
+/**
+ * Domain Validator utility class for validating domain names, wildcard domains, and IP addresses.
+ * Provides static methods for server-side domain validation used in certificate operations.
+ */
 class DomainValidator {
     /**
-     * Validate a domain name
+     * Validate a standard domain name according to RFC specifications.
+     * @static
      * @param {string} domain - Domain name to validate
-     * @returns {boolean} True if valid
+     * @returns {boolean} True if the domain is valid, false otherwise
+     * @example
+     * DomainValidator.isValidDomain('example.com'); // returns true
+     * DomainValidator.isValidDomain('localhost'); // returns true
+     * DomainValidator.isValidDomain('invalid..domain'); // returns false
      */
     static isValidDomain(domain) {
         if (!domain || typeof domain !== 'string') {
@@ -25,12 +37,15 @@ class DomainValidator {
         // Top-level domain must be at least 2 characters
         const regex = /^([a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$/i;
         return regex.test(domain);
-    }
-
-    /**
-     * Validate a wildcard domain name (e.g. *.example.com)
+    }    /**
+     * Validate a wildcard domain name (e.g. *.example.com).
+     * Ensures wildcard is only in the leftmost position and follows proper format.
+     * @static
      * @param {string} domain - Wildcard domain to validate
-     * @returns {boolean} True if valid
+     * @returns {boolean} True if the wildcard domain is valid, false otherwise
+     * @example
+     * DomainValidator.isValidWildcardDomain('*.example.com'); // returns true
+     * DomainValidator.isValidWildcardDomain('sub.*.example.com'); // returns false
      */
     static isValidWildcardDomain(domain) {
         if (!domain || typeof domain !== 'string') {
@@ -41,12 +56,14 @@ class DomainValidator {
         // Wildcard must be in leftmost position only
         const regex = /^\*\.([a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$/i;
         return regex.test(domain);
-    }
-
-    /**
-     * Validate an IPv4 address
+    }    /**
+     * Validate an IPv4 address according to standard format.
+     * @static
      * @param {string} ip - IP address to validate
-     * @returns {boolean} True if valid
+     * @returns {boolean} True if the IPv4 address is valid, false otherwise
+     * @example
+     * DomainValidator.isValidIPv4('192.168.1.1'); // returns true
+     * DomainValidator.isValidIPv4('300.1.1.1'); // returns false
      */
     static isValidIPv4(ip) {
         if (!ip || typeof ip !== 'string') {

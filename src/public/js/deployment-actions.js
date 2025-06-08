@@ -1,6 +1,38 @@
 /**
- * Deployment Actions Module
- * Handles the creation, editing, and management of certificate deployment actions
+ * @fileoverview Deployment Actions Module - Comprehensive certificate deployment management
+ * 
+ * This module provides a complete interface for creating, editing, and managing certificate
+ * deployment actions. It supports multiple deployment types including Docker containers,
+ * file system operations, SSH/SFTP transfers, FTP operations, email notifications,
+ * webhook calls, and custom shell commands.
+ * 
+ * Key Features:
+ * - Modal-based action creation and editing
+ * - Real-time form validation and error handling
+ * - Dynamic field rendering based on deployment type
+ * - Docker container and NPM certificate integration
+ * - File path validation and credential management
+ * - Sortable action lists with drag-and-drop support
+ * - Comprehensive logging and error reporting
+ * 
+ * Deployment Types Supported:
+ * - copy: File system copy operations
+ * - docker: Docker container certificate deployment
+ * - ssh: SSH/SFTP secure file transfers
+ * - ftp: FTP/FTPS file transfers
+ * - email: Email notification with certificate attachments
+ * - webhook: HTTP webhook POST requests
+ * - shell: Custom shell command execution
+ * 
+ * Dependencies:
+ * - Logger (global logging service)
+ * - Modal utilities for UI management
+ * - Form validation utilities
+ * - Docker and NPM integration services
+ * 
+ * @module public/deployment-actions
+ * @version 1.0.0
+ * @author Certificate Manager Team
  */
 
 // Module state
@@ -23,9 +55,13 @@ const DeploymentActions = {
     formId: "deployment-action-form",
     formTemplate: "/templates/deployment-action-form.html"
   },
-  
-  /**
-   * Initialize the deployment actions module
+    /**
+   * Initialize the deployment actions module.
+   * Sets up event handlers and prepares the module for use.
+   * This should be called once when the page loads.
+   * 
+   * @method init
+   * @memberof DeploymentActions
    */
   init() {
     Logger.debug("Initializing deployment actions module");
@@ -33,7 +69,12 @@ const DeploymentActions = {
   },
   
   /**
-   * Attach event handlers to global elements
+   * Attach event handlers to global DOM elements.
+   * Finds and binds click handlers to action buttons and form elements.
+   * 
+   * @method attachEventHandlers
+   * @memberof DeploymentActions
+   * @private
    */
   attachEventHandlers() {
     // Find and initialize the add action button if available
@@ -45,9 +86,17 @@ const DeploymentActions = {
   },
   
   /**
-   * Show the deployment action form modal
-   * @param {Object} [existingAction] - Existing action for edit mode
-   * @param {number} [actionIndex] - Index of existing action for edit mode
+   * Show the deployment action form modal for creating or editing actions.
+   * Handles both add and edit modes based on the provided parameters.
+   * 
+   * @method showActionForm
+   * @memberof DeploymentActions
+   * @param {Object} [existingAction=null] - Existing action object for edit mode
+   * @param {string} existingAction.type - The deployment action type (copy, docker, ssh, etc.)
+   * @param {string} existingAction.name - Display name for the action
+   * @param {Object} existingAction.config - Configuration object specific to the action type
+   * @param {number} [actionIndex=null] - Zero-based index of existing action for edit mode
+   * @async
    */
   showActionForm(existingAction = null, actionIndex = null) {
     // Store action for edit mode

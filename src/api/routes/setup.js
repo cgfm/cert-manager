@@ -1,6 +1,14 @@
 /**
- * Setup API Routes
+ * @fileoverview Setup API Routes - Handles application initial setup and configuration
+ * @module api/routes/setup
+ * @requires express
+ * @requires fs
+ * @requires path
+ * @requires crypto
+ * @requires ../../services/logger
+ * @author Certificate Manager
  */
+
 const express = require('express');
 const router = express.Router();
 const fs = require('fs').promises;
@@ -11,9 +19,14 @@ const logger = require('../../services/logger');
 const FILENAME = 'api/routes/setup.js';
 
 /**
- * Initialize setup router
- * @param {Object} deps - Dependencies
- * @returns {express.Router} Express router
+ * Initialize setup router with required dependencies.
+ * Provides endpoints for checking setup status and completing initial application setup.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.userManager - User manager service for user creation during setup
+ * @param {Object} deps.configService - Configuration service for managing app settings
+ * @param {Object} deps.activityService - Activity service for logging setup activities
+ * @param {Object} deps.authMiddleware - Authentication middleware for setup validation
+ * @returns {express.Router} Configured Express router with setup endpoints
  */
 function initSetupRouter(deps) {
   const { userManager, configService, activityService, authMiddleware } = deps;

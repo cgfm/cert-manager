@@ -1,6 +1,23 @@
 /**
- * Certificate Manager - Main JavaScript
- * Handles core functionality and initialization
+ * @fileoverview Certificate Manager - Main Client Application
+ * 
+ * This is the main JavaScript file for the Certificate Manager web application.
+ * It handles core functionality including:
+ * - Application initialization and authentication
+ * - Tab navigation and UI management
+ * - Certificate management operations (CRUD)
+ * - Real-time status updates and monitoring
+ * - Settings management and user preferences
+ * - Theme switching and accessibility features
+ * 
+ * The application uses a state-driven architecture with global state management
+ * for certificates, CA certificates, and user settings.
+ * 
+ * @module public/js/main
+ * @requires Logger
+ * @requires UIUtils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 // Initialize the application when DOM is loaded

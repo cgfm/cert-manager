@@ -1,9 +1,11 @@
 /**
- * Nginx Proxy Manager Integration Service
- * Handles all interactions with Nginx Proxy Manager instances
+ * @fileoverview Nginx Proxy Manager Integration Service - Handles interactions with NPM instances
  * @module services/npm-integration-service
  * @requires axios
- * @requires logger
+ * @requires https
+ * @requires child_process
+ * @requires ./logger
+ * @author Certificate Manager
  */
 
 const axios = require('axios');
@@ -13,11 +15,15 @@ const { execSync } = require('child_process');
 
 const FILENAME = 'services/npm-integration-service.js';
 
+/**
+ * Nginx Proxy Manager Integration Service for managing certificates and proxy hosts.
+ * Provides methods to interact with NPM API for certificate upload and proxy configuration.
+ */
 class NpmIntegrationService {
     /**
-     * Create a new NPM Integration Service
-     * @param {Object} options - Service options
-     * @param {Object} options.configService - Configuration service instance
+     * Create a new NPM Integration Service instance
+     * @param {Object} [options={}] - Service configuration options
+     * @param {Object} options.configService - Configuration service instance for accessing NPM settings
      */
     constructor(options = {}) {
         this.configService = options.configService;

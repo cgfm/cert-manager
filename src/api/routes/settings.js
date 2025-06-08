@@ -1,15 +1,15 @@
 /**
- * Settings API Routes
- * This module defines the routes for managing application settings.
- * It provides endpoints to get and update settings.
+ * @fileoverview Settings API Routes - Manages application configuration and settings
  * @module api/routes/settings
  * @requires express
- * @requires services/logger
+ * @requires nodemailer
+ * @requires https
+ * @requires node-fetch
+ * @requires axios
+ * @requires ../../services/logger
  * @version 0.0.2
  * @license MIT
  * @author Christian Meiners
- * @description This module exports a function that initializes an Express router for handling settings-related requests.
- * The router provides endpoints to get and update application settings.
  */
 
 const express = require('express');
@@ -20,9 +20,18 @@ const { Agent } = require('https');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const axios = require('axios');
 
-// Filename for better logging
 const FILENAME = 'api/routes/settings.js';
 
+/**
+ * Initialize settings router with required dependencies.
+ * Provides endpoints for managing application configuration, deployment settings, and integration testing.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.configService - Configuration service for managing app settings
+ * @param {Object} deps.renewalService - Renewal service for certificate renewal management
+ * @param {Object} deps.npmIntegrationService - NPM integration service for Nginx Proxy Manager
+ * @param {Object} deps.activityService - Activity service for logging settings changes
+ * @returns {express.Router} Configured Express router with settings management endpoints
+ */
 function initSettingsRouter(deps) {
     const router = express.Router();
     const { configService, renewalService, npmIntegrationService, activityService } = deps;

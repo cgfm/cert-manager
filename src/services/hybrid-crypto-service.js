@@ -1,7 +1,24 @@
-const logger = require('./logger'); // Assuming logger is in the same directory or accessible
+/**
+ * @fileoverview Hybrid Crypto Service - Provides crypto operations with automatic fallback between services
+ * @module services/hybrid-crypto-service
+ * @requires ./logger
+ * @author Certificate Manager
+ */
+
+const logger = require('./logger');
 const FILENAME = 'services/hybrid-crypto-service.js';
 
+/**
+ * Hybrid Crypto Service that provides crypto operations with automatic fallback.
+ * Uses ForgeCryptoService as primary and OpenSSLWrapper as fallback for reliability.
+ */
 class HybridCryptoService {
+    /**
+     * Create a new HybridCryptoService instance
+     * @param {Object} forgeService - ForgeCryptoService instance for primary crypto operations
+     * @param {Object} opensslService - OpenSSLWrapper instance for fallback crypto operations
+     * @throws {Error} Throws error if required services are not provided
+     */
     constructor(forgeService, opensslService) {
         if (!forgeService) {
             throw new Error('ForgeCryptoService instance is required for HybridCryptoService.');
@@ -13,15 +30,16 @@ class HybridCryptoService {
         this.opensslService = opensslService;
         this.renewalService = null; // For setRenewalService
         logger.info('HybridCryptoService initialized.', null, FILENAME);
-    }
-
-    /**
-     * Helper to execute a method with fallback.
-     * @param {string} methodName - The name of the method to call on primary and fallback services.
-     * @param {Array} args - Arguments to pass to the method.
-     * @param {string} [operationDescription] - A description of the operation for logging.
-     * @returns {Promise<any>}
+    }    /**
+     * Execute a crypto operation with automatic fallback between services.
+     * Attempts the operation with the primary service first, then falls back to secondary if it fails.
      * @private
+     * @async
+     * @param {string} methodName - The name of the method to call on both services
+     * @param {Array} args - Arguments to pass to the method
+     * @param {string} [operationDescription=methodName] - Description of the operation for logging
+     * @returns {Promise<any>} Result from the successful service call
+     * @throws {Error} Throws the last error if both services fail
      */
     async _executeWithFallback(methodName, args, operationDescription = methodName) {
         try {
@@ -45,11 +63,26 @@ class HybridCryptoService {
                 throw opensslError; // Re-throw the error from the fallback
             }
         }
-    }
-
+    }    /**
+     * Get certificate information from a certificate file with automatic fallback.
+     * @async
+     * @param {string} certPath - Path to the certificate file
+     * @param {string} [certNameLog=null] - Optional certificate name for logging purposes
+     * @returns {Promise<Object>} Certificate information object
+     * @throws {Error} Throws error if both services fail to read certificate
+     */
     async getCertificateInfo(certPath, certNameLog = null) {
         return this._executeWithFallback('getCertificateInfo', [certPath, certNameLog], `get certificate info for ${certNameLog || certPath}`);
     }
+
+    /**
+     * Generate a cryptographic key pair using the primary service.
+     * Currently defaults to ForgeCryptoService without fallback.
+     * @async
+     * @param {Object} [options={}] - Key generation options
+     * @returns {Promise<Object>} Generated key pair object
+     * @throws {Error} Throws error if key generation fails
+     */
 
     async generateKeyPair(options = {}) {
         // OpenSSLWrapper might not have a direct equivalent or might be more complex to call.

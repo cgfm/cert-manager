@@ -1,7 +1,9 @@
 /**
- * Filesystem API Routes
- * @module filesystemRoutes
+ * @fileoverview Filesystem API Routes - Provides file system browsing and management endpoints
+ * @module api/routes/filesystem
  * @requires express
+ * @requires path
+ * @author Certificate Manager
  */
 
 const express = require("express");
@@ -10,9 +12,12 @@ const path = require("path");
 const FILENAME = 'api/routes/filesystem.js';
 
 /**
- * Filesystem routes
- * @param {Object} deps - Dependencies
- * @returns {express.Router} Router
+ * Initialize filesystem routes with required dependencies.
+ * Provides endpoints for file system browsing, directory listing, and file operations.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.fileSystemService - File system service for file operations
+ * @param {Object} deps.logger - Logger service for request logging
+ * @returns {express.Router} Configured Express router with filesystem endpoints
  */
 function filesystemRoutes(deps) {
   const router = express.Router();

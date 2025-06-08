@@ -15,11 +15,18 @@ const logger = require('./logger');
 
 const FILENAME = 'services/config-service.js';
 
+/**
+ * Configuration service for managing application settings
+ * Handles loading configuration from files and environment variables
+ * @class ConfigService
+ */
 class ConfigService {
     /**
-     * Create a new ConfigService
-     * @param {Object} options - Configuration options
-     * @param {string} options.configDir - Directory for configuration files
+     * Create a new ConfigService instance
+     * @param {Object} [options={}] - Configuration options
+     * @param {string} [options.configDir] - Directory for configuration files (overrides environment variables)
+     * @param {string} [options.certsDir] - Directory for certificate files
+     * @param {string} [options.archiveBaseDir] - Base directory for certificate archives
      */
     constructor(options = {}) {
         // Get config directory from options, environment variable or default path
@@ -158,11 +165,11 @@ class ConfigService {
         this.loaded = false;
 
         logger.debug('ConfigService initialized with settings from file and environment variables', null, FILENAME);
-    }
-
-    /**
+    }    /**
      * Process environment variables to override file settings
-     * This centralizes all environment variable processing
+     * Centralizes all environment variable processing and applies them to effective settings
+     * @private
+     * @returns {void}
      */
     processEnvironmentVariables() {
         // Start with file-based settings
@@ -198,34 +205,32 @@ class ConfigService {
                     logger.debug(`Setting '${settingKey}' overridden by environment variable ${envName}=${value}`, null, FILENAME);
                 }
             });
-    }
-
-    /**
+    }    /**
      * Convert environment variable name to settings key
-     * @param {string} envName - Environment variable name (without prefix)
-     * @returns {string} Settings key
+     * Transforms SNAKE_CASE environment variable names to camelCase settings keys
+     * @param {string} envName - Environment variable name (without CERT_MANAGER_ prefix)
+     * @returns {string|null} Settings key in camelCase format, or null if invalid
      */
     envToSettingKey(envName) {
         // Convert SNAKE_CASE to camelCase
         return envName.toLowerCase()
             .replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-    }
-
-    /**
+    }    /**
      * Parse environment variable value to appropriate type
-     * @param {string} value - Environment variable value
-     * @returns {*} Parsed value
+     * Converts string values to boolean, number, or keeps as string based on content
+     * @param {string} value - Environment variable value as string
+     * @returns {boolean|number|string} Parsed value with appropriate type
      */
     parseEnvValue(value) {
         if (value === 'true') return true;
         if (value === 'false') return false;
         if (!isNaN(value) && value !== '') return Number(value);
         return value;
-    }
-
-    /**
+    }    /**
      * Load settings from configuration file
-     * @returns {Object} The loaded settings
+     * Reads settings from JSON file, handles JSON parsing errors, and merges with defaults
+     * @returns {Object} The loaded settings merged with default values
+     * @throws {Error} If critical file system operations fail
      */
     loadSettings() {
         try {
@@ -281,12 +286,11 @@ class ConfigService {
             logger.error('Error loading settings:', error, FILENAME);
             return this.defaultSettings;
         }
-    }
-
-    /**
+    }    /**
      * Save settings to configuration file
-     * @param {Object} settings - Settings to save
-     * @returns {boolean} Success status
+     * Writes settings object to JSON file with proper formatting
+     * @param {Object} settings - Settings object to save to file
+     * @returns {boolean} True if save was successful, false otherwise
      */
     saveSettings(settings) {
         try {
@@ -313,12 +317,11 @@ class ConfigService {
             logger.error('Error saving settings:', error, FILENAME);
             return false;
         }
-    }
-
-    /**
+    }    /**
      * Update specific settings
-     * @param {Object} newSettings - Settings to update
-     * @returns {boolean} Success status
+     * Merges new settings with existing ones and saves to file
+     * @param {Object} newSettings - Settings object with properties to update
+     * @returns {boolean} True if update was successful, false otherwise
      */
     updateSettings(newSettings) {
         try {
@@ -336,24 +339,23 @@ class ConfigService {
             logger.error('Error updating settings:', error, FILENAME);
             return false;
         }
-    }
-
-    /**
+    }    /**
      * Update method alias for updateSettings (for compatibility)
-     * @param {Object} newConfig - New configuration
-     * @param {string} section - Not used, kept for compatibility
-     * @returns {boolean} Success status
+     * Legacy method maintained for backward compatibility with older code
+     * @param {Object} newConfig - New configuration object to merge
+     * @param {string|null} [section=null] - Configuration section (not used, kept for compatibility)
+     * @returns {boolean} True if update was successful, false otherwise
+     * @deprecated Use updateSettings() instead
      */
     update(newConfig, section = null) {
         logger.debug('ConfigService.update called (compatibility method)', null, FILENAME);
         return this.updateSettings(newConfig);
-    }
-
-    /**
+    }    /**
      * Get settings value(s)
-     * @param {string|null} key - Setting key or null to get all settings
-     * @param {*} defaultValue - Default value if key not found
-     * @returns {*} The setting value or entire settings object
+     * Retrieves specific setting by key or all settings if no key provided
+     * @param {string|null} [key=null] - Setting key to retrieve, or null to get all settings
+     * @param {*} [defaultValue=null] - Default value to return if key is not found
+     * @returns {*} The setting value, entire settings object if key is null, or defaultValue if key not found
      */
     get(key = null, defaultValue = null) {
         // Return all settings if no key provided
@@ -364,12 +366,14 @@ class ConfigService {
         // Return specific setting or default value
         return this.effectiveSettings[key] !== undefined ?
             this.effectiveSettings[key] : defaultValue;
-    }
-
-    /**
+    }    /**
      * Update deployment settings
-     * @param {Object} settings - New deployment settings
-     * @returns {Promise<Boolean>} Success status
+     * Updates deployment configuration including email, nginx proxy manager, and docker settings
+     * @param {Object} settings - New deployment settings object
+     * @param {Object} [settings.email] - Email configuration settings
+     * @param {Object} [settings.nginxProxyManager] - Nginx Proxy Manager settings
+     * @param {Object} [settings.dockerDefaults] - Docker connection settings
+     * @returns {Promise<boolean>} Promise resolving to true if update was successful, false otherwise
      */
     async updateDeploymentSettings(settings) {
         try {

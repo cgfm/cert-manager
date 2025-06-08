@@ -237,15 +237,13 @@ Standard web-based validation:
 
 ```javascript
 // HTTP validation configuration
-{
-  "validation": {
-    "method": "http",
-    "challengeType": "http-01",
-    "webroot": "/var/www/html",
-    "challengePath": "/.well-known/acme-challenge/",
-    "httpPort": 80,
-    "timeout": 60,
-    "retryAttempts": 3
+{  "generation": {
+    "method": "openssl",
+    "keySize": 2048,
+    "algorithm": "RSA",
+    "validityDays": 365,
+    "selfSigned": false,
+    "signWithCA": true
   }
 }
 ```

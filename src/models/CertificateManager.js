@@ -7,18 +7,20 @@ const logger = require('../services/logger');
 const FILENAME = 'models/CertificateManager.js';
 
 /**
+ * Certificate Manager class for handling SSL certificate operations
+ * Enhanced with caching mechanism to improve performance when refreshing the frontend
  * @class CertificateManager
- * Enhanced with a caching mechanism to improve performance when refreshing the frontend.
  */
 class CertificateManager {
 
     /**
      * Constructor for CertificateManager
-     * @param {*} configService 
-     * @param {*} cryptoServiceService  
-     * @param {*} activityService 
+     * Initializes the certificate manager with required services and sets up caching
+     * @param {Object} configService - Configuration service instance for accessing settings
+     * @param {Object} cryptoService - Crypto service instance for certificate operations (note: parameter name was incorrect)
+     * @param {Object} [activityService=null] - Activity service instance for logging operations
      */
-    constructor(configService, cryptoServiceService , activityService = null) {
+    constructor(configService, cryptoService, activityService = null) {
         // Initialization state flag
         this.isInitialized = false;
 
@@ -41,9 +43,8 @@ class CertificateManager {
 
         // Initialize passphrase manager
         this.passphraseManager = new PassphraseManager(this.configDir);
-        
-        // Assign cryptoService wrapper
-        this.cryptoServiceService  = cryptoServiceService ;
+          // Assign cryptoService wrapper
+        this.cryptoService = cryptoService;
 
         // Assign activity service
         this.activityService = activityService;
@@ -78,11 +79,10 @@ class CertificateManager {
             // Config file might not exist yet
             logger.debug(`No certificate config found at ${this.configPath} or couldn't read stats`, null, FILENAME);
         }
-    }
-
-    /**
-     * Set cache expiry time
-     * @param {number} milliseconds - Time in milliseconds for cache to live
+    }    /**
+     * Set cache expiry time for certificate data
+     * @param {number} milliseconds - Time in milliseconds for cache to live (must be >= 0)
+     * @returns {void}
      */
     setCacheExpiryTime(milliseconds) {
         if (typeof milliseconds === 'number' && milliseconds >= 0) {
@@ -91,12 +91,11 @@ class CertificateManager {
         } else {
             logger.warn(`Invalid cache expiry time: ${milliseconds}, using default`, null, FILENAME);
         }
-    }
-
-    /**
-     * Check if cache is still valid
-     * @param {boolean} deepCheck - Whether to check file modifications as well
-     * @returns {boolean} True if cache is valid
+    }    /**
+     * Check if certificate cache is still valid
+     * Validates cache based on time expiry and optionally file modification times
+     * @param {boolean} [deepCheck=false] - Whether to check file modifications as well as time-based expiry
+     * @returns {boolean} True if cache is valid and can be used, false if refresh is needed
      */
     isCacheValid(deepCheck = false) {
         // If we have certificates and no pending changes, consider the cache valid
@@ -638,14 +637,14 @@ class CertificateManager {
             }
 
             // Check passphrase requirement if cryptoService is available
-            if (this.cryptoServiceService) {
+            if (this.cryptoService) {
                 try {
                     // Get key path from the certificate
                     const keyPath = certificate.paths?.keyPath || certificate.paths?.key;
 
                     if (keyPath && fs.existsSync(keyPath)) {
                         // Use isKeyEncrypted directly to check if the key needs a passphrase
-                        const needsPassphrase = await this.cryptoServiceService.isKeyEncrypted(keyPath);
+                        const needsPassphrase = await this.cryptoService.isKeyEncrypted(keyPath);
                         logger.info(`Passphrase requirement checked for ${certificate.name}: ${needsPassphrase ? 'Needs passphrase' : 'No passphrase required'}`, null, FILENAME, certificate.name);
 
                         // Update the certificate using its own method
@@ -753,7 +752,7 @@ class CertificateManager {
             logger.fine(`Parsing certificate file: ${filePath}`, null, FILENAME);
 
             // Use cryptoService wrapper instead of direct execution
-            const certInfo = await this.cryptoServiceService.getCertificateInfo(filePath);
+            const certInfo = await this.cryptoService.getCertificateInfo(filePath);
 
             // Log extracted certificate info for debugging
             logger.finest(`Certificate info extracted from ${filePath}:`, null, FILENAME);
@@ -1459,7 +1458,7 @@ class CertificateManager {
                     name: certificate.name
                 };
 
-                const forgeResult = await this.cryptoServiceService.renewCertificate(renewalForgeConfig);
+                const forgeResult = await this.cryptoService.renewCertificate(renewalForgeConfig);
                 // Assuming forgeResult contains { certPath, certificate (forge object) } on success
                 if (forgeResult.certificate && forgeResult.certPath) {
                     operationResult.success = true;
@@ -1508,7 +1507,7 @@ class CertificateManager {
                     }
 
                     // 1. Generate key for the new certificate
-                    await this.cryptoServiceService.generatePrivateKey({
+                    await this.cryptoService.generatePrivateKey({
                         keyPath: certPaths.key,
                         algorithm: keyOptions.algorithm,
                         bits: keyOptions.bits,
@@ -1520,7 +1519,7 @@ class CertificateManager {
 
                     // 2. Create CSR
                     const csrExtensions = this._prepareForgeExtensions(certificate, true); // Extensions for CSR (e.g., SANs)
-                    await this.cryptoServiceService.createCSR({
+                    await this.cryptoService.createCSR({
                         csrPath: certPaths.csr,
                         keyPath: certPaths.key,
                         keyPassphrase: certPassphrase,
@@ -1531,7 +1530,7 @@ class CertificateManager {
 
                     // 3. Sign CSR with CA
                     const finalCertExtensions = this._prepareForgeExtensions(certificate, false); // Extensions for the final certificate
-                    const forgeResult = await this.cryptoServiceService.signCertificateWithCA({
+                    const forgeResult = await this.cryptoService.signCertificateWithCA({
                         certPath: certPaths.crt,
                         csr: certPaths.csr,
                         caCertPath: caConfig.caCertPath,
@@ -1549,7 +1548,7 @@ class CertificateManager {
 
                 } else { // Self-signed (or Root CA)
                     const extensions = this._prepareForgeExtensions(certificate, false);
-                    const forgeResult = await this.cryptoServiceService.createSelfSignedCertificate({
+                    const forgeResult = await this.cryptoService.createSelfSignedCertificate({
                         certPath: certPaths.crt,
                         keyPath: certPaths.key,
                         keyAlgorithm: keyOptions.algorithm,
@@ -1571,7 +1570,7 @@ class CertificateManager {
 
             if (operationResult.success) {
                 // CRITICAL: Refresh certificate object properties from the newly created/updated files
-                await certificate.refreshPropertiesFromFiles(this.cryptoServiceService);
+                await certificate.refreshPropertiesFromFiles(this.cryptoService);
                 
                 if (!certificate.fingerprint) {
                     logger.error(`Certificate ${certificate.name} lacks a fingerprint after refresh. Crypto operation might have failed to write files or refresh failed.`, null, FILENAME, certificate.name);
@@ -1595,7 +1594,7 @@ class CertificateManager {
                     certificate.needsPassphrase = true; // Mark it as needing a passphrase
                     certificate.updatePassphraseStatus(this.passphraseManager); // Update hasPassphrase status
                 } else if (certificate.needsPassphrase === undefined && certificate.paths.keyPath) { // Check if key is encrypted if no passphrase was to be set
-                    certificate.needsPassphrase = await this.cryptoServiceService.isKeyEncrypted(certificate.paths.keyPath);
+                    certificate.needsPassphrase = await this.cryptoService.isKeyEncrypted(certificate.paths.keyPath);
                     certificate.updatePassphraseStatus(this.passphraseManager);
                 }
 
@@ -1774,7 +1773,7 @@ class CertificateManager {
 
             // CRITICAL STEP: Refresh certificate properties from its newly restored files
             logger.info(`Refreshing properties for certificate '${certName}' after restoring files...`, null, FILENAME, certName);
-            await certificate.refreshPropertiesFromFiles(this.cryptoServiceService); // This MUST be implemented in Certificate.js
+            await certificate.refreshPropertiesFromFiles(this.cryptoService); // This MUST be implemented in Certificate.js
             const newFingerprint = certificate.fingerprint;
 
             logger.info(`Certificate '${certName}' properties refreshed. Old fingerprint: ${currentFingerprint}, New fingerprint: ${newFingerprint}`, null, FILENAME, certName);

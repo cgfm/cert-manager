@@ -1,6 +1,28 @@
 /**
- * Certificate Manager - Certificate Actions
- * Handles operations on certificates like creation, renewal, and deployment
+ * @fileoverview Certificate Manager - Certificate Operations and Actions
+ * 
+ * This module handles all certificate-related operations and user interactions
+ * within the Certificate Manager web application. It provides comprehensive
+ * certificate lifecycle management capabilities.
+ * 
+ * Features include:
+ * - Certificate creation (standard, wildcard, CA certificates)
+ * - Certificate editing and renewal operations
+ * - Certificate format conversion (PEM, DER, P12, JKS)
+ * - Certificate deployment and installation
+ * - Certificate revocation and expiry management
+ * - Certificate viewing and validation
+ * - Multi-domain and SAN certificate support
+ * - Certificate signing request (CSR) generation
+ * 
+ * The module integrates with the backend certificate services and provides
+ * a rich user interface for both technical and non-technical users.
+ * 
+ * @module public/js/cert-actions
+ * @requires Logger
+ * @requires UIUtils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 /**

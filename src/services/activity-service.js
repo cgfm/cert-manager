@@ -1,17 +1,16 @@
 /**
- * Activity Service
- * Tracks and records system activities and events
+ * Activity Service for tracking and recording system activities and events
+ * Provides centralized activity logging with persistent storage and retrieval capabilities
+ * @class ActivityService
  */
-const fs = require('fs').promises;
-const path = require('path');
-const logger = require('./logger');
-
-const FILENAME = 'services/activity-service.js';
-
 class ActivityService {
   /**
-   * Create a new ActivityService
-   * @param {Object} config - Application configuration
+   * Create a new ActivityService instance
+   * @param {Object} config - Application configuration object
+   * @param {string} [config.configDir] - Directory for configuration files
+   * @param {Object} [config.activity] - Activity-specific configuration
+   * @param {string} [config.activity.storageFile] - Custom path for activities storage file
+   * @param {number} [config.activity.maxItems=1000] - Maximum number of activities to store
    */
   constructor(config) {
     this.config = config;

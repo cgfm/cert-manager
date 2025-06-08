@@ -1,15 +1,11 @@
 /**
- * CA Certificates API Router
- * This module defines the routes for managing CA certificates.
- * It provides an endpoint to retrieve all CA certificates in the system.
+ * @fileoverview CA Certificates API Router - Manages Certificate Authority certificate operations
  * @module api/routes/ca
  * @requires express
- * @requires services/logger
+ * @requires ../../services/logger
  * @version 0.0.2
  * @license MIT
  * @author Christian Meiners
- * @description This module exports a function that initializes an Express router for handling CA certificate-related requests.
- * The router provides a single endpoint to retrieve all CA certificates from the certificate manager.
  */
 
 const express = require('express');
@@ -18,10 +14,11 @@ const logger = require('../../services/logger');
 const FILENAME = 'api/routes/ca.js';
 
 /**
- * Initialize the CA certificates router with dependencies
- * @param {Object} deps - Dependencies
- * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @returns {express.Router} Express router
+ * Initialize the CA certificates router with required dependencies.
+ * Provides endpoints for retrieving and managing Certificate Authority certificates.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.certificateManager - Certificate manager instance for CA certificate operations
+ * @returns {express.Router} Configured Express router with CA certificate endpoints
  */
 function initCARouter(deps) {
   const router = express.Router();

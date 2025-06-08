@@ -1,6 +1,40 @@
 /**
- * Deployment Actions Sortable Functionality
- * Implements drag-and-drop reordering for deployment actions
+ * @fileoverview Deployment Actions Sortable Functionality - Drag-and-drop reordering interface
+ * 
+ * This module implements comprehensive drag-and-drop functionality for reordering certificate
+ * deployment actions. It provides a smooth, intuitive interface for users to reorganize
+ * deployment action sequences with visual feedback and touch/mouse support.
+ * 
+ * Key Features:
+ * - Drag-and-drop reordering with visual feedback
+ * - Touch device support for mobile interfaces
+ * - Dynamic placeholder positioning during drag
+ * - Automatic scrolling during drag operations
+ * - Real-time action list updates
+ * - Smooth animations and transitions
+ * - Error handling and recovery
+ * 
+ * Functionality:
+ * - Mouse-based drag operations with visual cues
+ * - Touch-based drag for mobile devices
+ * - Auto-scroll when dragging near container edges
+ * - Dynamic placeholder insertion for drop targets
+ * - Action order persistence and API updates
+ * - Comprehensive event handling and cleanup
+ * 
+ * Browser Compatibility:
+ * - Modern browsers with ES6+ support
+ * - Touch-enabled devices (tablets, phones)
+ * - Mouse and trackpad input devices
+ * 
+ * Dependencies:
+ * - Logger (global logging service)
+ * - Certificate management API endpoints
+ * - DOM manipulation utilities
+ * 
+ * @module public/deployment-actions-sortable
+ * @version 1.0.0
+ * @author Certificate Manager Team
  */
 
 // Variables to track drag state
@@ -14,7 +48,18 @@ let actionItems = [];
 let currentFingerprint = null;
 let sortableContainer = null;
 
-// Initialize sortable functionality for deployment actions
+/**
+ * Initialize sortable functionality for deployment actions.
+ * Sets up drag-and-drop reordering for the specified certificate's deployment actions.
+ * 
+ * @function initDeployActionsSortable
+ * @param {string} fingerprint - The certificate fingerprint to initialize sorting for
+ * @returns {void}
+ * 
+ * @example
+ * // Initialize sorting for a specific certificate
+ * initDeployActionsSortable('abc123def456');
+ */
 function initDeployActionsSortable(fingerprint) {
   Logger.debug(`Initializing sortable for deployment actions: ${fingerprint}`);
   currentFingerprint = fingerprint;

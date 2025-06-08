@@ -362,12 +362,11 @@ Implement failure recovery strategies:
     "enabled": true,
     "strategies": {
       "fallback_ca": {
-        "enabled": true,
-        "fallbackOrder": ["letsencrypt", "buypass", "zerossl"]
+        "enabled": true,        "fallbackOrder": ["internal-ca", "secondary-ca", "manual"]
       },
-      "alternative_validation": {
+      "alternative_methods": {
         "enabled": true,
-        "fallbackMethods": ["http", "dns", "tls-alpn"]
+        "fallbackMethods": ["ca-signed", "self-signed"]
       },
       "emergency_extension": {
         "enabled": true,

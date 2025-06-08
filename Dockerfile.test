@@ -1,0 +1,18 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy test files and utilities
+COPY tests ./tests
+COPY src ./src
+
+# Set environment variables for testing
+ENV NODE_ENV=test
+ENV CERT_MANAGER_URL=http://host.docker.internal:3000
+
+# Run tests
+CMD ["npm", "run", "test:api"]

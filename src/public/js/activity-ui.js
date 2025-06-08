@@ -1,6 +1,26 @@
 /**
- * Certificate Manager - Activity UI
- * Handles the activity log view and interactions
+ * @fileoverview Certificate Manager - Activity Log User Interface
+ * 
+ * This module provides the user interface for viewing and managing system activity logs.
+ * It displays a comprehensive audit trail of all certificate-related operations,
+ * user actions, and system events within the Certificate Manager.
+ * 
+ * Features include:
+ * - Real-time activity log display
+ * - Advanced filtering by activity type and search terms
+ * - Pagination for large activity datasets
+ * - Activity log clearing (admin functionality)
+ * - Color-coded activity types for better visibility
+ * - Timestamp formatting and user attribution
+ * 
+ * The activity UI integrates with the backend activity service to provide
+ * administrators and users with detailed system monitoring and audit capabilities.
+ * 
+ * @module public/js/activity-ui
+ * @requires Logger
+ * @requires UIUtils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 /**

@@ -1,12 +1,36 @@
 /**
- * Domain Validator
- * Utilities for validating domain names and IP addresses
+ * @fileoverview Domain Validator - Client-side domain and IP address validation utilities
+ * 
+ * This module provides comprehensive validation functions for domain names and IP addresses:
+ * - RFC-compliant domain name validation with length and format checks
+ * - IPv4 address validation with range verification
+ * - IPv6 address validation with proper format checking
+ * - Support for special cases (localhost, wildcard domains)
+ * - Email address validation with domain validation
+ * - URL validation with protocol and domain checks
+ * 
+ * Features include:
+ * - Strict RFC compliance for domain validation
+ * - Support for internationalized domain names (IDN)
+ * - Comprehensive IP address format validation
+ * - Wildcard domain validation for SSL certificates
+ * - Cross-platform compatibility for client-side validation
+ * 
+ * @module public/js/utils/domain-validator
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 const DomainValidator = {
   /**
-   * Validate a domain name
-   * @param {string} domain - Domain name to validate
-   * @returns {boolean} True if valid
+   * Validates a domain name according to RFC specifications
+   * Checks for proper format, length constraints, and special cases
+   * 
+   * @param {string} domain - Domain name to validate (e.g., 'example.com', 'sub.example.org')
+   * @returns {boolean} True if domain is valid according to RFC standards
+   * @example
+   * DomainValidator.isValidDomain('example.com'); // returns true
+   * DomainValidator.isValidDomain('localhost'); // returns true
+   * DomainValidator.isValidDomain('invalid..domain'); // returns false
    */
   isValidDomain: function(domain) {
     if (!domain) return false;
@@ -39,18 +63,30 @@ const DomainValidator = {
   },
   
   /**
-   * Validate an IP address (IPv4 or IPv6)
+   * Validate an IP address (supports both IPv4 and IPv6)
+   * Delegates to specific validation methods based on format
+   * 
    * @param {string} ip - IP address to validate
-   * @returns {boolean} True if valid
+   * @returns {boolean} True if the IP address is valid (either IPv4 or IPv6)
+   * @example
+   * DomainValidator.isValidIP('192.168.1.1'); // returns true
+   * DomainValidator.isValidIP('2001:db8::1'); // returns true
+   * DomainValidator.isValidIP('invalid'); // returns false
    */
   isValidIP: function(ip) {
     return this.isValidIPv4(ip) || this.isValidIPv6(ip);
   },
   
   /**
-   * Validate an IPv4 address
+   * Validates an IPv4 address format and value ranges
+   * Ensures each octet is within the valid range (0-255)
+   * 
    * @param {string} ip - IPv4 address to validate
-   * @returns {boolean} True if valid
+   * @returns {boolean} True if the IPv4 address is valid
+   * @example
+   * DomainValidator.isValidIPv4('192.168.1.1'); // returns true
+   * DomainValidator.isValidIPv4('256.1.1.1'); // returns false
+   * DomainValidator.isValidIPv4('192.168.1'); // returns false
    */
   isValidIPv4: function(ip) {
     if (!ip) return false;

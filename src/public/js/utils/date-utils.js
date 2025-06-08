@@ -1,12 +1,38 @@
 /**
- * Date Utilities
- * Helper functions for date formatting and manipulation
+ * @fileoverview Date Utilities - Comprehensive date formatting and manipulation utilities
+ * 
+ * This module provides a complete set of date and time utility functions:
+ * - Multiple date format options (ISO, localized, relative)
+ * - Time duration calculations and formatting
+ * - Date validation and parsing utilities
+ * - Timezone-aware date operations
+ * - Human-readable time difference calculations
+ * - Certificate expiry date formatting and validation
+ * 
+ * Features include:
+ * - Cross-browser compatible date parsing
+ * - Locale-aware formatting options
+ * - Robust error handling for invalid dates
+ * - Performance-optimized date calculations
+ * - Support for various input formats (strings, Date objects, timestamps)
+ * - Certificate management specific date utilities
+ * 
+ * @module public/js/utils/date-utils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 const DateUtils = {
   /**
-   * Format date as "YYYY-MM-DD"
-   * @param {string|Date} date - Date string or Date object
-   * @returns {string} Formatted date
+   * Formats a date as "YYYY-MM-DD" with proper validation
+   * Handles various input types and provides fallback for invalid dates
+   * 
+   * @param {string|Date|number} date - Date to format (string, Date object, or timestamp)
+   * @returns {string} Formatted date string or error message
+   * @example
+   * DateUtils.formatDate(new Date()); // returns "2023-12-25"
+   * DateUtils.formatDate('2023-12-25T10:30:00Z'); // returns "2023-12-25"
+   * DateUtils.formatDate(null); // returns "N/A"
+   * DateUtils.formatDate('invalid'); // returns "Invalid Date"
    */
   formatDate: function(date) {
     if (!date) return 'N/A';
@@ -24,9 +50,14 @@ const DateUtils = {
   },
   
   /**
-   * Format date and time as "YYYY-MM-DD HH:MM:SS"
-   * @param {string|Date} date - Date string or Date object
-   * @returns {string} Formatted date and time
+   * Formats date and time as "YYYY-MM-DD HH:MM:SS" with timezone handling
+   * Provides complete timestamp formatting for logs and displays
+   * 
+   * @param {string|Date|number} date - Date to format
+   * @returns {string} Formatted date and time string
+   * @example
+   * DateUtils.formatDateTime(new Date()); // returns "2023-12-25 14:30:45"
+   * DateUtils.formatDateTime('2023-12-25T10:30:00Z'); // returns "2023-12-25 10:30:00"
    */
   formatDateTime: function(date) {
     if (!date) return 'N/A';

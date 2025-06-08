@@ -1,12 +1,38 @@
 /**
- * Certificate Manager - Docker Utilities
- * Provides methods for interacting with Docker containers
+ * @fileoverview Docker Utilities - Client-side Docker container interaction utilities
+ * 
+ * This module provides functions for interacting with Docker containers from the client:
+ * - Docker service availability detection
+ * - Container listing and status checking
+ * - Container lifecycle management (start, stop, restart)
+ * - Container inspection and monitoring
+ * - Error handling for Docker API communication
+ * 
+ * Features include:
+ * - Asynchronous API communication with proper error handling
+ * - Container status monitoring with real-time updates
+ * - Support for Docker engine availability checking
+ * - Cross-platform Docker interaction support
+ * - Comprehensive container metadata retrieval
+ * 
+ * @module public/js/utils/docker-utils
+ * @requires fetch - Modern Fetch API for HTTP requests
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 const DockerUtils = {
     /**
      * Check if Docker is available
-     * @returns {Promise<boolean>} True if Docker is available
+     * Tests connectivity to the Docker API endpoint
+     * 
+     * @async
+     * @returns {Promise<boolean>} True if Docker is available and responsive
+     * @example
+     * const isAvailable = await DockerUtils.isDockerAvailable();
+     * if (isAvailable) {
+     *     console.log('Docker is available');
+     * }
      */
     async isDockerAvailable() {
         try {
@@ -26,7 +52,20 @@ const DockerUtils = {
     
     /**
      * Get list of Docker containers
-     * @returns {Promise<Array>} List of Docker containers
+     * Returns both running and stopped containers with status information
+     * 
+     * @async
+     * @returns {Promise<Array>} Array of container objects with metadata
+     * @throws {Error} When Docker API is unreachable or returns an error
+     * @example
+     * try {
+     *     const containers = await DockerUtils.getContainers();
+     *     containers.forEach(container => {
+     *         console.log(`${container.name}: ${container.status}`);
+     *     });
+     * } catch (error) {
+     *     console.error('Failed to get containers:', error);
+     * }
      */
     async getContainers() {
         try {

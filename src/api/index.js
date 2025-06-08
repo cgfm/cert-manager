@@ -137,11 +137,19 @@ try {
 }
 
 /**
- * Register all API routes
- * @param {Object} deps - Dependencies
- * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {cryptoServiceWrapper} deps.cryptoService - cryptoService wrapper instance
- * @returns {express.Router} Express router
+ * Register all API routes with proper middleware and dependencies
+ * @param {Object} deps - Dependencies object containing all required services
+ * @param {Object} deps.certificateManager - Certificate manager instance for cert operations
+ * @param {Object} deps.cryptoService - Crypto service wrapper instance for cryptographic operations
+ * @param {Object} deps.configService - Configuration service instance
+ * @param {Object} deps.activityService - Activity logging service instance
+ * @param {Object} deps.dockerService - Docker service instance for container operations
+ * @param {Object} deps.npmIntegrationService - NPM integration service instance
+ * @param {Object} deps.authMiddleware - Authentication middleware instance
+ * @param {Object} deps.userManager - User manager instance
+ * @param {Object} deps.logsService - Logs service instance
+ * @param {Object} deps.fileSystemService - File system service instance
+ * @returns {express.Router} Configured Express router with all API routes
  */
 function setupApi(deps) {
   const apiRouter = express.Router();

@@ -1,14 +1,14 @@
 /**
- * @module FileSystemService
+ * @fileoverview File System Service - Provides methods to interact with the local file system
+ * @module services/filesystem-service  
  * @requires fs
  * @requires path
  * @requires os
  * @requires util
- * @requires logger
+ * @requires ./logger
  * @version 0.1.0
  * @license MIT
  * @author Christian Meiners
- * @description This module provides methods to interact with the local file system.
  */
 
 const fs = require("fs");
@@ -23,12 +23,13 @@ const statAsync = promisify(fs.stat);
 const FILENAME = 'services/filesystem-service.js';
 
 /**
- * FileSystemService class for interacting with the filesystem
+ * File System Service for interacting with the filesystem, including Docker volume handling.
+ * Provides methods for file operations, directory browsing, and special location management.
  */
 class FileSystemService {
   /**
-   * Create a new FileSystemService
-   * @param {DockerService} [dockerService] - Optional Docker service instance
+   * Create a new FileSystemService instance
+   * @param {Object} [dockerService=null] - Optional Docker service instance for Docker environment integration
    */
   constructor(dockerService = null) {
     // Store reference to Docker service

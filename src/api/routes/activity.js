@@ -1,6 +1,11 @@
 /**
- * Activity API Routes
+ * @fileoverview Activity API Routes - Handles activity logging and retrieval endpoints
+ * @module api/routes/activity
+ * @requires express
+ * @requires ../../services/logger
+ * @author Certificate Manager
  */
+
 const express = require('express');
 const router = express.Router();
 const logger = require('../../services/logger');
@@ -8,9 +13,11 @@ const logger = require('../../services/logger');
 const FILENAME = 'api/routes/activity.js';
 
 /**
- * Initialize activity router
- * @param {Object} deps - Dependencies
- * @returns {express.Router} Express router
+ * Initialize activity router with required dependencies.
+ * Provides endpoints for retrieving and managing activity logs with filtering and pagination.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.activityService - Activity service for managing activity logs and history
+ * @returns {express.Router} Configured Express router with activity management endpoints
  */
 function initActivityRouter(deps) {
   const { activityService } = deps;

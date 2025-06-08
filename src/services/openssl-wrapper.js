@@ -55,12 +55,12 @@ class OpenSSLWrapper {
     this.renewalService = renewalService;
     logger.debug('Renewal service set for OpenSSL wrapper', null, FILENAME);
   }
-
   /**
    * Register files that will be created or modified with the renewal service
-   * @param {string|string[]} filePaths - Single file path or array of file paths
+   * @param {string|string[]} filePaths - Single file path or array of file paths to register
    * @param {number} [duration] - Duration in ms to ignore the files (default: this.defaultIgnoreDuration)
-   * @param {string} [certName] - Certificate name for logging context
+   * @param {string} [certName=null] - Certificate name for logging context
+   * @returns {void}
    */
   registerFilesWithRenewalService(filePaths, duration, certName = null) {
     if (!this.renewalService) {

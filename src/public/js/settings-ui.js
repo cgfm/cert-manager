@@ -1,10 +1,63 @@
 /**
- * Certificate Manager - Settings UI
- * Manages settings panel navigation and form handling
+ * @fileoverview Certificate Manager Settings UI - Comprehensive settings interface management
+ * 
+ * This module provides a complete user interface for managing all Certificate Manager settings.
+ * It handles navigation between different settings panels, form validation, data persistence,
+ * and real-time updates across multiple configuration categories.
+ * 
+ * Key Features:
+ * - Multi-panel settings navigation with tab interface
+ * - Real-time form validation and error handling
+ * - Automatic settings persistence and synchronization
+ * - Import/export functionality for configuration backup
+ * - Responsive design for desktop and mobile devices
+ * - Comprehensive logging and error reporting
+ * - Settings search and filtering capabilities
+ * 
+ * Settings Categories:
+ * - General: Basic application configuration
+ * - Security: Authentication, encryption, access control
+ * - Certificates: Certificate generation and management
+ * - Deployment: Action configuration and global settings
+ * - Notifications: Email, webhook, and alert settings
+ * - Advanced: System-level configuration options
+ * - Users: User management and role assignments
+ * - API: API token and integration management
+ * 
+ * UI Components:
+ * - Sidebar navigation with active state management
+ * - Form panels with validation feedback
+ * - Modal dialogs for confirmations and advanced options
+ * - Progress indicators for async operations
+ * - Toast notifications for user feedback
+ * 
+ * Browser Compatibility:
+ * - Modern browsers with ES6+ support
+ * - Responsive design for mobile devices
+ * - Progressive enhancement for older browsers
+ * 
+ * Dependencies:
+ * - Logger (global logging service)
+ * - Settings API endpoints
+ * - Form validation utilities
+ * - UI utility functions
+ * 
+ * @module public/settings-ui
+ * @version 1.0.0
+ * @author Certificate Manager Team
  */
 
 /**
- * Initialize settings UI components
+ * Initialize and configure the settings UI components.
+ * Sets up tab navigation, form handlers, and event listeners for all settings panels.
+ * This function should be called once when the settings page loads.
+ * 
+ * @function setupSettingsUI
+ * @returns {void}
+ * 
+ * @example
+ * // Initialize settings UI after page load
+ * document.addEventListener('DOMContentLoaded', setupSettingsUI);
  */
 function setupSettingsUI() {
     console.log('Setting up settings UI...'); // Debug
@@ -397,58 +450,7 @@ async function loadStorageLocations() {
     }
 }
 
-/**
- * Render available ACME servers
- */
-function renderAcmeServers(servers) {
-    const container = document.getElementById('acme-servers-list');
-
-    if (!servers || servers.length === 0) {
-        container.innerHTML = UIUtils.safeTemplate(`
-      <p class="empty-message">No ACME servers configured</p>
-    `, {});
-        return;
-    }
-
-    // Create HTML for each server
-    const serversHtml = servers.map((server, index) => {
-        return UIUtils.safeTemplate(`
-      <div class="acme-server-item" data-index="\${index|attr}">
-        <div class="acme-server-info">
-          <h4>\${name}</h4>
-          <div class="acme-server-url">\${url}</div>
-          <div class="acme-server-description">\${description}</div>
-        </div>
-        <div class="acme-server-actions">
-          <button class="button small edit-server-btn" data-index="\${index|attr}">Edit</button>
-          <button class="button small danger remove-server-btn" data-index="\${index|attr}">Remove</button>
-        </div>
-      </div>
-    `, {
-            index,
-            name: server.name,
-            url: server.url,
-            description: server.description || 'No description'
-        });
-    }).join('');
-
-    container.innerHTML = serversHtml;
-
-    // Add event listeners
-    document.querySelectorAll('.edit-server-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const index = parseInt(this.getAttribute('data-index'));
-            editAcmeServer(servers[index]);
-        });
-    });
-
-    document.querySelectorAll('.remove-server-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const index = parseInt(this.getAttribute('data-index'));
-            removeAcmeServer(index);
-        });
-    });
-}
+// ACME server management removed - not implemented in backend
 // Add this code to the end of your settings-ui.js file
 
 /**

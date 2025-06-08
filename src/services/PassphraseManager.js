@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Passphrase Manager - Securely manages certificate passphrases with encryption
+ * @module services/PassphraseManager
+ * @requires fs
+ * @requires path
+ * @requires crypto
+ * @requires ./logger
+ * @author Certificate Manager
+ */
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -6,12 +16,13 @@ const logger = require('./logger');
 const FILENAME = 'services/PassphraseManager.js';
 
 /**
- * Manages certificate passphrases securely
+ * Passphrase Manager for securely storing and retrieving certificate passphrases.
+ * Uses AES-256-GCM encryption to protect passphrases at rest.
  */
 class PassphraseManager {
     /**
      * Create a new PassphraseManager instance
-     * @param {string} configDir - Directory for storing encryption key
+     * @param {string} configDir - Directory path for storing encrypted passphrase file and encryption key
      */
     constructor(configDir) {
         this.configDir = configDir;
@@ -32,10 +43,11 @@ class PassphraseManager {
         this.loadPassphrases();
         logger.fine('PassphraseManager initialization complete', null, FILENAME);
     }
-    
-    /**
-     * Load encrypted passphrases from file
+      /**
+     * Load and decrypt passphrases from the encrypted storage file.
+     * Populates the in-memory passphrases cache with decrypted data.
      * @private
+     * @throws {Error} Throws error if decryption fails or file is corrupted
      */
     loadPassphrases() {
         try {

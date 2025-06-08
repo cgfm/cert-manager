@@ -1,9 +1,11 @@
 /**
- * @module LogsService
+ * @fileoverview Logs Service - Provides access to application logs and log file management
+ * @module services/logs-service
  * @requires fs
  * @requires path
  * @requires readline
- * @description Provides access to application logs
+ * @requires ./logger
+ * @author Certificate Manager
  */
 
 const fs = require('fs');
@@ -13,7 +15,19 @@ const logger = require('./logger');
 
 const FILENAME = 'services/logs-service.js';
 
+/**
+ * Logs Service for accessing and managing application log files.
+ * Provides methods to read, filter, and retrieve log entries from various log files.
+ */
 class LogsService {
+    /**
+     * Create a new LogsService instance
+     * @param {string} [logsDir=null] - Directory path where log files are stored
+     * @param {Object} [deps={}] - Dependencies for testing and flexibility
+     * @param {Object} [deps.logger] - Logger instance (defaults to logger module)
+     * @param {Object} [deps.fs] - File system module (defaults to fs)
+     * @param {Object} [deps.path] - Path module (defaults to path)
+     */
     constructor(logsDir = null, deps = {}) {
         // Set up dependencies with fallbacks
         this.logger = deps.logger || logger;
@@ -31,10 +45,12 @@ class LogsService {
         this.ensureLogsDirectory().catch(err => {
             this.logger.error(`Failed to ensure logs directory exists:`, err, FILENAME);
         });
-    }
-
-    /**
-     * Ensure logs directory exists
+    }    /**
+     * Ensure that the logs directory exists, creating it if necessary.
+     * @async
+     * @private
+     * @returns {Promise<void>} Promise that resolves when directory is confirmed to exist
+     * @throws {Error} Logs error but doesn't throw - allows service to continue functioning
      */
     async ensureLogsDirectory() {
         try {

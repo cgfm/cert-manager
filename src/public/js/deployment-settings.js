@@ -1,8 +1,52 @@
 /**
- * Deployment Settings Module
- * Handles global settings for deployment actions like email, NPM, etc.
+ * @fileoverview Deployment Settings Module - Global deployment configuration management
+ * 
+ * This module manages global settings and configurations for certificate deployment actions.
+ * It provides a centralized interface for configuring email servers, Docker defaults,
+ * Nginx Proxy Manager integration, and other deployment-related settings that are
+ * shared across multiple deployment actions.
+ * 
+ * Key Features:
+ * - Email/SMTP server configuration management
+ * - Docker deployment default settings
+ * - Nginx Proxy Manager integration settings
+ * - Real-time settings validation and testing
+ * - Secure credential storage and management
+ * - Settings import/export functionality
+ * - Configuration backup and restore
+ * 
+ * Settings Categories:
+ * - Email: SMTP server configuration, authentication, encryption
+ * - Docker: Default container settings, registry configuration
+ * - Nginx Proxy Manager: API endpoints, authentication tokens
+ * - Security: Encryption settings, credential management
+ * - Notifications: Global notification preferences
+ * 
+ * Security Considerations:
+ * - Sensitive data is encrypted before storage
+ * - API tokens are masked in the UI
+ * - Connection testing uses secure protocols
+ * - Settings are validated before saving
+ * 
+ * Dependencies:
+ * - Logger (global logging service)
+ * - Settings API endpoints
+ * - Form validation utilities
+ * - Encryption/decryption services
+ * 
+ * @module public/deployment-settings
+ * @version 1.0.0
+ * @author Certificate Manager Team
  */
 
+/**
+ * Global deployment settings object containing all configuration categories.
+ * @type {Object}
+ * @property {Object} email - Email/SMTP configuration settings
+ * @property {Object} email.smtp - SMTP server configuration
+ * @property {Object} nginxProxyManager - Nginx Proxy Manager integration settings
+ * @property {Object} dockerDefaults - Default Docker deployment settings
+ */
 let deploymentSettings = {
   email: {
     smtp: {}
@@ -11,7 +55,15 @@ let deploymentSettings = {
   dockerDefaults: {}
 };
 
-// Initialize deployment settings
+/**
+ * Initialize the deployment settings module.
+ * Loads settings from the server and sets up event handlers.
+ * 
+ * @async
+ * @function initDeploymentSettings
+ * @returns {Promise<void>} Promise that resolves when initialization is complete
+ * @throws {Error} If settings cannot be loaded or initialized
+ */
 async function initDeploymentSettings() {
   Logger.debug('Initializing deployment settings');
   
@@ -24,7 +76,15 @@ async function initDeploymentSettings() {
   Logger.debug('Deployment settings initialized');
 }
 
-// Load deployment settings from the server
+/**
+ * Load deployment settings from the server API.
+ * Fetches current settings and populates the local configuration object.
+ * 
+ * @async
+ * @function loadDeploymentSettings
+ * @returns {Promise<void>} Promise that resolves when settings are loaded
+ * @throws {Error} If the API request fails or returns invalid data
+ */
 async function loadDeploymentSettings() {
   try {
     Logger.debug('Loading deployment settings from server');

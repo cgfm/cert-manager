@@ -1,6 +1,12 @@
 /**
- * Deployment Actions Router
+ * @fileoverview Deployment Actions Router - Manages certificate deployment actions and configurations
+ * @module api/routes/deployment-actions
+ * @requires express
+ * @requires crypto
+ * @requires ../../services/logger
+ * @author Certificate Manager
  */
+
 const express = require('express');
 const logger = require('../../services/logger');
 const crypto = require('crypto');
@@ -8,12 +14,13 @@ const crypto = require('crypto');
 const FILENAME = 'api/routes/deployment-actions.js';
 
 /**
- * Initialize the deployment actions router with dependencies
- * @param {Object} deps - Dependencies
- * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {Object} deps.deployService - Deploy service instance
- * @param {ActivityService} deps.activityService - Activity service instance
- * @returns {express.Router} Express router
+ * Initialize the deployment actions router with required dependencies.
+ * Provides endpoints for managing deployment actions associated with certificates.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.certificateManager - Certificate manager instance for certificate operations
+ * @param {Object} deps.deployService - Deploy service instance for executing deployment actions
+ * @param {Object} deps.activityService - Activity service for logging deployment activities
+ * @returns {express.Router} Configured Express router with deployment action endpoints
  */
 function initDeploymentActionsRouter(deps) {
   const router = express.Router({ mergeParams: true });

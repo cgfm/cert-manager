@@ -1,41 +1,49 @@
 /**
- * Forge Crypto Service Module
- * @module ForgeCryptoService
+ * @fileoverview Forge Crypto Service - Provides cryptographic operations using node-forge
+ * @module services/forge-crypto-service
+ * @requires fs
+ * @requires path
+ * @requires node-forge
+ * @requires ./logger
  * @version 0.1.0
  * @license MIT
  * @author Christian Meiners (adapted by AI)
- * @description This module provides cryptographic operations for certificate management using node-forge.
  */
 
 const fs = require('fs').promises;
 const path = require('path');
 const forge = require('node-forge');
-const logger = require('./logger'); // Assuming logger is in the same directory or accessible
+const logger = require('./logger');
 
 const { pki, util, md, asn1 } = forge;
 const FILENAME = 'services/forge-crypto-service.js';
 
+/**
+ * Forge Crypto Service for certificate management operations using node-forge library.
+ * Provides key generation, certificate creation, validation, and file operations.
+ */
 class ForgeCryptoService {
+    /**
+     * Create a new ForgeCryptoService instance
+     */
     constructor() {
         logger.info('ForgeCryptoService initialized', null, FILENAME);
         this.renewalService = null;
         this.defaultIgnoreDuration = 5000; // 5 seconds
-    }
-
-    /**
-     * Set the renewal service instance
-     * @param {Object} renewalService - The renewal service instance
+    }    /**
+     * Set the renewal service instance for file change coordination.
+     * Allows the crypto service to register file changes with the renewal service.
+     * @param {Object} renewalService - The renewal service instance with ignoreFilePaths method
      */
     setRenewalService(renewalService) {
         this.renewalService = renewalService;
         logger.debug('Renewal service set for ForgeCryptoService', null, FILENAME);
-    }
-
-    /**
-     * Register files that will be created or modified with the renewal service
-     * @param {string|string[]} filePaths - Single file path or array of file paths
-     * @param {number} [duration] - Duration in ms to ignore the files (default: this.defaultIgnoreDuration)
-     * @param {string} [certName] - Certificate name for logging context
+    }    /**
+     * Register file paths with the renewal service to prevent file watching conflicts.
+     * Tells the renewal service to temporarily ignore specific files during operations.
+     * @param {string|string[]} filePaths - Single file path or array of file paths to register
+     * @param {number} [duration] - Duration in milliseconds to ignore the files (default: this.defaultIgnoreDuration)
+     * @param {string} [certName=null] - Certificate name for logging context
      */
     registerFilesWithRenewalService(filePaths, duration, certName = null) {
         if (!this.renewalService || typeof this.renewalService.ignoreFilePaths !== 'function') {

@@ -1,6 +1,26 @@
 /**
- * Certificate Manager - File Browser
- * Provides file browsing functionality for selecting files and directories
+ * @fileoverview Certificate Manager - File Browser Component
+ * 
+ * This module provides a comprehensive file browsing interface for the Certificate Manager.
+ * It allows users to navigate the filesystem, select files and directories, and perform
+ * basic file operations within the application.
+ * 
+ * Features include:
+ * - Cross-platform filesystem navigation (Windows/Linux/macOS)
+ * - Quick access to common system locations
+ * - File and directory selection
+ * - New folder creation
+ * - File type filtering and display
+ * - Responsive modal interface
+ * 
+ * The file browser integrates with deployment actions and certificate management
+ * workflows that require file path selection.
+ * 
+ * @module public/js/file-browser
+ * @requires Logger
+ * @requires UIUtils
+ * @author Certificate Manager
+ * @since 1.0.0
  */
 
 // File browser state

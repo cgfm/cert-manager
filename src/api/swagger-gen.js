@@ -1,8 +1,26 @@
 /**
- * This script generates an OpenAPI specification file in YAML format
- * for the Certificate Manager API using swagger-jsdoc.
- * It scans the specified directories for JSDoc comments
- * and generates the OpenAPI documentation based on those comments.
+ * @fileoverview OpenAPI Specification Generator - Automated API documentation generation
+ * 
+ * This script generates comprehensive OpenAPI specification files in YAML format
+ * for the Certificate Manager API using swagger-jsdoc. It provides:
+ * - Automated JSDoc comment parsing from source files
+ * - OpenAPI 3.0 specification generation
+ * - YAML format output for documentation systems
+ * - Route discovery and endpoint documentation
+ * - Schema definition extraction from models
+ * - API versioning and metadata management
+ * 
+ * The generator scans specified directories for JSDoc comments and creates
+ * a complete OpenAPI specification that can be used with documentation
+ * tools like Swagger UI, Redoc, or other API documentation systems.
+ * 
+ * Features include:
+ * - Automatic route discovery and documentation
+ * - Model schema extraction and validation
+ * - Security scheme documentation
+ * - Response format documentation
+ * - Example generation from JSDoc comments
+ * 
  * @module api/swagger-gen
  * @requires swagger-jsdoc
  * @requires js-yaml
@@ -11,8 +29,7 @@
  * @version 0.0.2
  * @license MIT
  * @author Christian Meiners
- * @description This script is used to generate OpenAPI documentation for the Certificate Manager API.
- * It uses swagger-jsdoc to parse JSDoc comments in the codebase and generate the OpenAPI spec.
+ * @since 1.0.0
  */
 
 const fs = require('fs');
@@ -23,7 +40,10 @@ const yaml = require('js-yaml');
 const FILENAME = 'api/swagger-gen.js';
 
 /**
- * Generate a basic OpenAPI spec file if it doesn't exist
+ * Generates a basic OpenAPI specification file if it doesn't already exist
+ * Creates the foundational YAML structure for API documentation
+ * 
+ * @returns {void}
  */
 function generateOpenApiSpec() {
   const apiSpecPath = path.join(__dirname, 'openapi.yaml');

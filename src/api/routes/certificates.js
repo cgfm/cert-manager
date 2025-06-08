@@ -1,15 +1,15 @@
 /**
- * Certificates API Router
- * This module defines the routes for managing certificates in the application.
- * It includes endpoints for creating, updating, deleting, and retrieving certificates,
- * as well as converting them to different formats and managing passphrases.
+ * @fileoverview Certificates API Router - Manages certificate CRUD operations and conversions
  * @module api/routes/certificates
  * @requires express
+ * @requires fs
+ * @requires path
  * @requires ../../services/logger
+ * @requires ./deployment-actions
+ * @requires ../../utils/DomainValidator
  * @version 0.0.3
  * @author Christian Meiners
  * @license MIT
- * @description This module provides an Express router for managing certificates.
  */
 
 const express = require('express');
@@ -22,11 +22,13 @@ const DomainValidator = require('../../utils/DomainValidator');
 const FILENAME = 'api/routes/certificates.js';
 
 /**
- * Initialize the certificates router with dependencies
- * @param {Object} deps - Dependencies
- * @param {CertificateManager} deps.certificateManager - Certificate manager instance
- * @param {cryptoServiceWrapper} deps.cryptoService - cryptoService wrapper instance
- * @returns {express.Router} Express router
+ * Initialize the certificates router with required dependencies.
+ * Provides endpoints for certificate CRUD operations, format conversions, and passphrase management.
+ * @param {Object} deps - Dependencies object containing required services
+ * @param {Object} deps.certificateManager - Certificate manager instance for certificate operations
+ * @param {Object} deps.cryptoService - Crypto service wrapper instance for cryptographic operations
+ * @param {Object} deps.activityService - Activity service for logging certificate operations
+ * @returns {express.Router} Configured Express router with certificate management endpoints
  */
 function initCertificatesRouter(deps) {
   const router = express.Router();
